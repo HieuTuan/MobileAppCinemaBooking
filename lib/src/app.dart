@@ -1,0 +1,32 @@
+import 'dart:math';
+
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+
+part 'core/app_tokens.dart';
+part 'data/seed_data.dart';
+part 'domain/entities.dart';
+part 'domain/extensions.dart';
+part 'navigation/app_navigation.dart';
+part 'presentation/components/auth_panels.dart';
+part 'presentation/components/booking_widgets.dart';
+part 'presentation/components/common_widgets.dart';
+part 'presentation/components/movie_widgets.dart';
+part 'presentation/components/staff_widgets.dart';
+part 'presentation/screens/admin/admin_screen.dart';
+part 'presentation/screens/admin/movie_editor_dialog.dart';
+part 'presentation/screens/auth/login_screen.dart';
+part 'presentation/screens/customer/ai_concierge_screen.dart';
+part 'presentation/screens/customer/booking_screen.dart';
+part 'presentation/screens/customer/customer_shell.dart';
+part 'presentation/screens/customer/movie_detail_screen.dart';
+part 'presentation/screens/customer/movie_lounge_screen.dart';
+part 'presentation/screens/customer/payment_transfer_screen.dart';
+part 'presentation/screens/customer/profile_screen.dart';
+part 'presentation/screens/customer/ticket_detail_screen.dart';
+part 'presentation/screens/customer/ticket_wallet_screen.dart';
+part 'presentation/screens/staff/staff_screen.dart';
+part 'services/cinema_helpers.dart';
+part 'state/cineverse_app.dart';
+part 'themes/app_theme.dart';
