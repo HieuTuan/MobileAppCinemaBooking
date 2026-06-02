@@ -1,32 +1,57 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
-part 'core/app_tokens.dart';
-part 'data/seed_data.dart';
-part 'domain/entities.dart';
-part 'domain/extensions.dart';
-part 'navigation/app_navigation.dart';
-part 'presentation/components/auth_panels.dart';
-part 'presentation/components/booking_widgets.dart';
-part 'presentation/components/common_widgets.dart';
-part 'presentation/components/movie_widgets.dart';
-part 'presentation/components/staff_widgets.dart';
-part 'presentation/screens/admin/admin_screen.dart';
-part 'presentation/screens/admin/movie_editor_dialog.dart';
-part 'presentation/screens/auth/login_screen.dart';
-part 'presentation/screens/customer/ai_concierge_screen.dart';
-part 'presentation/screens/customer/booking_screen.dart';
-part 'presentation/screens/customer/customer_shell.dart';
-part 'presentation/screens/customer/movie_detail_screen.dart';
-part 'presentation/screens/customer/movie_lounge_screen.dart';
-part 'presentation/screens/customer/payment_transfer_screen.dart';
-part 'presentation/screens/customer/profile_screen.dart';
-part 'presentation/screens/customer/ticket_detail_screen.dart';
-part 'presentation/screens/customer/ticket_wallet_screen.dart';
-part 'presentation/screens/staff/staff_screen.dart';
-part 'services/cinema_helpers.dart';
-part 'state/cineverse_app.dart';
-part 'themes/app_theme.dart';
+import 'core/app_theme.dart';
+import 'features/admin/admin_dashboard.dart';
+import 'features/auth/auth_screen.dart';
+import 'features/customer/customer_shell.dart';
+import 'features/staff/staff_dashboard.dart';
+import 'models/app_models.dart';
+import 'state/cinema_store.dart';
+
+class CineBookingApp extends StatefulWidget {
+  const CineBookingApp({super.key});
+
+  @override
+  State<CineBookingApp> createState() => _CineBookingAppState();
+}
+
+class _CineBookingAppState extends State<CineBookingApp> {
+  late final CinemaStore store;
+
+  @override
+  void initState() {
+    super.initState();
+    store = CinemaStore();
+  }
+
+  @override
+  void dispose() {
+    store.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: store,
+      builder: (context, _) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'CineLuxe Booking',
+          theme: buildAppTheme(),
+          home: _homeForRole(),
+        );
+      },
+    );
+  }
+
+  Widget _homeForRole() {
+    final user = store.currentUser;
+    if (user == null) return AuthScreen(store: store);
+    return switch (user.role) {
+      UserRole.customer => CustomerShell(store: store),
+      UserRole.staff => StaffDashboard(store: store),
+      UserRole.admin => AdminDashboard(store: store),
+    };
+  }
+}

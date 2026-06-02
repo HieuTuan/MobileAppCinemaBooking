@@ -4,7 +4,7 @@ import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('Cineverse Club login screen renders', (tester) async {
+  testWidgets('CineLuxe login screen renders', (tester) async {
     final previousOnError = FlutterError.onError;
     FlutterError.onError = (details) {
       if (details.exception is NetworkImageLoadException) return;
@@ -12,10 +12,10 @@ void main() {
     };
     addTearDown(() => FlutterError.onError = previousOnError);
 
-    await tester.pumpWidget(const CineverseApp());
+    await tester.pumpWidget(const CineBookingApp());
 
-    expect(find.text('Cineverse Club'), findsOneWidget);
-    expect(find.text('Dang nhap'), findsOneWidget);
-    expect(find.text('VAO SANH CINEVERSE'), findsOneWidget);
+    expect(find.text('CineLuxe'), findsOneWidget);
+    expect(find.text('Đăng nhập'), findsOneWidget);
+    expect(find.text('Vào hệ thống'), findsOneWidget);
   });
 }

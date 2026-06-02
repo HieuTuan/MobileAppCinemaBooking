@@ -1,51 +1,46 @@
-# Cineverse Club
+# CineLuxe Booking
 
-Cineverse Club la ung dung Flutter mo phong cong trai nghiem dien anh thuong luu:
+Ứng dụng Flutter mô phỏng hệ thống mobile mua bán vé xem phim theo SRS: Khách hàng, Nhân viên và Quản trị viên trong cùng một FE để demo nghiệp vụ nhanh.
 
-- Khach VIP xem phim, loc danh muc, chon rap/suat chieu, chon ghe Classic, Prestige VIP, Royal Velvet Sofa Bed, dat combo va nhan ma QR.
-- Bam vao phim de xem chi tiet poster, cover, dao dien, dien vien, noi dung va goi y trai nghiem.
-- Man thanh toan chuyen khoan co QR, thong tin ngan hang, noi dung chuyen khoan va xac nhan tao ve.
-- Hieu ung nen cinema dong, poster 3D hover va chuyen canh Hero khi xem chi tiet phim.
-- Dang ky tai khoan hoi vien moi va dang nhap bang tai khoan demo.
-- Khach VIP co trang ho so ca nhan, thong tin lien he, hang hoi vien va lich su dat ve.
-- Cineverse AI concierge goi y phim va combo dua tren nhu cau cua khach.
-- Admin quan ly phim: them, sua, xoa va gan the VIP Gold.
-- Staff soat ve theo ma `CVS-XXXXXX`, ten khach hoac QR data, chuyen ve `ACTIVE` sang `USED`.
+## Tài khoản demo
 
-## Tai khoan demo
-
-| Vai tro | Email | Mat ma |
+| Vai trò | Email | Mật khẩu |
 | --- | --- | --- |
-| Khach VIP | `demo@cineverse.vnd` | `demo1234` |
-| Admin | `admin@cineverse.vnd` | `admin1234` |
-| Staff | `staff@cineverse.vnd` | `staff1234` |
+| Khách hàng | `user@cineluxe.vn` | `123456` |
+| Nhân viên | `staff@cineluxe.vn` | `123456` |
+| Quản trị viên | `admin@cineluxe.vn` | `123456` |
 
-## Chay ung dung
+## Chức năng chính
 
-```bash
-flutter pub get
-flutter run
-```
+- Khách hàng: đăng ký/đăng nhập/quên mật khẩu/OAuth demo, xem và lọc phim, xem chi tiết/trailer, chọn rạp/suất/ghế, giữ ghế 10 phút, tối đa 8 ghế, chọn combo, thanh toán VNPay demo, nhận vé QR, hủy/hoàn vé, lịch sử giao dịch, đánh giá phim, cài đặt thông báo và hồ sơ.
+- Nhân viên: đăng nhập nội bộ, quét/nhập QR, xác thực vé, tra cứu booking, hỗ trợ đổi/hủy/in/gửi lại vé, cập nhật trạng thái phòng, báo cáo sự cố và xem danh sách ghế theo suất.
+- Quản trị viên: quản lý phim/thể loại/rạp/phòng/lịch chiếu, quản lý user/staff/RBAC, booking/refund, thống kê vé/doanh thu, xuất báo cáo Excel/PDF demo, cấu hình giá vé/banner/VNPay.
 
-## Cau truc thu muc
+## Cấu trúc
 
 ```text
 lib/
   main.dart
   src/
     app.dart
-    core/          Hang so mau sac, format tien te, app tokens.
-    data/          Du lieu demo seed: phim, suat chieu, combo, tai khoan.
-    domain/        Entity va enum nghiep vu: Movie, Booking, UserRole.
-    navigation/    Diem mo rong dieu huong app.
-    presentation/
-      components/  Widget tai su dung: card phim, ticket tile, seat map.
-      screens/     Man hinh theo chuc nang: auth, customer, admin, staff.
-    services/      Helper nghiep vu: gia ghe, trang thai ve, role label.
-    state/         State goc cua ung dung CineverseApp.
-    themes/        ThemeData, bang mau va text theme.
+    core/              Theme, màu sắc, formatter, label tiếng Việt.
+    data/              Dữ liệu demo.
+    models/            Entity và enum nghiệp vụ.
+    state/             CinemaStore quản lý state in-memory.
+    shared/widgets/    Scaffold, card, metric, button dùng chung.
+    features/
+      auth/            Đăng nhập, đăng ký, OTP/OAuth demo.
+      customer/        Phim, booking, vé QR, hồ sơ.
+      staff/           Soát vé và hỗ trợ quầy.
+      admin/           Quản trị nội dung, user, finance, system.
 ```
 
-## Ghi chu ky thuat
+## Chạy và kiểm tra
 
-Du an hien tai la Flutter, nen phien ban nay trien khai tron luong nghiep vu trong app de co the build va demo ngay. Cac luong Firebase, OTP, Bloc va router cu cua Sky/CineBook da duoc thay bang Cineverse Club.
+```bash
+flutter pub get
+flutter run
+flutter analyze
+flutter test
+flutter build web
+```
