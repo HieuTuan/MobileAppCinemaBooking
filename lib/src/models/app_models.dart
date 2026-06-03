@@ -1,5 +1,7 @@
 enum UserRole { customer, staff, admin }
 
+enum AppLanguage { vi, en }
+
 enum MovieStatus { nowShowing, comingSoon }
 
 enum SeatType { standard, vip, couple }

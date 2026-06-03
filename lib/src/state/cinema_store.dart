@@ -27,19 +27,25 @@ class CinemaStore extends ChangeNotifier {
   late List<FoodCombo> combos;
   late List<AppBanner> banners;
   late VnpayConfig vnpayConfig;
+  final List<String> customGenres = [];
+  AppLanguage language = AppLanguage.vi;
 
   final List<Booking> bookings = [];
   final List<Payment> payments = [];
   final List<Review> reviews = [];
   final List<TechnicalIssue> issues = [];
   final Map<String, bool> notificationSettings = {
-    'Nhắc giờ chiếu': true,
-    'Khuyến mãi': true,
-    'Phim mới': true,
+    'Nháº¯c giá» chiáº¿u': true,
+    'Khuyáº¿n mÃ£i': true,
+    'Phim má»›i': true,
   };
 
   AppUser? currentUser;
   DateTime? holdStartedAt;
+
+  int standardSeatSurcharge = 0;
+  int vipSeatSurcharge = 45000;
+  int coupleSeatSurcharge = 70000;
 
   bool get isLoggedIn => currentUser != null;
 
@@ -74,7 +80,7 @@ class CinemaStore extends ChangeNotifier {
       password: password,
       phone: phone,
       role: UserRole.customer,
-      memberRank: 'Thành viên mới',
+      memberRank: 'ThÃ nh viÃªn má»›i',
       points: 100,
     );
     users = [user, ...users];
@@ -105,14 +111,15 @@ class CinemaStore extends ChangeNotifier {
           movie.director.toLowerCase().contains(text) ||
           movie.cast.any((actor) => actor.toLowerCase().contains(text)) ||
           movie.genres.any((item) => item.toLowerCase().contains(text));
-      final matchesGenre = genre == 'Tất cả' || movie.genres.contains(genre);
+      final matchesGenre =
+          genre == 'Táº¥t cáº£' || movie.genres.contains(genre);
       final matchesStatus = status == null || movie.status == status;
       return matchesText && matchesGenre && matchesStatus;
     }).toList();
   }
 
   List<String> get genres {
-    return ['Tất cả', ...movies.expand((movie) => movie.genres).toSet()];
+    return ['Táº¥t cáº£', ...movies.expand((movie) => movie.genres).toSet()];
   }
 
   Movie movieById(String id) => movies.firstWhere((movie) => movie.id == id);
@@ -139,9 +146,9 @@ class CinemaStore extends ChangeNotifier {
 
   int seatPrice(SeatSpot seat, Showtime showtime) {
     return switch (seat.type) {
-      SeatType.standard => showtime.basePrice,
-      SeatType.vip => showtime.basePrice + 45000,
-      SeatType.couple => (showtime.basePrice * 2) + 70000,
+      SeatType.standard => showtime.basePrice + standardSeatSurcharge,
+      SeatType.vip => showtime.basePrice + vipSeatSurcharge,
+      SeatType.couple => (showtime.basePrice * 2) + coupleSeatSurcharge,
     };
   }
 
@@ -243,13 +250,29 @@ class CinemaStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  String validateTicket(String rawCode) {
+  String validateTicket(String rawCode, {String? expectedShowtimeId}) {
     final text = rawCode.trim();
     final booking = bookings.where((item) {
       return item.id.toLowerCase() == text.toLowerCase() ||
           item.qrCode.toLowerCase() == text.toLowerCase();
     }).firstOrNull;
     if (booking == null) return 'Không tìm thấy vé hoặc QR không hợp lệ.';
+    if (expectedShowtimeId != null &&
+        booking.showtimeId != expectedShowtimeId) {
+      final expected = showtimes
+          .where((item) => item.id == expectedShowtimeId)
+          .firstOrNull;
+      final actual = showtimes
+          .where((item) => item.id == booking.showtimeId)
+          .firstOrNull;
+      final expectedText = expected == null
+          ? expectedShowtimeId
+          : '${movieById(expected.movieId).title} ${shortDate(expected.startTime)} ${shortTime(expected.startTime)}';
+      final actualText = actual == null
+          ? booking.showtimeId
+          : '${booking.movieTitle} ${shortDate(actual.startTime)} ${shortTime(actual.startTime)}';
+      return 'Sai suất chiếu. Vé thuộc: $actualText. Suất đang soát: $expectedText.';
+    }
     if (booking.status == BookingStatus.used) return 'Vé đã được sử dụng.';
     if (booking.status == BookingStatus.cancelled ||
         booking.status == BookingStatus.refunded) {
@@ -276,6 +299,23 @@ class CinemaStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  void addGenre(String genre) {
+    final value = genre.trim();
+    if (value.isEmpty || genres.contains(value)) return;
+    customGenres.add(value);
+    notifyListeners();
+  }
+
+  void deleteGenre(String genre) {
+    customGenres.remove(genre);
+    movies = movies.map((movie) {
+      if (!movie.genres.contains(genre)) return movie;
+      final nextGenres = movie.genres.where((item) => item != genre).toList();
+      return movie.copyWith(genres: nextGenres.isEmpty ? ['Khác'] : nextGenres);
+    }).toList();
+    notifyListeners();
+  }
+
   void toggleUserStatus(String userId) {
     users = users
         .map(
@@ -296,7 +336,7 @@ class CinemaStore extends ChangeNotifier {
         password: '123456',
         phone: '0909000999',
         role: UserRole.staff,
-        permissions: const ['Soát vé'],
+        permissions: const ['SoÃ¡t vÃ©'],
       ),
       ...users,
     ];
@@ -323,7 +363,7 @@ class CinemaStore extends ChangeNotifier {
         roomId: roomId,
         description: description,
         createdAt: DateTime.now(),
-        status: 'Đã gửi Admin',
+        status: 'ÄÃ£ gá»­i Admin',
       ),
     );
     notifyListeners();
@@ -351,6 +391,80 @@ class CinemaStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  void deleteUser(String userId) {
+    users = users.where((user) => user.id != userId).toList();
+    if (currentUser?.id == userId) currentUser = null;
+    notifyListeners();
+  }
+
+  void updateUserPermissions(String userId, List<String> permissions) {
+    users = users
+        .map(
+          (user) => user.id == userId
+              ? user.copyWith(permissions: List.unmodifiable(permissions))
+              : user,
+        )
+        .toList();
+    if (currentUser?.id == userId) {
+      currentUser = users.firstWhere((user) => user.id == userId);
+    }
+    notifyListeners();
+  }
+
+  void saveRoom(Room room) {
+    final exists = rooms.any((item) => item.id == room.id);
+    rooms = exists
+        ? rooms.map((item) => item.id == room.id ? room : item).toList()
+        : [room, ...rooms];
+    notifyListeners();
+  }
+
+  void saveShowtime(Showtime showtime) {
+    final exists = showtimes.any((item) => item.id == showtime.id);
+    showtimes = exists
+        ? showtimes
+              .map((item) => item.id == showtime.id ? showtime : item)
+              .toList()
+        : [showtime, ...showtimes];
+    notifyListeners();
+  }
+
+  void deleteShowtime(String showtimeId) {
+    showtimes = showtimes
+        .where((showtime) => showtime.id != showtimeId)
+        .toList();
+    notifyListeners();
+  }
+
+  void saveBanner(AppBanner banner) {
+    final exists = banners.any((item) => item.id == banner.id);
+    banners = exists
+        ? banners.map((item) => item.id == banner.id ? banner : item).toList()
+        : [banner, ...banners];
+    notifyListeners();
+  }
+
+  void updateVnpayConfig(VnpayConfig config) {
+    vnpayConfig = config;
+    notifyListeners();
+  }
+
+  void updateSeatPricing({
+    required int standardSurcharge,
+    required int vipSurcharge,
+    required int coupleSurcharge,
+  }) {
+    standardSeatSurcharge = standardSurcharge;
+    vipSeatSurcharge = vipSurcharge;
+    coupleSeatSurcharge = coupleSurcharge;
+    notifyListeners();
+  }
+
+  void setLanguage(AppLanguage nextLanguage) {
+    language = nextLanguage;
+    notifyListeners();
+  }
+
   int revenueTotal() {
     return payments
         .where((payment) => payment.status == PaymentStatus.success)
@@ -373,7 +487,7 @@ class CinemaStore extends ChangeNotifier {
     final booking = Booking(
       id: 'BK-DEMO01',
       userId: 'U001',
-      customerName: 'Nguyễn Minh Anh',
+      customerName: 'Nguyá»…n Minh Anh',
       showtimeId: showtime.id,
       movieTitle: movieById(showtime.movieId).title,
       seats: const ['C4', 'C5'],
