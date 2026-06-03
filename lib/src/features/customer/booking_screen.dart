@@ -1,13 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/formatters.dart';
-import '../../core/labels.dart';
 import '../../models/app_models.dart';
-import '../../shared/widgets/glass_card.dart';
 import '../../state/cinema_store.dart';
+import 'payment_screen.dart';
 
 class BookingScreen extends StatefulWidget {
   const BookingScreen({
@@ -27,240 +24,242 @@ class BookingScreen extends StatefulWidget {
 
 class _BookingScreenState extends State<BookingScreen> {
   final List<String> _selectedSeats = [];
-  final Map<String, int> _comboQuantities = {};
-  late final Timer _timer;
-  int _remainingSeconds = 600;
-  PaymentStatus _paymentStatus = PaymentStatus.success;
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      setState(() => _remainingSeconds = (_remainingSeconds - 1).clamp(0, 600));
-      if (_remainingSeconds == 0) _selectedSeats.clear();
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer.cancel();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
-    final store = widget.store;
-    final room = store.roomById(widget.showtime.roomId);
-    final cinema = store.cinemaForRoom(widget.showtime.roomId);
-    final selectedCombos = _expandedComboIds();
-    final total = store.calculateTotal(
+    final room = widget.store.roomById(widget.showtime.roomId);
+    final cinema = widget.store.cinemaForRoom(widget.showtime.roomId);
+    final total = widget.store.calculateTotal(
       widget.showtime,
       _selectedSeats,
-      selectedCombos,
+      const [],
     );
 
     return Scaffold(
-      backgroundColor: AppColors.ivory,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          'Chọn ghế & bắp nước',
-          style: TextStyle(fontWeight: FontWeight.w900),
+        backgroundColor: Colors.white,
+        title: Text(
+          _cinemaName(cinema),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w900),
         ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
-            child: Center(child: _CountdownPill(seconds: _remainingSeconds)),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: AppColors.line),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Rạp hiện tại',
+                    onPressed: () {},
+                    icon: const Icon(Icons.directions_bus_filled_outlined),
+                  ),
+                  Container(width: 1, height: 22, color: AppColors.line),
+                  IconButton(
+                    tooltip: 'Trang chủ',
+                    onPressed: () => Navigator.of(
+                      context,
+                    ).popUntil((route) => route.isFirst),
+                    icon: const Icon(Icons.home_rounded),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
-      bottomNavigationBar: _InvoiceBar(
+      bottomNavigationBar: _SeatCheckoutBar(
+        movie: widget.movie,
+        showtime: widget.showtime,
+        room: room,
         total: total,
-        onConfirm: () => _confirm(total),
+        onContinue: () => _goToPayment(total),
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 104),
+        padding: EdgeInsets.zero,
         children: [
-          _BookingSummary(
-            movie: widget.movie,
-            showtime: widget.showtime,
-            room: room,
-            cinema: cinema,
-          ),
-          const SizedBox(height: 14),
-          _SeatSelector(
-            store: store,
+          _CinemaAddressBanner(address: _cinemaAddress(cinema)),
+          const SizedBox(height: 18),
+          const _ScreenCurve(),
+          const SizedBox(height: 10),
+          _SeatMap(
+            store: widget.store,
             showtime: widget.showtime,
             selectedSeats: _selectedSeats,
             onChanged: () => setState(() {}),
           ),
           const SizedBox(height: 22),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Expanded(child: _SectionHeading('Combo bắp & nước uống')),
-              Text(
-                'Đi kèm tiện lợi',
-                textAlign: TextAlign.right,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: AppColors.gold,
+          const _SeatLegend(),
+          const SizedBox(height: 10),
+          Center(
+            child: TextButton(
+              onPressed: () {},
+              child: const Text(
+                'Xem chi tiết hình ảnh và thông tin ghế',
+                style: TextStyle(
+                  color: AppColors.ink,
+                  decoration: TextDecoration.underline,
+                  fontSize: 16,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ...store.combos.map(
-            (combo) => _ComboTile(
-              combo: combo,
-              quantity: _comboQuantities[combo.id] ?? 0,
-              onChanged: (value) {
-                setState(() {
-                  if (value <= 0) {
-                    _comboQuantities.remove(combo.id);
-                  } else {
-                    _comboQuantities[combo.id] = value;
-                  }
-                });
-              },
             ),
           ),
-          const SizedBox(height: 14),
-          _PaymentCard(
-            total: total,
-            status: _paymentStatus,
-            onChanged: (status) => setState(() => _paymentStatus = status),
-          ),
+          const SizedBox(height: 18),
+          Container(height: 12, color: AppColors.pearl),
         ],
       ),
     );
   }
 
-  List<String> _expandedComboIds() {
-    return [
-      for (final entry in _comboQuantities.entries)
-        for (var i = 0; i < entry.value; i++) entry.key,
-    ];
-  }
-
-  void _confirm(int total) {
+  void _goToPayment(int total) {
     if (_selectedSeats.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Bạn cần chọn ít nhất 1 ghế.')),
       );
       return;
     }
-    if (_paymentStatus != PaymentStatus.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'VNPay đang ở trạng thái ${paymentStatusLabel(_paymentStatus)}.',
-          ),
-        ),
-      );
-      return;
-    }
 
-    final booking = widget.store.createBooking(
-      showtime: widget.showtime,
-      selectedSeats: _selectedSeats,
-      selectedCombos: _expandedComboIds(),
-    );
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Đặt vé thành công'),
-        content: Text(
-          'Mã vé ${booking.id} đã được tạo.\nTổng thanh toán: ${money(total)}\nVé QR đã nằm trong ví vé.',
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PaymentScreen(
+          store: widget.store,
+          movie: widget.movie,
+          showtime: widget.showtime,
+          selectedSeats: List.unmodifiable(_selectedSeats),
+          total: total,
         ),
-        actions: [
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-            },
-            child: const Text('Hoàn tất'),
-          ),
-        ],
       ),
     );
   }
+
+  String _cinemaName(Cinema cinema) {
+    return cinema.name.contains('Ã') || cinema.name.contains('á')
+        ? 'CineLuxe Tràng Tiền'
+        : cinema.name;
+  }
+
+  String _cinemaAddress(Cinema cinema) {
+    return cinema.address.contains('Ã') || cinema.address.contains('Æ')
+        ? '24 Hai Bà Trưng, Hoàn Kiếm, Hà Nội'
+        : '${cinema.address}, ${cinema.city}';
+  }
 }
 
-class _BookingSummary extends StatelessWidget {
-  const _BookingSummary({
-    required this.movie,
-    required this.showtime,
-    required this.room,
-    required this.cinema,
-  });
+class _CinemaAddressBanner extends StatelessWidget {
+  const _CinemaAddressBanner({required this.address});
 
-  final Movie movie;
-  final Showtime showtime;
-  final Room room;
-  final Cinema cinema;
+  final String address;
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              movie.posterUrl,
-              width: 64,
-              height: 84,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                width: 64,
-                height: 84,
-                color: AppColors.goldSoft,
-                child: const Icon(Icons.local_movies_rounded),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
+      child: Container(
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.black, width: 1.2),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.location_on_rounded, color: AppColors.ink),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                address,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  movie.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
+            TextButton(
+              onPressed: () {},
+              child: const Text(
+                'Chi tiết',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w900,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '${room.screenType} • ${room.name}',
-                  style: const TextStyle(
-                    color: AppColors.gold,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Suất chiếu: ${shortTime(showtime.startTime)} • ${shortDate(showtime.startTime)}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                Text(
-                  cinema.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _SeatSelector extends StatelessWidget {
-  const _SeatSelector({
+class _ScreenCurve extends StatelessWidget {
+  const _ScreenCurve();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 72,
+      child: CustomPaint(
+        painter: _ScreenPainter(),
+        child: const Align(
+          alignment: Alignment.bottomCenter,
+          child: Text(
+            'M À N  H Ì N H',
+            style: TextStyle(
+              color: AppColors.muted,
+              fontSize: 18,
+              letterSpacing: 0,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ScreenPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final shadow = Paint()
+      ..color = Colors.black.withValues(alpha: .10)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 20
+      ..strokeCap = StrokeCap.round;
+    final line = Paint()
+      ..color = Colors.black
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round;
+    final path = Path()
+      ..moveTo(size.width * .1, size.height * .48)
+      ..quadraticBezierTo(
+        size.width * .5,
+        size.height * .2,
+        size.width * .9,
+        size.height * .48,
+      );
+    canvas.drawPath(path, shadow);
+    canvas.drawPath(path, line);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _SeatMap extends StatelessWidget {
+  const _SeatMap({
     required this.store,
     required this.showtime,
     required this.selectedSeats,
@@ -276,224 +275,219 @@ class _SeatSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     final booked = store.bookedSeats(showtime.id);
     final held = store.heldSeats(showtime.id);
-    return GlassCard(
-      padding: const EdgeInsets.fromLTRB(14, 18, 14, 14),
+    final rows = _seatRows(store.seats);
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(999),
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.gold.withValues(alpha: .1),
-                  AppColors.gold.withValues(alpha: .75),
-                  AppColors.gold.withValues(alpha: .1),
+          for (final row in rows.entries)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  for (final seat in row.value)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: _SeatTile(
+                        seat: seat,
+                        selected: selectedSeats.contains(seat.code),
+                        booked: booked.contains(seat.code),
+                        held: held.contains(seat.code),
+                        onTap: () => _toggleSeat(context, seat, booked, held),
+                      ),
+                    ),
                 ],
               ),
             ),
-            child: const Center(
-              child: Text(
-                'MÀN HÌNH CHIẾU • PHÒNG VIP',
-                style: TextStyle(
-                  color: AppColors.ink,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: store.seats.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 10,
-              crossAxisSpacing: 6,
-              mainAxisSpacing: 6,
-              childAspectRatio: 1,
-            ),
-            itemBuilder: (context, index) {
-              final seat = store.seats[index];
-              final selected = selectedSeats.contains(seat.code);
-              final isBooked = booked.contains(seat.code);
-              final isHeld = held.contains(seat.code);
-              final disabled = isBooked || isHeld;
-              final color = _seatColor(seat.type, selected, isBooked, isHeld);
-              return Tooltip(
-                message:
-                    '${seat.code} - ${seatTypeLabel(seat.type)} - ${money(store.seatPrice(seat, showtime))}',
-                child: InkWell(
-                  onTap: disabled
-                      ? null
-                      : () {
-                          if (selected) {
-                            selectedSeats.remove(seat.code);
-                          } else if (selectedSeats.length >= 8) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Mỗi lần đặt tối đa 8 ghế.'),
-                              ),
-                            );
-                          } else {
-                            selectedSeats.add(seat.code);
-                          }
-                          onChanged();
-                        },
-                  borderRadius: BorderRadius.circular(6),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: selected ? AppColors.ink : Colors.white,
-                        width: selected ? 2 : 1,
-                      ),
-                      boxShadow: selected ? softShadow(.12) : null,
-                    ),
-                    child: Text(
-                      seat.code,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        color: disabled || selected
-                            ? Colors.white
-                            : Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-          const Divider(color: AppColors.line),
-          const SizedBox(height: 8),
-          const Wrap(
-            spacing: 14,
-            runSpacing: 8,
-            alignment: WrapAlignment.center,
-            children: [
-              _LegendDot(
-                color: Color(0xFF2F80ED),
-                label: 'Standard\n(60.000đ)',
-              ),
-              _LegendDot(color: Color(0xFFFFB000), label: 'VIP\n(90.000đ)'),
-              _LegendDot(color: Color(0xFFE91E63), label: 'Couple\n(140.000đ)'),
-              _LegendDot(color: Color(0xFF223046), label: 'Đã bán/giữ'),
-            ],
-          ),
         ],
       ),
     );
   }
 
-  Color _seatColor(SeatType type, bool selected, bool booked, bool held) {
-    if (selected) return AppColors.ink;
-    if (booked || held) return const Color(0xFF223046);
+  Map<String, List<SeatSpot>> _seatRows(List<SeatSpot> seats) {
+    final rows = <String, List<SeatSpot>>{};
+    for (final seat in seats) {
+      rows.putIfAbsent(seat.row, () => []).add(seat);
+    }
+    for (final rowSeats in rows.values) {
+      rowSeats.sort((a, b) => b.column.compareTo(a.column));
+    }
+    return Map.fromEntries(
+      rows.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
+    );
+  }
+
+  void _toggleSeat(
+    BuildContext context,
+    SeatSpot seat,
+    Set<String> booked,
+    Set<String> held,
+  ) {
+    if (booked.contains(seat.code) || held.contains(seat.code)) return;
+    if (selectedSeats.contains(seat.code)) {
+      selectedSeats.remove(seat.code);
+    } else if (selectedSeats.length >= 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mỗi lần đặt tối đa 8 ghế.')),
+      );
+      return;
+    } else {
+      selectedSeats.add(seat.code);
+    }
+    onChanged();
+  }
+}
+
+class _SeatTile extends StatelessWidget {
+  const _SeatTile({
+    required this.seat,
+    required this.selected,
+    required this.booked,
+    required this.held,
+    required this.onTap,
+  });
+
+  final SeatSpot seat;
+  final bool selected;
+  final bool booked;
+  final bool held;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = booked || held;
+    final colors = _seatColors(seat.type, selected, disabled);
+    return InkWell(
+      onTap: disabled ? null : onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 54,
+        height: 44,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: colors.background,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: selected ? Colors.black : colors.border,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: disabled
+            ? const Icon(Icons.close_rounded, color: AppColors.muted, size: 18)
+            : Text(
+                seat.code,
+                style: TextStyle(
+                  color: colors.text,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+      ),
+    );
+  }
+
+  _SeatColors _seatColors(SeatType type, bool selected, bool disabled) {
+    if (disabled) {
+      return const _SeatColors(
+        background: Colors.white,
+        text: AppColors.muted,
+        border: AppColors.line,
+      );
+    }
+    if (selected) {
+      return const _SeatColors(
+        background: Colors.black,
+        text: Colors.white,
+        border: Colors.black,
+      );
+    }
     return switch (type) {
-      SeatType.standard => const Color(0xFF2F80ED),
-      SeatType.vip => const Color(0xFFFFB000),
-      SeatType.couple => const Color(0xFFE91E63),
+      SeatType.standard => const _SeatColors(
+        background: Color(0xFFE8E8E8),
+        text: Colors.black,
+        border: Color(0xFFE8E8E8),
+      ),
+      SeatType.vip => const _SeatColors(
+        background: Color(0xFFD4D4D4),
+        text: Colors.black,
+        border: Color(0xFFD4D4D4),
+      ),
+      SeatType.couple => const _SeatColors(
+        background: Color(0xFFF4F4F4),
+        text: Colors.black,
+        border: Color(0xFFF4F4F4),
+      ),
     };
   }
 }
 
-class _ComboTile extends StatelessWidget {
-  const _ComboTile({
-    required this.combo,
-    required this.quantity,
-    required this.onChanged,
+class _SeatColors {
+  const _SeatColors({
+    required this.background,
+    required this.text,
+    required this.border,
   });
 
-  final FoodCombo combo;
-  final int quantity;
-  final ValueChanged<int> onChanged;
+  final Color background;
+  final Color text;
+  final Color border;
+}
+
+class _SeatLegend extends StatelessWidget {
+  const _SeatLegend();
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      margin: const EdgeInsets.only(bottom: 10),
+    return const SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: EdgeInsets.symmetric(horizontal: 18),
       child: Row(
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.goldSoft,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(Icons.fastfood_rounded, color: AppColors.gold),
+          _LegendItem(
+            color: Colors.white,
+            border: AppColors.line,
+            label: 'Đã đặt',
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  combo.name,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  combo.description,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  money(combo.price),
-                  style: const TextStyle(
-                    color: AppColors.gold,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          _QuantityStepper(quantity: quantity, onChanged: onChanged),
+          _LegendItem(color: Colors.black, label: 'Ghế bạn chọn'),
+          _LegendItem(color: Color(0xFFE8E8E8), label: 'Ghế thường'),
+          _LegendItem(color: Color(0xFFD4D4D4), label: 'Ghế VIP'),
+          _LegendItem(color: Color(0xFFF4F4F4), label: 'Ghế đôi'),
         ],
       ),
     );
   }
 }
 
-class _QuantityStepper extends StatelessWidget {
-  const _QuantityStepper({required this.quantity, required this.onChanged});
+class _LegendItem extends StatelessWidget {
+  const _LegendItem({required this.color, required this.label, this.border});
 
-  final int quantity;
-  final ValueChanged<int> onChanged;
+  final Color color;
+  final String label;
+  final Color? border;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.pearl,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.line),
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(right: 16),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            onPressed: quantity == 0 ? null : () => onChanged(quantity - 1),
-            icon: const Icon(Icons.remove_rounded),
+          Container(
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: border ?? color, width: 2),
+            ),
           ),
+          const SizedBox(width: 6),
           Text(
-            '$quantity',
-            style: const TextStyle(fontWeight: FontWeight.w900),
-          ),
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            onPressed: () => onChanged(quantity + 1),
-            icon: const Icon(Icons.add_rounded),
+            label,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -501,111 +495,106 @@ class _QuantityStepper extends StatelessWidget {
   }
 }
 
-class _PaymentCard extends StatelessWidget {
-  const _PaymentCard({
+class _SeatCheckoutBar extends StatelessWidget {
+  const _SeatCheckoutBar({
+    required this.movie,
+    required this.showtime,
+    required this.room,
     required this.total,
-    required this.status,
-    required this.onChanged,
+    required this.onContinue,
   });
 
+  final Movie movie;
+  final Showtime showtime;
+  final Room room;
   final int total;
-  final PaymentStatus status;
-  final ValueChanged<PaymentStatus> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _SectionHeading('Thanh toán VNPay'),
-          const SizedBox(height: 8),
-          Text('Tổng tiền gửi sang VNPay sandbox: ${money(total)}'),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              ChoiceChip(
-                selected: status == PaymentStatus.success,
-                label: const Text('Thành công'),
-                onSelected: (_) => onChanged(PaymentStatus.success),
-              ),
-              ChoiceChip(
-                selected: status == PaymentStatus.processing,
-                label: const Text('Đang xử lý'),
-                onSelected: (_) => onChanged(PaymentStatus.processing),
-              ),
-              ChoiceChip(
-                selected: status == PaymentStatus.failed,
-                label: const Text('Thất bại'),
-                onSelected: (_) => onChanged(PaymentStatus.failed),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InvoiceBar extends StatelessWidget {
-  const _InvoiceBar({required this.total, required this.onConfirm});
-
-  final int total;
-  final VoidCallback onConfirm;
+  final VoidCallback onContinue;
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
         decoration: BoxDecoration(
           color: Colors.white,
           border: const Border(top: BorderSide(color: AppColors.line)),
-          boxShadow: softShadow(.1),
+          boxShadow: softShadow(.08),
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Tổng hóa đơn'.toUpperCase(),
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: AppColors.muted,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    money(total),
+            Row(
+              children: [
+                _AgeBadge(label: movie.ageRating),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    movie.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: AppColors.gold,
+                      fontSize: 20,
                       fontWeight: FontWeight.w900,
-                      fontSize: 18,
                     ),
                   ),
-                ],
-              ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text(
+                    'Đổi suất',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
             ),
+            const SizedBox(height: 6),
+            Text(
+              '${shortTime(showtime.startTime)}~${shortTime(showtime.endTime)} | ${DateFormatLite.weekday(showtime.startTime)}, ${shortDate(showtime.startTime)} | ${room.screenType} Phụ đề',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Text(
+                  'Tạm tính',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: AppColors.muted,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  total == 0 ? '0đ' : money(total),
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
             SizedBox(
-              height: 50,
-              child: FilledButton.icon(
-                onPressed: onConfirm,
-                icon: const Icon(Icons.arrow_forward_rounded),
-                label: const Text('Xác nhận'),
+              height: 58,
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: onContinue,
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF9800),
-                  foregroundColor: AppColors.ink,
-                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                  textStyle: const TextStyle(
+                    fontSize: 21,
+                    fontWeight: FontWeight.w900,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
+                child: const Text('Tiếp tục'),
               ),
             ),
           ],
@@ -615,25 +604,25 @@ class _InvoiceBar extends StatelessWidget {
   }
 }
 
-class _CountdownPill extends StatelessWidget {
-  const _CountdownPill({required this.seconds});
+class _AgeBadge extends StatelessWidget {
+  const _AgeBadge({required this.label});
 
-  final int seconds;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFFFFEBEE),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFFCDD2)),
+        color: Colors.black,
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Text(
-          '${(seconds ~/ 60).toString().padLeft(1, '0')}:${(seconds % 60).toString().padLeft(2, '0')}',
+          label,
           style: const TextStyle(
-            color: AppColors.danger,
+            color: Colors.white,
+            fontSize: 12,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -642,42 +631,20 @@ class _CountdownPill extends StatelessWidget {
   }
 }
 
-class _LegendDot extends StatelessWidget {
-  const _LegendDot({required this.color, required this.label});
-
-  final Color color;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 6),
-        Text(label, style: Theme.of(context).textTheme.labelSmall),
-      ],
-    );
-  }
-}
-
-class _SectionHeading extends StatelessWidget {
-  const _SectionHeading(this.title);
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      title.toUpperCase(),
-      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-        fontWeight: FontWeight.w900,
-        letterSpacing: 0,
-      ),
-    );
+class DateFormatLite {
+  static String weekday(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(date.year, date.month, date.day);
+    if (target == today) return 'Hôm nay';
+    return switch (date.weekday) {
+      DateTime.monday => 'Thứ 2',
+      DateTime.tuesday => 'Thứ 3',
+      DateTime.wednesday => 'Thứ 4',
+      DateTime.thursday => 'Thứ 5',
+      DateTime.friday => 'Thứ 6',
+      DateTime.saturday => 'Thứ 7',
+      _ => 'Chủ nhật',
+    };
   }
 }

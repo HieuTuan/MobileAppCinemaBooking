@@ -1,0 +1,7 @@
+flutter emulators --launch Pixel 10 Pro XL
+
+
+flutter pub get
+
+
+flutter run

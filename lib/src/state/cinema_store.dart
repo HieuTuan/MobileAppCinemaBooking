@@ -182,6 +182,8 @@ class CinemaStore extends ChangeNotifier {
     required Showtime showtime,
     required List<String> selectedSeats,
     required Iterable<String> selectedCombos,
+    String paymentMethod = 'vnpay',
+    String? transactionId,
   }) {
     final comboList = List<String>.unmodifiable(selectedCombos);
     final user = currentUser!;
@@ -205,10 +207,10 @@ class CinemaStore extends ChangeNotifier {
     final payment = Payment(
       id: 'PAY${compactId(now)}',
       bookingId: id,
-      method: 'vnpay',
+      method: paymentMethod,
       amount: booking.totalAmount,
       status: PaymentStatus.success,
-      vnpayTransactionId: 'VNP${now.millisecondsSinceEpoch}',
+      vnpayTransactionId: transactionId ?? 'VNP${now.millisecondsSinceEpoch}',
       vnpayResponseCode: '00',
       paidAt: now,
     );
