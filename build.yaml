@@ -1,0 +1,24 @@
+# Build configuration for json_serializable code generation
+targets:
+  $default:
+    builders:
+      json_serializable:
+        options:
+          # Creates a toJson() method on classes
+          any_map: false
+          # Checks for extra keys in JSON that aren't in the target object
+          checked: false
+          # Creates a factory constructor fromJson()
+          create_factory: true
+          # Creates a toJson() method
+          create_to_json: true
+          # Disallows null values for non-nullable fields
+          disallow_unrecognized_keys: false
+          # Generates explicit type arguments
+          explicit_to_json: false
+          # Field naming convention: none, snake, kebab, pascal
+          field_rename: none
+          # Creates generic argument factories
+          generic_argument_factories: false
+          # Includes if null: includes null values in JSON output
+          include_if_null: true

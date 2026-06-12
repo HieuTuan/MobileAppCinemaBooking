@@ -4,7 +4,7 @@ import '../../shared/widgets/luxury_scaffold.dart';
 import '../../state/cinema_store.dart';
 import 'movie_list_screen.dart';
 import 'profile_screen.dart';
-import 'tickets_screen.dart';
+import 'api_tickets_screen.dart';
 
 class CustomerShell extends StatefulWidget {
   const CustomerShell({super.key, required this.store});
@@ -22,7 +22,7 @@ class _CustomerShellState extends State<CustomerShell> {
   Widget build(BuildContext context) {
     final screens = [
       MovieListScreen(store: widget.store),
-      TicketsScreen(store: widget.store),
+      ApiTicketsScreen(store: widget.store),
       ProfileScreen(store: widget.store),
     ];
     return LuxuryScaffold(

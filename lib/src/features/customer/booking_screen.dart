@@ -1,10 +1,17 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../../api/api_client.dart';
+import '../../../api/exceptions/api_exceptions.dart';
+import '../../../services/secure_storage_service.dart';
+import '../../../websocket/websocket_client.dart' as realtime;
 import '../../core/app_theme.dart';
 import '../../core/formatters.dart';
 import '../../models/app_models.dart';
 import '../../state/cinema_store.dart';
-import 'payment_screen.dart';
+import 'combo_selection_screen.dart';
 
 class BookingScreen extends StatefulWidget {
   const BookingScreen({
@@ -24,6 +31,75 @@ class BookingScreen extends StatefulWidget {
 
 class _BookingScreenState extends State<BookingScreen> {
   final List<String> _selectedSeats = [];
+  final APIClient _apiClient = APIClient();
+  late final realtime.WebSocketClient _webSocketClient;
+  StreamSubscription? _seatUpdateSubscription;
+  StreamSubscription? _connectionSubscription;
+  realtime.ConnectionState _connectionState =
+      realtime.ConnectionState.disconnected;
+  bool _loadingSeats = true;
+  bool _holdingSeats = false;
+  String? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.store.addListener(_onStoreChanged);
+    _webSocketClient = realtime.WebSocketClient(onStateSync: _syncSeatState);
+    _seatUpdateSubscription = _webSocketClient.seatUpdateStream.listen((
+      update,
+    ) {
+      widget.store.applySeatUpdate(widget.showtime.id, update);
+      if (update.status.name != 'available' && !_holdingSeats) {
+        _selectedSeats.remove(update.seatCode);
+      }
+    });
+    _connectionSubscription = _webSocketClient.connectionStateStream.listen((
+      state,
+    ) {
+      if (mounted) setState(() => _connectionState = state);
+    });
+    _initializeRealtimeSeats();
+  }
+
+  @override
+  void dispose() {
+    widget.store.removeListener(_onStoreChanged);
+    _seatUpdateSubscription?.cancel();
+    _connectionSubscription?.cancel();
+    _webSocketClient.dispose();
+    super.dispose();
+  }
+
+  void _onStoreChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _initializeRealtimeSeats() async {
+    try {
+      await _syncSeatState(widget.showtime.id);
+      String token = 'demo-token';
+      try {
+        token = await SecureStorageService().getAccessToken() ?? token;
+      } catch (_) {
+        // Demo mode can connect without a persisted token.
+      }
+      await _webSocketClient.connect(widget.showtime.id, token);
+      if (mounted) setState(() => _loadError = null);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _loadError = 'Không thể tải trạng thái ghế. Nhấn để thử lại.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loadingSeats = false);
+    }
+  }
+
+  Future<void> _syncSeatState(String showtimeId) async {
+    widget.store.applySeatMap(await _apiClient.getSeats(showtimeId));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -81,21 +157,30 @@ class _BookingScreenState extends State<BookingScreen> {
         showtime: widget.showtime,
         room: room,
         total: total,
-        onContinue: () => _goToPayment(total),
+        loading: _holdingSeats,
+        onContinue: _holdAndContinue,
       ),
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
           _CinemaAddressBanner(address: _cinemaAddress(cinema)),
+          _ConnectionBanner(
+            state: _connectionState,
+            error: _loadError,
+            onRetry: _initializeRealtimeSeats,
+          ),
           const SizedBox(height: 18),
           const _ScreenCurve(),
           const SizedBox(height: 10),
-          _SeatMap(
-            store: widget.store,
-            showtime: widget.showtime,
-            selectedSeats: _selectedSeats,
-            onChanged: () => setState(() {}),
-          ),
+          if (_loadingSeats)
+            const Center(child: CircularProgressIndicator())
+          else
+            _SeatMap(
+              store: widget.store,
+              showtime: widget.showtime,
+              selectedSeats: _selectedSeats,
+              onChanged: () => setState(() {}),
+            ),
           const SizedBox(height: 22),
           const _SeatLegend(),
           const SizedBox(height: 10),
@@ -120,7 +205,7 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
-  void _goToPayment(int total) {
+  Future<void> _holdAndContinue() async {
     if (_selectedSeats.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Bạn cần chọn ít nhất 1 ghế.')),
@@ -128,15 +213,61 @@ class _BookingScreenState extends State<BookingScreen> {
       return;
     }
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => PaymentScreen(
-          store: widget.store,
-          movie: widget.movie,
-          showtime: widget.showtime,
-          selectedSeats: List.unmodifiable(_selectedSeats),
-          total: total,
+    setState(() => _holdingSeats = true);
+    try {
+      final hold = await _apiClient.holdSeats(
+        widget.showtime.id,
+        _selectedSeats,
+        userId: widget.store.currentUser?.id,
+      );
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ComboSelectionScreen(
+            store: widget.store,
+            movie: widget.movie,
+            showtime: widget.showtime,
+            selectedSeats: List.unmodifiable(_selectedSeats),
+            hold: hold,
+          ),
         ),
+      );
+    } on DioException catch (error) {
+      final conflict = error.error;
+      if (conflict is ApiConflictException) {
+        _selectedSeats.removeWhere(conflict.unavailableSeats.contains);
+        await _showSeatConflict(conflict.unavailableSeats);
+        await _syncSeatState(widget.showtime.id);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không thể giữ ghế. Vui lòng thử lại.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _holdingSeats = false);
+    }
+  }
+
+  Future<void> _showSeatConflict(List<String> seats) {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Ghế vừa được người khác chọn'),
+        content: Text(
+          seats.isEmpty
+              ? 'Một số ghế không còn khả dụng.'
+              : 'Ghế ${seats.join(', ')} không còn khả dụng.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Thử lại'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Chọn ghế khác'),
+          ),
+        ],
       ),
     );
   }
@@ -151,6 +282,40 @@ class _BookingScreenState extends State<BookingScreen> {
     return cinema.address.contains('Ã') || cinema.address.contains('Æ')
         ? '24 Hai Bà Trưng, Hoàn Kiếm, Hà Nội'
         : '${cinema.address}, ${cinema.city}';
+  }
+}
+
+class _ConnectionBanner extends StatelessWidget {
+  const _ConnectionBanner({
+    required this.state,
+    required this.error,
+    required this.onRetry,
+  });
+
+  final realtime.ConnectionState state;
+  final String? error;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (state == realtime.ConnectionState.connected && error == null) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+      child: Material(
+        color: AppColors.pearl,
+        borderRadius: BorderRadius.circular(8),
+        child: ListTile(
+          dense: true,
+          leading: const Icon(Icons.sync_rounded),
+          title: Text(error ?? 'Đang kết nối cập nhật ghế thời gian thực...'),
+          trailing: error == null
+              ? null
+              : TextButton(onPressed: onRetry, child: const Text('Thử lại')),
+        ),
+      ),
+    );
   }
 }
 
@@ -501,6 +666,7 @@ class _SeatCheckoutBar extends StatelessWidget {
     required this.showtime,
     required this.room,
     required this.total,
+    required this.loading,
     required this.onContinue,
   });
 
@@ -508,6 +674,7 @@ class _SeatCheckoutBar extends StatelessWidget {
   final Showtime showtime;
   final Room room;
   final int total;
+  final bool loading;
   final VoidCallback onContinue;
 
   @override
@@ -582,7 +749,7 @@ class _SeatCheckoutBar extends StatelessWidget {
               height: 58,
               width: double.infinity,
               child: FilledButton(
-                onPressed: onContinue,
+                onPressed: loading ? null : onContinue,
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.black,
                   foregroundColor: Colors.white,
@@ -594,7 +761,16 @@ class _SeatCheckoutBar extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                child: const Text('Tiếp tục'),
+                child: loading
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Tiếp tục'),
               ),
             ),
           ],

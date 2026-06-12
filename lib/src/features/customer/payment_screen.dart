@@ -2,10 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../api/api_client.dart';
+import '../../../models/booking_models.dart' as api_models;
+import '../../../services/payment_service.dart';
 import '../../core/app_theme.dart';
 import '../../core/formatters.dart';
 import '../../models/app_models.dart';
 import '../../state/cinema_store.dart';
+import 'booking_confirmation_screen.dart';
 
 enum _PaymentMethod { vnpay, bank }
 
@@ -17,6 +21,8 @@ class PaymentScreen extends StatefulWidget {
     required this.showtime,
     required this.selectedSeats,
     required this.total,
+    required this.hold,
+    required this.comboSelections,
   });
 
   final CinemaStore store;
@@ -24,15 +30,46 @@ class PaymentScreen extends StatefulWidget {
   final Showtime showtime;
   final List<String> selectedSeats;
   final int total;
+  final api_models.HoldResponse hold;
+  final List<api_models.ComboSelection> comboSelections;
 
   @override
   State<PaymentScreen> createState() => _PaymentScreenState();
 }
 
 class _PaymentScreenState extends State<PaymentScreen> {
+  final APIClient _apiClient = APIClient();
+  final PaymentService _paymentService = PaymentService();
   _PaymentMethod _method = _PaymentMethod.vnpay;
   String _bank = 'VCB';
   bool _processing = false;
+  Timer? _holdTimer;
+  Duration _remaining = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _updateRemaining();
+    _holdTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _updateRemaining(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _holdTimer?.cancel();
+    super.dispose();
+  }
+
+  void _updateRemaining() {
+    final remaining = widget.hold.expiresAt.difference(DateTime.now());
+    if (mounted) {
+      setState(
+        () => _remaining = remaining.isNegative ? Duration.zero : remaining,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,15 +80,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        title: const Text(
-          'Thanh toán',
-          style: TextStyle(fontWeight: FontWeight.w900),
+        title: Text(
+          'Thanh toán • ${_formatDuration(_remaining)}',
+          style: const TextStyle(fontWeight: FontWeight.w900),
         ),
       ),
       bottomNavigationBar: _PaymentBottomBar(
         total: widget.total,
         processing: _processing,
-        onPay: _pay,
+        onPay: _remaining == Duration.zero ? null : _payWithVnpay,
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 12, 18, 120),
@@ -100,54 +137,79 @@ class _PaymentScreenState extends State<PaymentScreen> {
     });
   }
 
-  Future<void> _pay() async {
+  Future<void> _payWithVnpay() async {
     if (_processing) return;
     setState(() => _processing = true);
-    await Future<void>.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-
-    final transactionCode = _transactionCode();
-    final booking = widget.store.createBooking(
-      showtime: widget.showtime,
-      selectedSeats: widget.selectedSeats,
-      selectedCombos: const [],
-      paymentMethod: _method == _PaymentMethod.vnpay ? 'vnpay' : _bank,
-      transactionId: transactionCode,
-    );
-    setState(() => _processing = false);
-
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Thanh toán thành công'),
-          content: Text(
-            'Giao dịch $transactionCode đã được xác nhận.\n'
-            'Mã vé ${booking.id} đã được tạo.\n'
-            'Tổng thanh toán: ${money(widget.total)}',
+    try {
+      final booking = await _apiClient.createBooking(
+        api_models.CreateBookingRequest(
+          holdId: widget.hold.holdId,
+          combos: widget.comboSelections,
+          userId: widget.store.currentUser?.id,
+        ),
+      );
+      if (!mounted) return;
+      final result = await _paymentService.processPayment(
+        context,
+        booking.bookingId,
+        booking.paymentUrl,
+      );
+      if (!mounted) return;
+      setState(() => _processing = false);
+      if (result.isSuccess) {
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) =>
+                BookingConfirmationScreen(bookingId: booking.bookingId),
           ),
-          actions: [
+        );
+        return;
+      }
+      await _showPaymentFailure(result);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _processing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không thể xử lý thanh toán. Vui lòng thử lại.'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _showPaymentFailure(PaymentResult result) {
+    final isTimeout = result.status == api_models.ApiPaymentStatus.timeout;
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(isTimeout ? 'Thanh toán hết hạn' : 'Thanh toán thất bại'),
+        content: Text(
+          isTimeout
+              ? 'Phiên thanh toán đã hết hạn. Ghế sẽ được tự động giải phóng.'
+              : 'Giao dịch chưa thành công. Bạn có thể thử lại.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Đóng'),
+          ),
+          if (!isTimeout)
             FilledButton(
               onPressed: () {
                 Navigator.of(context).pop();
                 Navigator.of(context).popUntil((route) => route.isFirst);
               },
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Hoàn tất'),
+              child: const Text('Đặt lại'),
             ),
-          ],
-        );
-      },
+        ],
+      ),
     );
   }
 
-  String _transactionCode() {
-    final prefix = _method == _PaymentMethod.vnpay ? 'VNPAY' : _bank;
-    return '$prefix-${DateTime.now().millisecondsSinceEpoch}';
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes.toString().padLeft(2, '0');
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
   }
 
   String _cinemaName(Cinema cinema) {
@@ -404,7 +466,7 @@ class _PaymentBottomBar extends StatelessWidget {
 
   final int total;
   final bool processing;
-  final VoidCallback onPay;
+  final VoidCallback? onPay;
 
   @override
   Widget build(BuildContext context) {

@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import '../core/formatters.dart';
 import '../data/seed_data.dart';
 import '../models/app_models.dart';
+import '../../models/booking_models.dart' as api_models;
+import '../../websocket/seat_update.dart' as ws_models;
 
 class CinemaStore extends ChangeNotifier {
   CinemaStore() {
@@ -42,6 +44,7 @@ class CinemaStore extends ChangeNotifier {
 
   AppUser? currentUser;
   DateTime? holdStartedAt;
+  final Map<String, Map<String, SeatStatus>> _remoteSeatStatuses = {};
 
   int standardSeatSurcharge = 0;
   int vipSeatSurcharge = 45000;
@@ -153,7 +156,7 @@ class CinemaStore extends ChangeNotifier {
   }
 
   Set<String> bookedSeats(String showtimeId) {
-    return bookings
+    final local = bookings
         .where(
           (booking) =>
               booking.showtimeId == showtimeId &&
@@ -162,11 +165,51 @@ class CinemaStore extends ChangeNotifier {
         )
         .expand((booking) => booking.seats)
         .toSet();
+    final remote = _remoteSeatStatuses[showtimeId] ?? const {};
+    local.addAll(
+      remote.entries
+          .where((entry) => entry.value == SeatStatus.booked)
+          .map((entry) => entry.key),
+    );
+    return local;
   }
 
   Set<String> heldSeats(String showtimeId) {
-    holdStartedAt ??= DateTime.now();
-    return {'B4', 'D7'}..removeAll(bookedSeats(showtimeId));
+    final remote = _remoteSeatStatuses[showtimeId] ?? const {};
+    return remote.entries
+        .where((entry) => entry.value == SeatStatus.held)
+        .map((entry) => entry.key)
+        .toSet()
+      ..removeAll(bookedSeats(showtimeId));
+  }
+
+  void applySeatMap(api_models.SeatMap seatMap) {
+    _remoteSeatStatuses[seatMap.showtimeId] = {
+      for (final seat in seatMap.seats) seat.code: _appSeatStatus(seat.status),
+    };
+    notifyListeners();
+  }
+
+  void applySeatUpdate(String showtimeId, ws_models.SeatUpdate update) {
+    _remoteSeatStatuses.putIfAbsent(
+      showtimeId,
+      () => {},
+    )[update.seatCode] = switch (update.status) {
+      ws_models.SeatStatus.available => SeatStatus.available,
+      ws_models.SeatStatus.held => SeatStatus.held,
+      ws_models.SeatStatus.booked => SeatStatus.booked,
+      ws_models.SeatStatus.selected => SeatStatus.selected,
+    };
+    notifyListeners();
+  }
+
+  SeatStatus _appSeatStatus(api_models.ApiSeatStatus status) {
+    return switch (status) {
+      api_models.ApiSeatStatus.available => SeatStatus.available,
+      api_models.ApiSeatStatus.held => SeatStatus.held,
+      api_models.ApiSeatStatus.booked => SeatStatus.booked,
+      api_models.ApiSeatStatus.selected => SeatStatus.selected,
+    };
   }
 
   int calculateTotal(
