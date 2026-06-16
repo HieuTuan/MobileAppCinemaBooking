@@ -184,11 +184,11 @@ public class UserServiceImpl implements UserService {
 - Không bao giờ chứa `id`, `createdAt`, `updatedAt` trong request body.
 ```java
 public record AddCartItemRequest(
-    @NotNull(message = "ID sản phẩm không được để trống")
-    Long productId,
-    @NotNull(message = "Số lượng không được để trống")
-    @Positive(message = "Số lượng phải lớn hơn 0")
-    BigDecimal quantity
+        @NotNull(message = "ID sản phẩm không được để trống")
+        Long productId,
+        @NotNull(message = "Số lượng không được để trống")
+        @Positive(message = "Số lượng phải lớn hơn 0")
+        BigDecimal quantity
 ) {}
 ```
 
@@ -203,21 +203,21 @@ Mọi endpoint trả về danh sách dữ liệu **phải** dùng `PageResponse<
 ```java
 // dto/response/PageResponse.java
 public record PageResponse<T>(
-    List<T> content,
-    int page,
-    int size,
-    long totalElements,
-    int totalPages,
-    boolean last
-) {
+                List<T> content,
+                int page,
+                int size,
+                long totalElements,
+                int totalPages,
+                boolean last
+        ) {
     public static <T> PageResponse<T> of(Page<T> page) {
         return new PageResponse<>(
-            page.getContent(),
-            page.getNumber(),
-            page.getSize(),
-            page.getTotalElements(),
-            page.getTotalPages(),
-            page.isLast()
+                page.getContent(),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isLast()
         );
     }
 }
@@ -232,7 +232,7 @@ PageResponse<ProductResponse> getProducts(Pageable pageable);
 ```java
 @GetMapping
 public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> getProducts(
-    @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+        @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
 ) {
     return ResponseEntity.ok(ApiResponse.success(productService.getProducts(pageable)));
 }
@@ -276,8 +276,8 @@ public interface CartMapper {
 Bắt buộc tạo index cho các trường FK để tối ưu hiệu năng:
 ```java
 @Table(name = "orders", indexes = {
-    @Index(name = "idx_orders_user_id", columnList = "user_id"),
-    @Index(name = "idx_orders_status", columnList = "status")
+        @Index(name = "idx_orders_user_id", columnList = "user_id"),
+        @Index(name = "idx_orders_status", columnList = "status")
 })
 ```
 
@@ -337,7 +337,7 @@ Service thực hiện soft delete:
 ```java
 public void deleteProduct(Long id) {
     var product = productRepository.findById(id)
-        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với id: " + id));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với id: " + id));
     product.setDeleted(true);
     product.setDeletedAt(LocalDateTime.now());
     // Không cần gọi save() nếu đang trong @Transactional managed context
@@ -355,12 +355,104 @@ Optional<Cart> findByUserId(Long userId);
 
 ## Service Layer Conventions
 
-- Tất cả các Service Impl phải gắn `@Service` và `@Transactional` (ở cấp class).
-- Các method chỉ đọc (Read-only) phải được chú thích rõ ràng bằng `@Transactional(readOnly = true)`.
-- **Luôn sử dụng DTO**: Service method nhận Request DTO và trả về Response DTO (ngoại trừ các hàm helper nội bộ).
-- Không bao giờ trả về `null` khi tìm không thấy dữ liệu — hãy ném lỗi cụ thể:
-    - `ResourceNotFoundException` (HTTP Status 404)
-    - `BadRequestException` (HTTP Status 400 hoặc 409)
+### Quy tắc Interface + Impl (BẮT BUỘC)
+
+**NEVER** tạo `ServiceImpl` mà không có Service interface tương ứng. Mọi service **phải** có đủ 2 file:
+
+| File | Package | Naming |
+|---|---|---|
+| Interface | `com.bryan.service` | `{Entity}Service` (ví dụ: `ProductService`) |
+| Implementation | `com.bryan.service.impl` | `{Entity}ServiceImpl` (ví dụ: `ProductServiceImpl`) |
+
+Controller chỉ được inject **interface**, tuyệt đối không inject trực tiếp `ServiceImpl`.
+
+### Service Interface — Template chuẩn
+
+```java
+// service/ProductService.java
+public interface ProductService {
+
+    // Trả về PageResponse cho mọi API list
+    PageResponse<ProductResponse> getProducts(Pageable pageable);
+
+    // Trả về Response DTO, không bao giờ trả Entity
+    ProductResponse getProductById(Long id);
+
+    ProductResponse createProduct(CreateProductRequest request);
+
+    ProductResponse updateProduct(Long id, UpdateProductRequest request);
+
+    void deleteProduct(Long id);
+}
+```
+
+### Service Implementation — Template chuẩn
+
+```java
+// service/impl/ProductServiceImpl.java
+@Service
+@RequiredArgsConstructor
+@Slf4j
+@Transactional          // Default cho write operations ở class level
+public class ProductServiceImpl implements ProductService {
+
+    private final ProductRepository productRepository;
+    private final ProductMapper productMapper;
+
+    @Override
+    @Transactional(readOnly = true)     // BẮT BUỘC cho mọi method chỉ đọc
+    public PageResponse<ProductResponse> getProducts(Pageable pageable) {
+        return PageResponse.of(
+            productRepository.findAllByIsDeletedFalse(pageable)
+                .map(productMapper::toResponse)
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProductResponse getProductById(Long id) {
+        var product = productRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Không tìm thấy sản phẩm với id: " + id));
+        return productMapper.toResponse(product);
+    }
+
+    @Override
+    public ProductResponse createProduct(CreateProductRequest request) {
+        var product = productMapper.toEntity(request);
+        var saved = productRepository.save(product);
+        return productMapper.toResponse(saved);
+    }
+
+    @Override
+    public ProductResponse updateProduct(Long id, UpdateProductRequest request) {
+        var product = productRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Không tìm thấy sản phẩm với id: " + id));
+        productMapper.updateEntity(request, product);   // @MappingTarget, IGNORE null
+        return productMapper.toResponse(product);
+        // Không gọi save() — managed entity trong @Transactional tự flush
+    }
+
+    @Override
+    public void deleteProduct(Long id) {
+        var product = productRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Không tìm thấy sản phẩm với id: " + id));
+        product.setDeleted(true);
+        product.setDeletedAt(LocalDateTime.now());
+    }
+}
+```
+
+### Các quy tắc bắt buộc
+
+- `@Transactional` đặt ở **class level** (áp dụng cho toàn bộ write methods).
+- `@Transactional(readOnly = true)` đặt ở **method level** cho mọi method chỉ đọc — giúp Hibernate tắt dirty checking, tăng hiệu năng.
+- **Luôn dùng DTO**: nhận `Request DTO` → trả `Response DTO`. Không bao giờ nhận hoặc trả `Entity`.
+- Không bao giờ trả `null` khi không tìm thấy dữ liệu — ném exception cụ thể:
+    - `ResourceNotFoundException` → 404
+    - `BadRequestException` → 400 / 409
 
 ---
 
@@ -384,7 +476,7 @@ Optional<Cart> findByUserId(Long userId);
 ### Lấy thông tin User hiện tại trong Service:
 ```java
 CustomUserDetails userDetails = (CustomUserDetails)
-    SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 Long userId = userDetails.getId();
 ```
 
@@ -395,8 +487,8 @@ Khai báo CORS trong `SecurityConfig`. Không để wildcard `*` trên productio
 CorsConfigurationSource corsConfigurationSource() {
     var config = new CorsConfiguration();
     config.setAllowedOrigins(List.of(
-        "http://localhost:3000",   // local dev
-        "https://organicmart.vn"   // production — thay bằng domain thực
+            "http://localhost:3000",   // local dev
+            "https://organicmart.vn"   // production — thay bằng domain thực
     ));
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
     config.setAllowedHeaders(List.of("*"));
@@ -528,8 +620,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<List<ValidationError>>> handleValidationExceptions(
             MethodArgumentNotValidException ex) {
         var errors = ex.getBindingResult().getFieldErrors().stream()
-            .map(e -> new ValidationError(e.getField(), e.getDefaultMessage()))
-            .toList();
+                .map(e -> new ValidationError(e.getField(), e.getDefaultMessage()))
+                .toList();
         return ApiResponse.validationError(errors); // Xem ApiResponse bên dưới
     }
 
@@ -625,7 +717,7 @@ public class ApiResponse<T> {
     public static ResponseEntity<ApiResponse<List<ValidationError>>> validationError(
             List<ValidationError> errors) {
         return ResponseEntity.status(400)
-            .body(new ApiResponse<>(400, "Dữ liệu không hợp lệ", errors));
+                .body(new ApiResponse<>(400, "Dữ liệu không hợp lệ", errors));
     }
 
     // ── Getters ──────────────────────────────────────────────────
@@ -759,7 +851,7 @@ class ProductServiceImplTest {
     void shouldThrowResourceNotFoundException_whenProductNotFound() {
         when(productRepository.findById(99L)).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class,
-            () -> productService.getProductById(99L));
+                () -> productService.getProductById(99L));
     }
 }
 ```
@@ -779,9 +871,9 @@ class ProductServiceImplTest {
 @BeforeEach
 void setUp() {
     user = User.builder()
-        .id(1L)
-        .email("test@example.com")
-        .build();
+            .id(1L)
+            .email("test@example.com")
+            .build();
 }
 ```
 

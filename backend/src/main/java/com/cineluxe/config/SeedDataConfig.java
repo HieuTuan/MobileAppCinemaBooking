@@ -1,7 +1,7 @@
 package com.cineluxe.config;
 
-import com.cineluxe.domain.FoodCombo;
-import com.cineluxe.domain.ShowtimeSeat;
+import com.cineluxe.entity.FoodCombo;
+import com.cineluxe.entity.ShowtimeSeat;
 import com.cineluxe.repository.FoodComboRepository;
 import com.cineluxe.repository.ShowtimeSeatRepository;
 import java.util.ArrayList;

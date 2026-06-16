@@ -1,7 +1,7 @@
 package com.cineluxe.repository;
 
-import com.cineluxe.domain.SeatStatus;
-import com.cineluxe.domain.ShowtimeSeat;
+import com.cineluxe.entity.SeatStatus;
+import com.cineluxe.entity.ShowtimeSeat;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;

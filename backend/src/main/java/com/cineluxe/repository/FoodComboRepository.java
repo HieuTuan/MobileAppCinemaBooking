@@ -1,6 +1,6 @@
 package com.cineluxe.repository;
 
-import com.cineluxe.domain.FoodCombo;
+import com.cineluxe.entity.FoodCombo;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 

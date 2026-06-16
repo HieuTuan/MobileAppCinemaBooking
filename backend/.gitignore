@@ -1,0 +1,23 @@
+# Environment variables
+.env
+
+# AI Agent instruction file
+AGENTS.md
+
+# IDEs and Editors
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Build targets
+target/
+out/
+/bin/

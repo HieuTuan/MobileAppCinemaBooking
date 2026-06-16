@@ -1,6 +1,6 @@
 package com.cineluxe.websocket;
 
-import com.cineluxe.domain.ShowtimeSeat;
+import com.cineluxe.entity.ShowtimeSeat;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.List;
