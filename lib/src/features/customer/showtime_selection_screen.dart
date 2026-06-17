@@ -4,6 +4,7 @@ import '../../core/app_theme.dart';
 import '../../core/formatters.dart';
 import '../../models/app_models.dart';
 import '../../state/cinema_store.dart';
+import 'age_gate_modal.dart';
 import 'booking_screen.dart';
 
 class ShowtimeSelectionScreen extends StatefulWidget {
@@ -318,14 +319,11 @@ class _CinemaShowtimeCard extends StatelessWidget {
                     return _ShowtimeCard(
                       showtime: showtime,
                       movie: movie,
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => BookingScreen(
-                            store: store,
-                            movie: movie,
-                            showtime: showtime,
-                          ),
-                        ),
+                      onTap: () => _navigateToBooking(
+                        context,
+                        store: store,
+                        movie: movie,
+                        showtime: showtime,
                       ),
                     );
                   },
@@ -557,4 +555,28 @@ class _SectionDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(height: 12, color: AppColors.pearl);
   }
+}
+
+/// Navigates to [BookingScreen], showing the age gate first when the movie
+/// has an ageRating of 'T18' and the user hasn't confirmed in this session.
+Future<void> _navigateToBooking(
+  BuildContext context, {
+  required CinemaStore store,
+  required Movie movie,
+  required Showtime showtime,
+}) async {
+  if (movie.ageRating == 'T18' && !AgeGateSession.isConfirmed(movie.id)) {
+    final confirmed = await showAgeGate(context, movie.id);
+    if (!confirmed) return; // user dismissed or underage — stay on this screen
+  }
+  if (!context.mounted) return;
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => BookingScreen(
+        store: store,
+        movie: movie,
+        showtime: showtime,
+      ),
+    ),
+  );
 }

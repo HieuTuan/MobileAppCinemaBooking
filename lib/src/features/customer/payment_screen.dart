@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../api/api_client.dart';
+import '../../../api/exceptions/api_exceptions.dart';
 import '../../../models/booking_models.dart' as api_models;
 import '../../../services/payment_service.dart';
 import '../../core/app_theme.dart';
@@ -166,6 +168,33 @@ class _PaymentScreenState extends State<PaymentScreen> {
         return;
       }
       await _showPaymentFailure(result);
+    } on DioException catch (error) {
+      if (!mounted) return;
+      setState(() => _processing = false);
+      if (error.error is ApiAuthorizationException) {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Xác minh độ tuổi yêu cầu'),
+            content: const Text(
+              'Phim này yêu cầu xác minh độ tuổi 18+. '
+              'Vui lòng cập nhật ngày sinh trong hồ sơ.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Đóng'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Không thể xử lý thanh toán. Vui lòng thử lại.'),
+          ),
+        );
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() => _processing = false);

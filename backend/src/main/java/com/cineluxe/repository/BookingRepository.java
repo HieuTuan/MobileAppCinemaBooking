@@ -12,6 +12,8 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
   List<Booking> findByUserIdAndStatusOrderByCreatedAtDesc(String userId, String status);
   List<Booking> findByStatusAndPaymentExpiresAtBefore(String status, Instant now);
 
+  boolean existsByUserIdAndStatus(String userId, String status);
+
   /**
    * Search bookings by booking ID and/or customer name, limited to showtimes within 24 hours.
    * Used by staff for manual ticket validation lookup.
