@@ -6,6 +6,7 @@ import '../models/review.dart';
 import '../models/showtime.dart';
 import '../models/paginated_response.dart';
 import '../models/booking_models.dart';
+import '../models/notification_preferences.dart';
 import 'interceptors/auth_interceptor.dart';
 import 'interceptors/error_interceptor.dart';
 import 'interceptors/retry_interceptor.dart';
@@ -629,5 +630,194 @@ class APIClient {
       ),
     );
     return ValidationResult.fromJson(response.data!);
+  }
+
+  /// Search bookings by booking ID or customer name for staff operations.
+  ///
+  /// **Requirements:**
+  /// - 12.1: Staff can search by booking ID using GET /api/bookings/search?bookingId={id}
+  /// - 12.2: Staff can search by customer name using GET /api/bookings/search?customerName={name}
+  /// - 12.3: Returns booking details with status, movieTitle, showtimeDateTime, seats, and qrCode
+  /// - 12.4: Returns empty array when no bookings match the search criteria
+  /// - 12.5: Limits results to bookings for showtimes within 24 hours (before/after current time)
+  ///
+  /// Parameters:
+  /// - [bookingId]: Optional booking ID to search for
+  /// - [customerName]: Optional customer name to search for
+  ///
+  /// At least one search parameter must be provided.
+  ///
+  /// Returns list of matching bookings limited to showtimes within 24 hours.
+  /// Returns empty list if no matches found.
+  ///
+  /// Example:
+  /// ```dart
+  /// // Search by booking ID
+  /// final bookings = await apiClient.searchBookings(bookingId: 'BK123456');
+  ///
+  /// // Search by customer name
+  /// final bookings = await apiClient.searchBookings(customerName: 'John Doe');
+  /// ```
+  Future<List<BookingDetails>> searchBookings({
+    String? bookingId,
+    String? customerName,
+    CancelToken? cancelToken,
+  }) async {
+    final queryParameters = <String, dynamic>{};
+
+    if (bookingId != null && bookingId.isNotEmpty) {
+      queryParameters['bookingId'] = bookingId;
+    }
+    if (customerName != null && customerName.isNotEmpty) {
+      queryParameters['customerName'] = customerName;
+    }
+
+    final response = await get<List<dynamic>>(
+      '/api/bookings/search',
+      queryParameters: queryParameters,
+      cancelToken: cancelToken,
+    );
+
+    return (response.data as List<dynamic>)
+        .map((json) => BookingDetails.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  // ============================================================================
+  // Push Notification Device Registration - Requirements 37.3, 37.5
+  // ============================================================================
+
+  /// Register device for push notifications.
+  ///
+  /// **Requirements:**
+  /// - 37.3: POST /api/users/{userId}/devices with deviceToken, platform, and deviceModel
+  /// - 37.5: Update registration when device token changes (app reinstall)
+  ///
+  /// Parameters:
+  /// - [userId]: User ID to register device for
+  /// - [deviceToken]: FCM token (Android) or APNs token (iOS)
+  /// - [platform]: Platform identifier ("android" or "ios")
+  /// - [deviceModel]: Device model information (optional)
+  ///
+  /// Returns void on success, throws exception on failure.
+  ///
+  /// Example:
+  /// ```dart
+  /// await apiClient.registerDevice(
+  ///   userId: 'user-123',
+  ///   deviceToken: 'fcm-token-...',
+  ///   platform: 'android',
+  ///   deviceModel: 'Samsung Galaxy S21',
+  /// );
+  /// ```
+  Future<void> registerDevice({
+    required String userId,
+    required String deviceToken,
+    required String platform,
+    String? deviceModel,
+    CancelToken? cancelToken,
+  }) async {
+    await post(
+      '/api/users/$userId/devices',
+      data: {
+        'deviceToken': deviceToken,
+        'platform': platform,
+        if (deviceModel != null) 'deviceModel': deviceModel,
+      },
+      cancelToken: cancelToken,
+    );
+  }
+
+  /// Unregister device from push notifications
+  ///
+  /// **Requirement 37.6**: DELETE /api/users/{userId}/devices/{deviceToken} to stop notifications
+  ///
+  /// This should be called when user logs out to stop sending notifications to the device.
+  ///
+  /// Parameters:
+  /// - [userId]: User ID whose device to unregister
+  /// - [deviceToken]: Device token to unregister
+  /// - [cancelToken]: Optional Dio cancel token for request cancellation
+  ///
+  /// Returns void on success, throws exception on failure.
+  ///
+  /// Example:
+  /// ```dart
+  /// await apiClient.unregisterDevice(
+  ///   userId: 'user-123',
+  ///   deviceToken: 'fcm-token-...',
+  /// );
+  /// ```
+  Future<void> unregisterDevice({
+    required String userId,
+    required String deviceToken,
+    CancelToken? cancelToken,
+  }) async {
+    await delete(
+      '/api/users/$userId/devices/$deviceToken',
+      cancelToken: cancelToken,
+    );
+  }
+
+  // ============================================================================
+  // Notification Preferences - Requirements 38.1, 38.2, 38.3
+  // ============================================================================
+
+  /// Get notification preferences for a user.
+  ///
+  /// **Requirements:**
+  /// - 38.1: GET /api/users/{userId}/notification-preferences when customer opens settings
+  /// - 38.2: Returns preferences with categories (showtimeReminders, promotions, newMovies, bookingUpdates)
+  ///
+  /// Parameters:
+  /// - [userId]: User ID to fetch preferences for
+  /// - [cancelToken]: Optional Dio cancel token for request cancellation
+  ///
+  /// Returns notification preferences with all category toggles.
+  ///
+  /// Example:
+  /// ```dart
+  /// final prefs = await apiClient.getNotificationPreferences('user-123');
+  /// print('Showtime reminders: ${prefs.showtimeReminders}');
+  /// ```
+  Future<NotificationPreferences> getNotificationPreferences(
+    String userId, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await get<Map<String, dynamic>>(
+      '/api/users/$userId/notification-preferences',
+      cancelToken: cancelToken,
+    );
+
+    return NotificationPreferences.fromJson(response.data!);
+  }
+
+  /// Update notification preferences for a user.
+  ///
+  /// **Requirements:**
+  /// - 38.3: PATCH /api/users/{userId}/notification-preferences with updated category
+  ///
+  /// Parameters:
+  /// - [userId]: User ID to update preferences for
+  /// - [preferences]: Updated notification preferences
+  /// - [cancelToken]: Optional Dio cancel token for request cancellation
+  ///
+  /// Returns void on success, throws exception on failure.
+  ///
+  /// Example:
+  /// ```dart
+  /// final updated = prefs.copyWith(promotions: false);
+  /// await apiClient.updateNotificationPreferences('user-123', updated);
+  /// ```
+  Future<void> updateNotificationPreferences(
+    String userId,
+    NotificationPreferences preferences, {
+    CancelToken? cancelToken,
+  }) async {
+    await patch(
+      '/api/users/$userId/notification-preferences',
+      data: preferences.toJson(),
+      cancelToken: cancelToken,
+    );
   }
 }

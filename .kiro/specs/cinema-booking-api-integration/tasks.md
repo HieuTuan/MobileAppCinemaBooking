@@ -2,7 +2,16 @@
 
 ## Overview
 
-This implementation plan transforms the existing Flutter cinema booking prototype into a production-ready platform by implementing comprehensive backend API connectivity, real-time seat synchronization via WebSocket, VNPay payment integration, Google OAuth authentication, push notifications, QR code ticket generation and validation, offline support, and administrative capabilities. The implementation uses Dart/Flutter for the mobile client with Dio HTTP client, WebSocket client for real-time updates, and integration with external services (VNPay, Google OAuth, FCM).
+This implementation plan transforms the existing Flutter cinema booking prototype into a production-ready platform by implementing comprehensive backend API connectivity, real-time seat synchronization via WebSocket, VNPay payment integration, Google OAuth authentication, push notifications, QR code ticket generation and validation, offline support, and administrative capabilities. 
+
+**Technical Stack:**
+- **Mobile**: Flutter (Dart) for Android and iOS with Dio HTTP client, WebSocket client for real-time updates
+- **Backend**: Spring Boot 3.4.6 + Java 17 (located in /backend folder)
+- **Database**: PostgreSQL with Spring Data JPA (Code First - entities define schema)
+- **Architecture**: Spring MVC (controller/service/repository/entity/dto layers)
+- **Package**: com.cineluxe.* with standard Spring Boot organization
+- **Existing Modules**: Booking, ShowtimeSeat (with @Version for optimistic locking), FoodCombo, WebSocket seat updates
+- **External Services**: VNPay payment gateway, Google OAuth 2.0, Firebase Cloud Messaging (FCM for Android, APNs for iOS)
 
 ## Tasks
 
@@ -278,96 +287,96 @@ This implementation plan transforms the existing Flutter cinema booking prototyp
     - Play audio/vibration feedback for validation result
     - _Requirements: 11.9_
 
-- [ ] 16. Implement staff manual booking lookup
-  - [~] 16.1 Implement booking search endpoints
+- [x] 16. Implement staff manual booking lookup
+  - [x] 16.1 Implement booking search endpoints
     - Implement searchBookings(bookingId, customerName) endpoint
     - Display search results with booking details
     - Limit results to showtimes within 24 hours
     - _Requirements: 12.1, 12.2, 12.3, 12.4_
   
-  - [~] 16.2 Implement manual validation from search results
+  - [x] 16.2 Implement manual validation from search results
     - Display manual validation button for selected booking
     - Call validation endpoint with staffId
     - Apply same validation rules as QR code validation
     - _Requirements: 12.6, 12.7, 12.8_
 
-- [ ] 17. Implement offline caching for bookings and movies
-  - [~] 17.1 Create CacheManager class with sqflite
+- [x] 17. Implement offline caching for bookings and movies
+  - [x] 17.1 Create CacheManager class with sqflite
     - Set up sqflite database with tables: cached_bookings, cached_movies
     - Implement cacheBooking, getCachedBookings, getCachedBooking methods
     - Implement cacheMovies, getCachedMovies, isCacheStale methods
     - _Requirements: 35.1, 35.2, 35.6_
   
-  - [~] 17.2 Implement QR code image caching
+  - [x] 17.2 Implement QR code image caching
     - Implement cacheQRCode(bookingId, imageData) method
     - Implement getCachedQRCode(bookingId) method
     - Store QR code PNG as blob in database
     - _Requirements: 10.7, 35.1_
   
-  - [~] 17.3 Implement offline mode UI with cache fallback
+  - [x] 17.3 Implement offline mode UI with cache fallback
     - Display cached bookings with offline indicator when network unavailable
     - Display cached movies with "Showing cached results" banner
     - Load QR code from cache for offline ticket display
     - _Requirements: 35.3, 35.4, 35.8_
   
-  - [~] 17.4 Implement cache synchronization on connectivity restoration
+  - [x] 17.4 Implement cache synchronization on connectivity restoration
     - Detect network connectivity changes
     - Sync cached bookings with backend to detect updates
     - Fetch fresh movie data and update cache
     - Use stale-while-revalidate pattern: show cache immediately, fetch updates in background
     - _Requirements: 35.5, 35.7_
 
-- [~] 18. Checkpoint - Staff features and offline support complete
+- [x] 18. Checkpoint - Staff features and offline support complete
   - Ensure QR scanning, validation, manual lookup, and offline caching work correctly, ask the user if questions arise.
 
 - [ ] 19. Implement push notification support
-  - [~] 19.1 Set up Firebase messaging integration
+  - [x] 19.1 Set up Firebase messaging integration
     - Add firebase_messaging and firebase_core packages
     - Configure Firebase project for Android and iOS
     - Set up GoogleService-Info.plist (iOS) and google-services.json (Android)
     - _Requirements: 15.3, 37.1_
   
-  - [~] 19.2 Create PushNotificationHandler class
+  - [x] 19.2 Create PushNotificationHandler class
     - Implement initialize() method to set up Firebase messaging
     - Implement requestPermission() for notification permissions
     - Obtain FCM token (Android) or APNs token (iOS)
     - _Requirements: 15.4, 37.2_
   
-  - [~] 19.3 Implement device registration endpoint
+  - [x] 19.3 Implement device registration endpoint
     - Implement registerDevice(deviceToken, platform) endpoint
     - Store device token on backend for push targeting
     - Handle token refresh when token changes
     - _Requirements: 37.3, 37.5_
   
-  - [~] 19.4 Implement notification handling and routing
+  - [x] 19.4 Implement notification handling and routing
     - Handle foreground notifications with in-app banner
     - Handle background/terminated notification taps
     - Route to appropriate screen based on deeplink: booking details, movie details, promotions
     - _Requirements: 15.6, 15.7, 16.6_
   
-  - [~] 19.5 Implement device unregistration on logout
+  - [x] 19.5 Implement device unregistration on logout
     - Call unregisterDevice endpoint when user logs out
     - Clear device token from backend
     - _Requirements: 37.6_
 
-- [ ] 20. Implement notification preferences management
-  - [~] 20.1 Create notification preferences UI
+- [x] 20. Implement notification preferences management
+  - [x] 20.1 Create notification preferences UI
     - Display toggle switches for: showtime reminders, promotions, new movies, booking updates
     - Implement getNotificationPreferences endpoint
     - Implement updateNotificationPreferences endpoint
     - _Requirements: 38.1, 38.2, 38.3, 38.6_
   
-  - [~] 20.2 Handle critical notifications override
+  - [x] 20.2 Handle critical notifications override
     - Ensure payment confirmations and booking cancellations always send regardless of preferences
     - _Requirements: 38.5_
 
-- [ ] 21. Implement verified movie reviews
-  - [~] 21.1 Create Review data models
+- [-] 21. Implement verified movie reviews
+  - [x] 21.1 Create Review data models
     - Create Review, CreateReviewRequest models with JSON serialization
     - Generate JSON serialization code
     - _Requirements: 14.3_
   
-  - [~] 21.2 Implement review creation endpoint
+  - [-] 21.2 Implement review creation endpoint
     - Implement createReview(movieId, rating, comment) endpoint
     - Handle 403 Forbidden error when user hasn't watched movie
     - Display verification badge for verified reviews

@@ -5,6 +5,7 @@ import '../../core/formatters.dart';
 import '../../core/labels.dart';
 import '../../shared/widgets/glass_card.dart';
 import '../../state/cinema_store.dart';
+import 'notification_preferences_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, required this.store});
@@ -102,16 +103,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         const SectionTitle(title: 'Cài đặt thông báo'),
         GlassCard(
-          child: Column(
-            children: widget.store.notificationSettings.entries.map((entry) {
-              return SwitchListTile(
-                value: entry.value,
-                onChanged: (value) =>
-                    widget.store.setNotification(entry.key, value),
-                title: Text(entry.key),
-                subtitle: const Text('Push notification trong app và email'),
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.notifications, color: AppColors.primary),
+            title: const Text('Quản lý thông báo'),
+            subtitle: const Text('Cài đặt tùy chọn nhận thông báo'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => NotificationPreferencesScreen(
+                    userId: user.id,
+                  ),
+                ),
               );
-            }).toList(),
+            },
           ),
         ),
         const SectionTitle(title: 'Lịch sử vé'),

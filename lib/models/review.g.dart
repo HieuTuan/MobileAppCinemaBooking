@@ -6,6 +6,23 @@ part of 'review.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
+CreateReviewRequest _$CreateReviewRequestFromJson(Map<String, dynamic> json) =>
+    CreateReviewRequest(
+      userId: json['userId'] as String,
+      movieId: json['movieId'] as String,
+      rating: (json['rating'] as num).toInt(),
+      comment: json['comment'] as String,
+    );
+
+Map<String, dynamic> _$CreateReviewRequestToJson(
+  CreateReviewRequest instance,
+) => <String, dynamic>{
+  'userId': instance.userId,
+  'movieId': instance.movieId,
+  'rating': instance.rating,
+  'comment': instance.comment,
+};
+
 Review _$ReviewFromJson(Map<String, dynamic> json) => Review(
   id: json['id'] as String,
   userId: json['userId'] as String,
