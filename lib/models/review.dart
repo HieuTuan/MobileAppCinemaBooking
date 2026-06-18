@@ -2,6 +2,84 @@ import 'package:json_annotation/json_annotation.dart';
 
 part 'review.g.dart';
 
+/// Request model for creating a new movie review.
+///
+/// **Requirements Coverage:**
+/// - Requirement 14.3: POST /api/reviews with userId, movieId, rating (1-5), and comment
+/// - Requirement 14.4: Rating must be integer between 1 and 5 inclusive
+/// - Requirement 14.5: Comment length must be between 10 and 500 characters
+///
+/// Usage:
+/// ```dart
+/// final request = CreateReviewRequest(
+///   userId: 'user-123',
+///   movieId: 'movie-456',
+///   rating: 5,
+///   comment: 'An amazing film with stunning visuals!',
+/// );
+/// final json = request.toJson();
+/// ```
+@JsonSerializable(includeIfNull: false)
+class CreateReviewRequest {
+  /// ID of the user submitting the review
+  final String userId;
+
+  /// ID of the movie being reviewed
+  final String movieId;
+
+  /// Star rating from 1 (worst) to 5 (best)
+  final int rating;
+
+  /// Review comment text (10–500 characters)
+  final String comment;
+
+  const CreateReviewRequest({
+    required this.userId,
+    required this.movieId,
+    required this.rating,
+    required this.comment,
+  });
+
+  /// Creates an instance from JSON map
+  factory CreateReviewRequest.fromJson(Map<String, dynamic> json) =>
+      _$CreateReviewRequestFromJson(json);
+
+  /// Converts instance to JSON map
+  Map<String, dynamic> toJson() => _$CreateReviewRequestToJson(this);
+
+  /// Validates that rating is in the range 1–5
+  String? validateRating() {
+    if (rating < 1 || rating > 5) {
+      return 'Rating must be between 1 and 5';
+    }
+    return null;
+  }
+
+  /// Validates that comment is between 10 and 500 characters
+  String? validateComment() {
+    if (comment.length < 10) {
+      return 'Comment must be at least 10 characters';
+    }
+    if (comment.length > 500) {
+      return 'Comment must not exceed 500 characters';
+    }
+    return null;
+  }
+
+  /// Validates all fields and returns a list of error messages
+  List<String> validate() {
+    final errors = <String>[];
+    final ratingError = validateRating();
+    if (ratingError != null) errors.add(ratingError);
+    final commentError = validateComment();
+    if (commentError != null) errors.add(commentError);
+    return errors;
+  }
+
+  /// Returns true when all fields pass validation
+  bool get isValid => validate().isEmpty;
+}
+
 /// Review model representing a customer's movie review.
 /// 
 /// **Requirements Coverage:**

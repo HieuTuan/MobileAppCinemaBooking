@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../models/app_models.dart';
+import '../../repositories/movie_repository.dart';
+import '../../shared/widgets/cache_banner.dart';
 import '../../shared/widgets/glass_card.dart';
 import '../../state/cinema_store.dart';
+import '../../utils/connectivity_service.dart';
 import 'movie_detail_screen.dart';
 
 class MovieListScreen extends StatefulWidget {
@@ -22,6 +27,15 @@ class _MovieListScreenState extends State<MovieListScreen> {
   MovieStatus? _status;
   double _featuredPage = 0;
 
+  final MovieRepository _movieRepo = MovieRepository();
+  final ConnectivityService _connectivity = ConnectivityService();
+
+  // Cache status (driven by repository + connectivity stream).
+  bool _fromCache = false;
+  DateTime? _cachedAt;
+  StreamSubscription? _changesSub;
+  StreamSubscription? _connectivitySub;
+
   PageController get _carouselController {
     return _featuredController ??= PageController(viewportFraction: .66)
       ..addListener(() {
@@ -33,10 +47,38 @@ class _MovieListScreenState extends State<MovieListScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _movieRepo.startAutoSync();
+    _changesSub = _movieRepo.changes.listen((_) {
+      if (!mounted) return;
+      setState(() {
+        _fromCache = false;
+        _cachedAt = DateTime.now();
+      });
+    });
+    _connectivitySub = _connectivity.connectivityStream.listen((_) {
+      if (!mounted) return;
+      setState(() {});
+    });
+  }
+
+  @override
   void dispose() {
+    _changesSub?.cancel();
+    _connectivitySub?.cancel();
     _search.dispose();
     _featuredController?.dispose();
     super.dispose();
+  }
+
+  Future<void> _pullRefresh() async {
+    final result = await _movieRepo.getMovies(forceRefresh: true);
+    if (!mounted) return;
+    setState(() {
+      _fromCache = result.fromCache;
+      _cachedAt = result.cachedAt;
+    });
   }
 
   @override
@@ -44,56 +86,63 @@ class _MovieListScreenState extends State<MovieListScreen> {
     final store = widget.store;
     final selectedGenre = _genre.isEmpty ? store.genres.first : _genre;
     final movies = store.searchMovies(_search.text, selectedGenre, _status);
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-      children: [
-        _FeaturedMovieCarousel(
-          movies: store.movies,
-          controller: _carouselController,
-          page: _featuredPage,
-          onMovieTap: (movie) => _openMovie(store, movie),
-        ),
-        const SizedBox(height: 14),
-        _HeroBanner(store: store),
-        const SizedBox(height: 14),
-        _MovieFilterBar(
-          search: _search,
-          genres: store.genres,
-          selectedGenre: selectedGenre,
-          selectedStatus: _status,
-          onSearchChanged: (_) => setState(() {}),
-          onStatusChanged: (status) => setState(() => _status = status),
-          onGenreChanged: (genre) => setState(() => _genre = genre),
-        ),
-        const SectionTitle(title: 'Phim phù hợp với bạn'),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            final columns = width >= 900
-                ? 4
-                : width >= 620
-                ? 3
-                : 2;
-            return GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: movies.length,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: columns,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: .58,
-              ),
-              itemBuilder: (context, index) {
-                return _MovieCard(
-                  movie: movies[index],
-                  onTap: () => _openMovie(store, movies[index]),
-                );
-              },
-            );
-          },
-        ),
-      ],
+    return RefreshIndicator(
+      onRefresh: _pullRefresh,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+        children: [
+          CacheBanner(
+            fromCache: _fromCache || !_connectivity.isOnline,
+            cachedAt: _cachedAt,
+          ),
+          _FeaturedMovieCarousel(
+            movies: store.movies,
+            controller: _carouselController,
+            page: _featuredPage,
+            onMovieTap: (movie) => _openMovie(store, movie),
+          ),
+          const SizedBox(height: 14),
+          _HeroBanner(store: store),
+          const SizedBox(height: 14),
+          _MovieFilterBar(
+            search: _search,
+            genres: store.genres,
+            selectedGenre: selectedGenre,
+            selectedStatus: _status,
+            onSearchChanged: (_) => setState(() {}),
+            onStatusChanged: (status) => setState(() => _status = status),
+            onGenreChanged: (genre) => setState(() => _genre = genre),
+          ),
+          const SectionTitle(title: 'Phim phù hợp với bạn'),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final columns = width >= 900
+                  ? 4
+                  : width >= 620
+                      ? 3
+                      : 2;
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: movies.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: .58,
+                ),
+                itemBuilder: (context, index) {
+                  return _MovieCard(
+                    movie: movies[index],
+                    onTap: () => _openMovie(store, movies[index]),
+                  );
+                },
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 

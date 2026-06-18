@@ -3,21 +3,22 @@
 // Do not manually edit this file.
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-import 'dart:async' as _i8;
+import 'dart:async' as _i9;
 
-import 'package:cine_book/api/api_client.dart' as _i7;
+import 'package:cine_book/api/api_client.dart' as _i8;
 import 'package:cine_book/models/booking_models.dart' as _i5;
 import 'package:cine_book/models/movie.dart' as _i4;
+import 'package:cine_book/models/notification_preferences.dart' as _i6;
 import 'package:cine_book/models/paginated_response.dart' as _i3;
-import 'package:cine_book/models/review.dart' as _i9;
-import 'package:cine_book/models/showtime.dart' as _i10;
-import 'package:cine_book/services/secure_storage_service.dart' as _i11;
+import 'package:cine_book/models/review.dart' as _i10;
+import 'package:cine_book/models/showtime.dart' as _i11;
+import 'package:cine_book/services/secure_storage_service.dart' as _i12;
 import 'package:dio/dio.dart' as _i2;
-import 'package:google_sign_in/google_sign_in.dart' as _i6;
+import 'package:google_sign_in/google_sign_in.dart' as _i7;
 import 'package:google_sign_in_platform_interface/google_sign_in_platform_interface.dart'
-    as _i12;
+    as _i13;
 import 'package:mockito/mockito.dart' as _i1;
-import 'package:mockito/src/dummies.dart' as _i13;
+import 'package:mockito/src/dummies.dart' as _i14;
 
 // ignore_for_file: type=lint
 // ignore_for_file: avoid_redundant_argument_values
@@ -105,16 +106,22 @@ class _FakeValidationResult_12 extends _i1.SmartFake
     : super(parent, parentInvocation);
 }
 
-class _FakeGoogleSignInAuthentication_13 extends _i1.SmartFake
-    implements _i6.GoogleSignInAuthentication {
-  _FakeGoogleSignInAuthentication_13(Object parent, Invocation parentInvocation)
+class _FakeNotificationPreferences_13 extends _i1.SmartFake
+    implements _i6.NotificationPreferences {
+  _FakeNotificationPreferences_13(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
+class _FakeGoogleSignInAuthentication_14 extends _i1.SmartFake
+    implements _i7.GoogleSignInAuthentication {
+  _FakeGoogleSignInAuthentication_14(Object parent, Invocation parentInvocation)
     : super(parent, parentInvocation);
 }
 
 /// A class which mocks [APIClient].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockAPIClient extends _i1.Mock implements _i7.APIClient {
+class MockAPIClient extends _i1.Mock implements _i8.APIClient {
   MockAPIClient() {
     _i1.throwOnMissingStub(this);
   }
@@ -186,7 +193,7 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
           as _i2.Options);
 
   @override
-  _i8.Future<_i2.Response<T>> get<T>(
+  _i9.Future<_i2.Response<T>> get<T>(
     String? path, {
     Map<String, dynamic>? queryParameters,
     _i2.Options? options,
@@ -204,7 +211,7 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
                 #onReceiveProgress: onReceiveProgress,
               },
             ),
-            returnValue: _i8.Future<_i2.Response<T>>.value(
+            returnValue: _i9.Future<_i2.Response<T>>.value(
               _FakeResponse_2<T>(
                 this,
                 Invocation.method(
@@ -220,10 +227,10 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
               ),
             ),
           )
-          as _i8.Future<_i2.Response<T>>);
+          as _i9.Future<_i2.Response<T>>);
 
   @override
-  _i8.Future<_i2.Response<T>> post<T>(
+  _i9.Future<_i2.Response<T>> post<T>(
     String? path, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
@@ -245,7 +252,7 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
                 #onReceiveProgress: onReceiveProgress,
               },
             ),
-            returnValue: _i8.Future<_i2.Response<T>>.value(
+            returnValue: _i9.Future<_i2.Response<T>>.value(
               _FakeResponse_2<T>(
                 this,
                 Invocation.method(
@@ -263,10 +270,10 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
               ),
             ),
           )
-          as _i8.Future<_i2.Response<T>>);
+          as _i9.Future<_i2.Response<T>>);
 
   @override
-  _i8.Future<_i2.Response<T>> postPayment<T>(
+  _i9.Future<_i2.Response<T>> postPayment<T>(
     String? path, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
@@ -286,7 +293,7 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
                 #onReceiveProgress: onReceiveProgress,
               },
             ),
-            returnValue: _i8.Future<_i2.Response<T>>.value(
+            returnValue: _i9.Future<_i2.Response<T>>.value(
               _FakeResponse_2<T>(
                 this,
                 Invocation.method(
@@ -303,10 +310,10 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
               ),
             ),
           )
-          as _i8.Future<_i2.Response<T>>);
+          as _i9.Future<_i2.Response<T>>);
 
   @override
-  _i8.Future<_i2.Response<T>> put<T>(
+  _i9.Future<_i2.Response<T>> put<T>(
     String? path, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
@@ -328,7 +335,7 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
                 #onReceiveProgress: onReceiveProgress,
               },
             ),
-            returnValue: _i8.Future<_i2.Response<T>>.value(
+            returnValue: _i9.Future<_i2.Response<T>>.value(
               _FakeResponse_2<T>(
                 this,
                 Invocation.method(
@@ -346,10 +353,10 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
               ),
             ),
           )
-          as _i8.Future<_i2.Response<T>>);
+          as _i9.Future<_i2.Response<T>>);
 
   @override
-  _i8.Future<_i2.Response<T>> patch<T>(
+  _i9.Future<_i2.Response<T>> patch<T>(
     String? path, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
@@ -371,7 +378,7 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
                 #onReceiveProgress: onReceiveProgress,
               },
             ),
-            returnValue: _i8.Future<_i2.Response<T>>.value(
+            returnValue: _i9.Future<_i2.Response<T>>.value(
               _FakeResponse_2<T>(
                 this,
                 Invocation.method(
@@ -389,10 +396,10 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
               ),
             ),
           )
-          as _i8.Future<_i2.Response<T>>);
+          as _i9.Future<_i2.Response<T>>);
 
   @override
-  _i8.Future<_i2.Response<T>> delete<T>(
+  _i9.Future<_i2.Response<T>> delete<T>(
     String? path, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
@@ -410,7 +417,7 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
                 #cancelToken: cancelToken,
               },
             ),
-            returnValue: _i8.Future<_i2.Response<T>>.value(
+            returnValue: _i9.Future<_i2.Response<T>>.value(
               _FakeResponse_2<T>(
                 this,
                 Invocation.method(
@@ -426,10 +433,10 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
               ),
             ),
           )
-          as _i8.Future<_i2.Response<T>>);
+          as _i9.Future<_i2.Response<T>>);
 
   @override
-  _i8.Future<_i3.PaginatedResponse<_i4.Movie>> getMovies({
+  _i9.Future<_i3.PaginatedResponse<_i4.Movie>> getMovies({
     String? search,
     String? genre,
     String? status,
@@ -446,7 +453,7 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
               #pageSize: pageSize,
               #cancelToken: cancelToken,
             }),
-            returnValue: _i8.Future<_i3.PaginatedResponse<_i4.Movie>>.value(
+            returnValue: _i9.Future<_i3.PaginatedResponse<_i4.Movie>>.value(
               _FakePaginatedResponse_3<_i4.Movie>(
                 this,
                 Invocation.method(#getMovies, [], {
@@ -460,10 +467,10 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
               ),
             ),
           )
-          as _i8.Future<_i3.PaginatedResponse<_i4.Movie>>);
+          as _i9.Future<_i3.PaginatedResponse<_i4.Movie>>);
 
   @override
-  _i8.Future<_i4.Movie> getMovieDetails(
+  _i9.Future<_i4.Movie> getMovieDetails(
     String? movieId, {
     _i2.CancelToken? cancelToken,
   }) =>
@@ -473,7 +480,7 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
               [movieId],
               {#cancelToken: cancelToken},
             ),
-            returnValue: _i8.Future<_i4.Movie>.value(
+            returnValue: _i9.Future<_i4.Movie>.value(
               _FakeMovie_4(
                 this,
                 Invocation.method(
@@ -484,10 +491,10 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
               ),
             ),
           )
-          as _i8.Future<_i4.Movie>);
+          as _i9.Future<_i4.Movie>);
 
   @override
-  _i8.Future<_i3.PaginatedResponse<_i9.Review>> getMovieReviews(
+  _i9.Future<_i3.PaginatedResponse<_i10.Review>> getMovieReviews(
     String? movieId, {
     int? page = 1,
     int? pageSize = 20,
@@ -499,8 +506,8 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
               [movieId],
               {#page: page, #pageSize: pageSize, #cancelToken: cancelToken},
             ),
-            returnValue: _i8.Future<_i3.PaginatedResponse<_i9.Review>>.value(
-              _FakePaginatedResponse_3<_i9.Review>(
+            returnValue: _i9.Future<_i3.PaginatedResponse<_i10.Review>>.value(
+              _FakePaginatedResponse_3<_i10.Review>(
                 this,
                 Invocation.method(
                   #getMovieReviews,
@@ -510,10 +517,10 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
               ),
             ),
           )
-          as _i8.Future<_i3.PaginatedResponse<_i9.Review>>);
+          as _i9.Future<_i3.PaginatedResponse<_i10.Review>>);
 
   @override
-  _i8.Future<List<_i10.Showtime>> getShowtimes(
+  _i9.Future<List<_i11.Showtime>> getShowtimes(
     String? movieId, {
     DateTime? date,
     _i2.CancelToken? cancelToken,
@@ -524,24 +531,24 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
               [movieId],
               {#date: date, #cancelToken: cancelToken},
             ),
-            returnValue: _i8.Future<List<_i10.Showtime>>.value(
-              <_i10.Showtime>[],
+            returnValue: _i9.Future<List<_i11.Showtime>>.value(
+              <_i11.Showtime>[],
             ),
           )
-          as _i8.Future<List<_i10.Showtime>>);
+          as _i9.Future<List<_i11.Showtime>>);
 
   @override
-  _i8.Future<_i5.SeatMap> getSeats(String? showtimeId) =>
+  _i9.Future<_i5.SeatMap> getSeats(String? showtimeId) =>
       (super.noSuchMethod(
             Invocation.method(#getSeats, [showtimeId]),
-            returnValue: _i8.Future<_i5.SeatMap>.value(
+            returnValue: _i9.Future<_i5.SeatMap>.value(
               _FakeSeatMap_5(this, Invocation.method(#getSeats, [showtimeId])),
             ),
           )
-          as _i8.Future<_i5.SeatMap>);
+          as _i9.Future<_i5.SeatMap>);
 
   @override
-  _i8.Future<_i5.HoldResponse> holdSeats(
+  _i9.Future<_i5.HoldResponse> holdSeats(
     String? showtimeId,
     List<String>? seatCodes, {
     String? userId,
@@ -552,7 +559,7 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
               [showtimeId, seatCodes],
               {#userId: userId},
             ),
-            returnValue: _i8.Future<_i5.HoldResponse>.value(
+            returnValue: _i9.Future<_i5.HoldResponse>.value(
               _FakeHoldResponse_6(
                 this,
                 Invocation.method(
@@ -563,80 +570,80 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
               ),
             ),
           )
-          as _i8.Future<_i5.HoldResponse>);
+          as _i9.Future<_i5.HoldResponse>);
 
   @override
-  _i8.Future<List<_i5.FoodCombo>> getFoodCombos() =>
+  _i9.Future<List<_i5.FoodCombo>> getFoodCombos() =>
       (super.noSuchMethod(
             Invocation.method(#getFoodCombos, []),
-            returnValue: _i8.Future<List<_i5.FoodCombo>>.value(
+            returnValue: _i9.Future<List<_i5.FoodCombo>>.value(
               <_i5.FoodCombo>[],
             ),
           )
-          as _i8.Future<List<_i5.FoodCombo>>);
+          as _i9.Future<List<_i5.FoodCombo>>);
 
   @override
-  _i8.Future<_i5.BookingResponse> createBooking(
+  _i9.Future<_i5.BookingResponse> createBooking(
     _i5.CreateBookingRequest? request,
   ) =>
       (super.noSuchMethod(
             Invocation.method(#createBooking, [request]),
-            returnValue: _i8.Future<_i5.BookingResponse>.value(
+            returnValue: _i9.Future<_i5.BookingResponse>.value(
               _FakeBookingResponse_7(
                 this,
                 Invocation.method(#createBooking, [request]),
               ),
             ),
           )
-          as _i8.Future<_i5.BookingResponse>);
+          as _i9.Future<_i5.BookingResponse>);
 
   @override
-  _i8.Future<_i5.BookingDetails> getBookingDetails(String? bookingId) =>
+  _i9.Future<_i5.BookingDetails> getBookingDetails(String? bookingId) =>
       (super.noSuchMethod(
             Invocation.method(#getBookingDetails, [bookingId]),
-            returnValue: _i8.Future<_i5.BookingDetails>.value(
+            returnValue: _i9.Future<_i5.BookingDetails>.value(
               _FakeBookingDetails_8(
                 this,
                 Invocation.method(#getBookingDetails, [bookingId]),
               ),
             ),
           )
-          as _i8.Future<_i5.BookingDetails>);
+          as _i9.Future<_i5.BookingDetails>);
 
   @override
-  _i8.Future<List<_i5.BookingDetails>> getUserBookings(
+  _i9.Future<List<_i5.BookingDetails>> getUserBookings(
     String? userId, {
     String? status,
   }) =>
       (super.noSuchMethod(
             Invocation.method(#getUserBookings, [userId], {#status: status}),
-            returnValue: _i8.Future<List<_i5.BookingDetails>>.value(
+            returnValue: _i9.Future<List<_i5.BookingDetails>>.value(
               <_i5.BookingDetails>[],
             ),
           )
-          as _i8.Future<List<_i5.BookingDetails>>);
+          as _i9.Future<List<_i5.BookingDetails>>);
 
   @override
-  _i8.Future<_i5.BookingQr> getBookingQr(String? bookingId) =>
+  _i9.Future<_i5.BookingQr> getBookingQr(String? bookingId) =>
       (super.noSuchMethod(
             Invocation.method(#getBookingQr, [bookingId]),
-            returnValue: _i8.Future<_i5.BookingQr>.value(
+            returnValue: _i9.Future<_i5.BookingQr>.value(
               _FakeBookingQr_9(
                 this,
                 Invocation.method(#getBookingQr, [bookingId]),
               ),
             ),
           )
-          as _i8.Future<_i5.BookingQr>);
+          as _i9.Future<_i5.BookingQr>);
 
   @override
-  _i8.Future<_i5.CancelBookingResponse> cancelBooking(
+  _i9.Future<_i5.CancelBookingResponse> cancelBooking(
     String? bookingId, {
     String? userId,
   }) =>
       (super.noSuchMethod(
             Invocation.method(#cancelBooking, [bookingId], {#userId: userId}),
-            returnValue: _i8.Future<_i5.CancelBookingResponse>.value(
+            returnValue: _i9.Future<_i5.CancelBookingResponse>.value(
               _FakeCancelBookingResponse_10(
                 this,
                 Invocation.method(
@@ -647,23 +654,23 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
               ),
             ),
           )
-          as _i8.Future<_i5.CancelBookingResponse>);
+          as _i9.Future<_i5.CancelBookingResponse>);
 
   @override
-  _i8.Future<_i5.PaymentStatusResult> getPaymentStatus(String? bookingId) =>
+  _i9.Future<_i5.PaymentStatusResult> getPaymentStatus(String? bookingId) =>
       (super.noSuchMethod(
             Invocation.method(#getPaymentStatus, [bookingId]),
-            returnValue: _i8.Future<_i5.PaymentStatusResult>.value(
+            returnValue: _i9.Future<_i5.PaymentStatusResult>.value(
               _FakePaymentStatusResult_11(
                 this,
                 Invocation.method(#getPaymentStatus, [bookingId]),
               ),
             ),
           )
-          as _i8.Future<_i5.PaymentStatusResult>);
+          as _i9.Future<_i5.PaymentStatusResult>);
 
   @override
-  _i8.Future<_i5.ValidationResult> validateTicket(
+  _i9.Future<_i5.ValidationResult> validateTicket(
     String? bookingId,
     String? expectedShowtimeId, {
     String? staffId,
@@ -674,7 +681,7 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
               [bookingId, expectedShowtimeId],
               {#staffId: staffId},
             ),
-            returnValue: _i8.Future<_i5.ValidationResult>.value(
+            returnValue: _i9.Future<_i5.ValidationResult>.value(
               _FakeValidationResult_12(
                 this,
                 Invocation.method(
@@ -685,119 +692,250 @@ class MockAPIClient extends _i1.Mock implements _i7.APIClient {
               ),
             ),
           )
-          as _i8.Future<_i5.ValidationResult>);
+          as _i9.Future<_i5.ValidationResult>);
+
+  @override
+  _i9.Future<List<_i5.BookingDetails>> searchBookings({
+    String? bookingId,
+    String? customerName,
+    _i2.CancelToken? cancelToken,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#searchBookings, [], {
+              #bookingId: bookingId,
+              #customerName: customerName,
+              #cancelToken: cancelToken,
+            }),
+            returnValue: _i9.Future<List<_i5.BookingDetails>>.value(
+              <_i5.BookingDetails>[],
+            ),
+          )
+          as _i9.Future<List<_i5.BookingDetails>>);
+
+  @override
+  _i9.Future<void> registerDevice({
+    required String? userId,
+    required String? deviceToken,
+    required String? platform,
+    String? deviceModel,
+    _i2.CancelToken? cancelToken,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#registerDevice, [], {
+              #userId: userId,
+              #deviceToken: deviceToken,
+              #platform: platform,
+              #deviceModel: deviceModel,
+              #cancelToken: cancelToken,
+            }),
+            returnValue: _i9.Future<void>.value(),
+            returnValueForMissingStub: _i9.Future<void>.value(),
+          )
+          as _i9.Future<void>);
+
+  @override
+  _i9.Future<void> unregisterDevice({
+    required String? userId,
+    required String? deviceToken,
+    _i2.CancelToken? cancelToken,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#unregisterDevice, [], {
+              #userId: userId,
+              #deviceToken: deviceToken,
+              #cancelToken: cancelToken,
+            }),
+            returnValue: _i9.Future<void>.value(),
+            returnValueForMissingStub: _i9.Future<void>.value(),
+          )
+          as _i9.Future<void>);
+
+  @override
+  _i9.Future<_i6.NotificationPreferences> getNotificationPreferences(
+    String? userId, {
+    _i2.CancelToken? cancelToken,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(
+              #getNotificationPreferences,
+              [userId],
+              {#cancelToken: cancelToken},
+            ),
+            returnValue: _i9.Future<_i6.NotificationPreferences>.value(
+              _FakeNotificationPreferences_13(
+                this,
+                Invocation.method(
+                  #getNotificationPreferences,
+                  [userId],
+                  {#cancelToken: cancelToken},
+                ),
+              ),
+            ),
+          )
+          as _i9.Future<_i6.NotificationPreferences>);
+
+  @override
+  _i9.Future<void> updateNotificationPreferences(
+    String? userId,
+    _i6.NotificationPreferences? preferences, {
+    _i2.CancelToken? cancelToken,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(
+              #updateNotificationPreferences,
+              [userId, preferences],
+              {#cancelToken: cancelToken},
+            ),
+            returnValue: _i9.Future<void>.value(),
+            returnValueForMissingStub: _i9.Future<void>.value(),
+          )
+          as _i9.Future<void>);
 }
 
 /// A class which mocks [SecureStorageService].
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockSecureStorageService extends _i1.Mock
-    implements _i11.SecureStorageService {
+    implements _i12.SecureStorageService {
   MockSecureStorageService() {
     _i1.throwOnMissingStub(this);
   }
 
   @override
-  _i8.Future<void> saveAccessToken(String? token) =>
+  _i9.Future<void> saveAccessToken(String? token) =>
       (super.noSuchMethod(
             Invocation.method(#saveAccessToken, [token]),
-            returnValue: _i8.Future<void>.value(),
-            returnValueForMissingStub: _i8.Future<void>.value(),
+            returnValue: _i9.Future<void>.value(),
+            returnValueForMissingStub: _i9.Future<void>.value(),
           )
-          as _i8.Future<void>);
+          as _i9.Future<void>);
 
   @override
-  _i8.Future<void> saveRefreshToken(String? token) =>
+  _i9.Future<void> saveRefreshToken(String? token) =>
       (super.noSuchMethod(
             Invocation.method(#saveRefreshToken, [token]),
-            returnValue: _i8.Future<void>.value(),
-            returnValueForMissingStub: _i8.Future<void>.value(),
+            returnValue: _i9.Future<void>.value(),
+            returnValueForMissingStub: _i9.Future<void>.value(),
           )
-          as _i8.Future<void>);
+          as _i9.Future<void>);
 
   @override
-  _i8.Future<void> saveTokenExpiry(DateTime? expiryTime) =>
+  _i9.Future<void> saveTokenExpiry(DateTime? expiryTime) =>
       (super.noSuchMethod(
             Invocation.method(#saveTokenExpiry, [expiryTime]),
-            returnValue: _i8.Future<void>.value(),
-            returnValueForMissingStub: _i8.Future<void>.value(),
+            returnValue: _i9.Future<void>.value(),
+            returnValueForMissingStub: _i9.Future<void>.value(),
           )
-          as _i8.Future<void>);
+          as _i9.Future<void>);
 
   @override
-  _i8.Future<String?> getAccessToken() =>
+  _i9.Future<String?> getAccessToken() =>
       (super.noSuchMethod(
             Invocation.method(#getAccessToken, []),
-            returnValue: _i8.Future<String?>.value(),
+            returnValue: _i9.Future<String?>.value(),
           )
-          as _i8.Future<String?>);
+          as _i9.Future<String?>);
 
   @override
-  _i8.Future<String?> getRefreshToken() =>
+  _i9.Future<String?> getRefreshToken() =>
       (super.noSuchMethod(
             Invocation.method(#getRefreshToken, []),
-            returnValue: _i8.Future<String?>.value(),
+            returnValue: _i9.Future<String?>.value(),
           )
-          as _i8.Future<String?>);
+          as _i9.Future<String?>);
 
   @override
-  _i8.Future<DateTime?> getTokenExpiry() =>
+  _i9.Future<DateTime?> getTokenExpiry() =>
       (super.noSuchMethod(
             Invocation.method(#getTokenExpiry, []),
-            returnValue: _i8.Future<DateTime?>.value(),
+            returnValue: _i9.Future<DateTime?>.value(),
           )
-          as _i8.Future<DateTime?>);
+          as _i9.Future<DateTime?>);
 
   @override
-  _i8.Future<bool> hasAccessToken() =>
+  _i9.Future<bool> hasAccessToken() =>
       (super.noSuchMethod(
             Invocation.method(#hasAccessToken, []),
-            returnValue: _i8.Future<bool>.value(false),
+            returnValue: _i9.Future<bool>.value(false),
           )
-          as _i8.Future<bool>);
+          as _i9.Future<bool>);
 
   @override
-  _i8.Future<bool> isTokenExpired() =>
+  _i9.Future<bool> isTokenExpired() =>
       (super.noSuchMethod(
             Invocation.method(#isTokenExpired, []),
-            returnValue: _i8.Future<bool>.value(false),
+            returnValue: _i9.Future<bool>.value(false),
           )
-          as _i8.Future<bool>);
+          as _i9.Future<bool>);
 
   @override
-  _i8.Future<void> clearTokens() =>
+  _i9.Future<void> clearTokens() =>
       (super.noSuchMethod(
             Invocation.method(#clearTokens, []),
-            returnValue: _i8.Future<void>.value(),
-            returnValueForMissingStub: _i8.Future<void>.value(),
+            returnValue: _i9.Future<void>.value(),
+            returnValueForMissingStub: _i9.Future<void>.value(),
           )
-          as _i8.Future<void>);
+          as _i9.Future<void>);
 
   @override
-  _i8.Future<void> clearAll() =>
+  _i9.Future<void> saveDeviceToken(String? token) =>
+      (super.noSuchMethod(
+            Invocation.method(#saveDeviceToken, [token]),
+            returnValue: _i9.Future<void>.value(),
+            returnValueForMissingStub: _i9.Future<void>.value(),
+          )
+          as _i9.Future<void>);
+
+  @override
+  _i9.Future<String?> getDeviceToken() =>
+      (super.noSuchMethod(
+            Invocation.method(#getDeviceToken, []),
+            returnValue: _i9.Future<String?>.value(),
+          )
+          as _i9.Future<String?>);
+
+  @override
+  _i9.Future<bool> hasDeviceTokenChanged(String? currentToken) =>
+      (super.noSuchMethod(
+            Invocation.method(#hasDeviceTokenChanged, [currentToken]),
+            returnValue: _i9.Future<bool>.value(false),
+          )
+          as _i9.Future<bool>);
+
+  @override
+  _i9.Future<void> clearDeviceToken() =>
+      (super.noSuchMethod(
+            Invocation.method(#clearDeviceToken, []),
+            returnValue: _i9.Future<void>.value(),
+            returnValueForMissingStub: _i9.Future<void>.value(),
+          )
+          as _i9.Future<void>);
+
+  @override
+  _i9.Future<void> clearAll() =>
       (super.noSuchMethod(
             Invocation.method(#clearAll, []),
-            returnValue: _i8.Future<void>.value(),
-            returnValueForMissingStub: _i8.Future<void>.value(),
+            returnValue: _i9.Future<void>.value(),
+            returnValueForMissingStub: _i9.Future<void>.value(),
           )
-          as _i8.Future<void>);
+          as _i9.Future<void>);
 }
 
 /// A class which mocks [GoogleSignIn].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockGoogleSignIn extends _i1.Mock implements _i6.GoogleSignIn {
+class MockGoogleSignIn extends _i1.Mock implements _i7.GoogleSignIn {
   MockGoogleSignIn() {
     _i1.throwOnMissingStub(this);
   }
 
   @override
-  _i12.SignInOption get signInOption =>
+  _i13.SignInOption get signInOption =>
       (super.noSuchMethod(
             Invocation.getter(#signInOption),
-            returnValue: _i12.SignInOption.standard,
+            returnValue: _i13.SignInOption.standard,
           )
-          as _i12.SignInOption);
+          as _i13.SignInOption);
 
   @override
   List<String> get scopes =>
@@ -813,15 +951,15 @@ class MockGoogleSignIn extends _i1.Mock implements _i6.GoogleSignIn {
           as bool);
 
   @override
-  _i8.Stream<_i6.GoogleSignInAccount?> get onCurrentUserChanged =>
+  _i9.Stream<_i7.GoogleSignInAccount?> get onCurrentUserChanged =>
       (super.noSuchMethod(
             Invocation.getter(#onCurrentUserChanged),
-            returnValue: _i8.Stream<_i6.GoogleSignInAccount?>.empty(),
+            returnValue: _i9.Stream<_i7.GoogleSignInAccount?>.empty(),
           )
-          as _i8.Stream<_i6.GoogleSignInAccount?>);
+          as _i9.Stream<_i7.GoogleSignInAccount?>);
 
   @override
-  _i8.Future<_i6.GoogleSignInAccount?> signInSilently({
+  _i9.Future<_i7.GoogleSignInAccount?> signInSilently({
     bool? suppressErrors = true,
     bool? reAuthenticate = false,
   }) =>
@@ -830,52 +968,52 @@ class MockGoogleSignIn extends _i1.Mock implements _i6.GoogleSignIn {
               #suppressErrors: suppressErrors,
               #reAuthenticate: reAuthenticate,
             }),
-            returnValue: _i8.Future<_i6.GoogleSignInAccount?>.value(),
+            returnValue: _i9.Future<_i7.GoogleSignInAccount?>.value(),
           )
-          as _i8.Future<_i6.GoogleSignInAccount?>);
+          as _i9.Future<_i7.GoogleSignInAccount?>);
 
   @override
-  _i8.Future<bool> isSignedIn() =>
+  _i9.Future<bool> isSignedIn() =>
       (super.noSuchMethod(
             Invocation.method(#isSignedIn, []),
-            returnValue: _i8.Future<bool>.value(false),
+            returnValue: _i9.Future<bool>.value(false),
           )
-          as _i8.Future<bool>);
+          as _i9.Future<bool>);
 
   @override
-  _i8.Future<_i6.GoogleSignInAccount?> signIn() =>
+  _i9.Future<_i7.GoogleSignInAccount?> signIn() =>
       (super.noSuchMethod(
             Invocation.method(#signIn, []),
-            returnValue: _i8.Future<_i6.GoogleSignInAccount?>.value(),
+            returnValue: _i9.Future<_i7.GoogleSignInAccount?>.value(),
           )
-          as _i8.Future<_i6.GoogleSignInAccount?>);
+          as _i9.Future<_i7.GoogleSignInAccount?>);
 
   @override
-  _i8.Future<_i6.GoogleSignInAccount?> signOut() =>
+  _i9.Future<_i7.GoogleSignInAccount?> signOut() =>
       (super.noSuchMethod(
             Invocation.method(#signOut, []),
-            returnValue: _i8.Future<_i6.GoogleSignInAccount?>.value(),
+            returnValue: _i9.Future<_i7.GoogleSignInAccount?>.value(),
           )
-          as _i8.Future<_i6.GoogleSignInAccount?>);
+          as _i9.Future<_i7.GoogleSignInAccount?>);
 
   @override
-  _i8.Future<_i6.GoogleSignInAccount?> disconnect() =>
+  _i9.Future<_i7.GoogleSignInAccount?> disconnect() =>
       (super.noSuchMethod(
             Invocation.method(#disconnect, []),
-            returnValue: _i8.Future<_i6.GoogleSignInAccount?>.value(),
+            returnValue: _i9.Future<_i7.GoogleSignInAccount?>.value(),
           )
-          as _i8.Future<_i6.GoogleSignInAccount?>);
+          as _i9.Future<_i7.GoogleSignInAccount?>);
 
   @override
-  _i8.Future<bool> requestScopes(List<String>? scopes) =>
+  _i9.Future<bool> requestScopes(List<String>? scopes) =>
       (super.noSuchMethod(
             Invocation.method(#requestScopes, [scopes]),
-            returnValue: _i8.Future<bool>.value(false),
+            returnValue: _i9.Future<bool>.value(false),
           )
-          as _i8.Future<bool>);
+          as _i9.Future<bool>);
 
   @override
-  _i8.Future<bool> canAccessScopes(
+  _i9.Future<bool> canAccessScopes(
     List<String>? scopes, {
     String? accessToken,
   }) =>
@@ -885,9 +1023,9 @@ class MockGoogleSignIn extends _i1.Mock implements _i6.GoogleSignIn {
               [scopes],
               {#accessToken: accessToken},
             ),
-            returnValue: _i8.Future<bool>.value(false),
+            returnValue: _i9.Future<bool>.value(false),
           )
-          as _i8.Future<bool>);
+          as _i9.Future<bool>);
 }
 
 /// A class which mocks [GoogleSignInAccount].
@@ -895,7 +1033,7 @@ class MockGoogleSignIn extends _i1.Mock implements _i6.GoogleSignIn {
 /// See the documentation for Mockito's code generation for more information.
 // ignore: must_be_immutable
 class MockGoogleSignInAccount extends _i1.Mock
-    implements _i6.GoogleSignInAccount {
+    implements _i7.GoogleSignInAccount {
   MockGoogleSignInAccount() {
     _i1.throwOnMissingStub(this);
   }
@@ -904,7 +1042,7 @@ class MockGoogleSignInAccount extends _i1.Mock
   String get email =>
       (super.noSuchMethod(
             Invocation.getter(#email),
-            returnValue: _i13.dummyValue<String>(
+            returnValue: _i14.dummyValue<String>(
               this,
               Invocation.getter(#email),
             ),
@@ -915,48 +1053,48 @@ class MockGoogleSignInAccount extends _i1.Mock
   String get id =>
       (super.noSuchMethod(
             Invocation.getter(#id),
-            returnValue: _i13.dummyValue<String>(this, Invocation.getter(#id)),
+            returnValue: _i14.dummyValue<String>(this, Invocation.getter(#id)),
           )
           as String);
 
   @override
-  _i8.Future<_i6.GoogleSignInAuthentication> get authentication =>
+  _i9.Future<_i7.GoogleSignInAuthentication> get authentication =>
       (super.noSuchMethod(
             Invocation.getter(#authentication),
-            returnValue: _i8.Future<_i6.GoogleSignInAuthentication>.value(
-              _FakeGoogleSignInAuthentication_13(
+            returnValue: _i9.Future<_i7.GoogleSignInAuthentication>.value(
+              _FakeGoogleSignInAuthentication_14(
                 this,
                 Invocation.getter(#authentication),
               ),
             ),
           )
-          as _i8.Future<_i6.GoogleSignInAuthentication>);
+          as _i9.Future<_i7.GoogleSignInAuthentication>);
 
   @override
-  _i8.Future<Map<String, String>> get authHeaders =>
+  _i9.Future<Map<String, String>> get authHeaders =>
       (super.noSuchMethod(
             Invocation.getter(#authHeaders),
-            returnValue: _i8.Future<Map<String, String>>.value(
+            returnValue: _i9.Future<Map<String, String>>.value(
               <String, String>{},
             ),
           )
-          as _i8.Future<Map<String, String>>);
+          as _i9.Future<Map<String, String>>);
 
   @override
-  _i8.Future<void> clearAuthCache() =>
+  _i9.Future<void> clearAuthCache() =>
       (super.noSuchMethod(
             Invocation.method(#clearAuthCache, []),
-            returnValue: _i8.Future<void>.value(),
-            returnValueForMissingStub: _i8.Future<void>.value(),
+            returnValue: _i9.Future<void>.value(),
+            returnValueForMissingStub: _i9.Future<void>.value(),
           )
-          as _i8.Future<void>);
+          as _i9.Future<void>);
 }
 
 /// A class which mocks [GoogleSignInAuthentication].
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockGoogleSignInAuthentication extends _i1.Mock
-    implements _i6.GoogleSignInAuthentication {
+    implements _i7.GoogleSignInAuthentication {
   MockGoogleSignInAuthentication() {
     _i1.throwOnMissingStub(this);
   }

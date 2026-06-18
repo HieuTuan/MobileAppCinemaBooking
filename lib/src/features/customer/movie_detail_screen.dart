@@ -5,6 +5,7 @@ import '../../core/formatters.dart';
 import '../../models/app_models.dart';
 import '../../state/cinema_store.dart';
 import 'booking_screen.dart';
+import 'movie_reviews_section.dart';
 import 'showtime_selection_screen.dart';
 
 class MovieDetailScreen extends StatelessWidget {
@@ -88,7 +89,10 @@ class MovieDetailScreen extends StatelessWidget {
           const _SectionDivider(),
           _ShowtimeSection(store: store, movie: movie, showtimes: showtimes),
           const _SectionDivider(),
-          _AudienceReviews(store: store, movie: movie),
+          MovieReviewsSection(
+            movieId: movie.id,
+            currentUserId: store.currentUser?.id,
+          ),
         ],
       ),
     );

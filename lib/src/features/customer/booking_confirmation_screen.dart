@@ -1,8 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../../../api/api_client.dart';
 import '../../../models/booking_models.dart';
+import '../../../repositories/booking_repository.dart';
+import '../../core/app_theme.dart';
 import '../../core/formatters.dart';
 
 class BookingConfirmationScreen extends StatefulWidget {
@@ -16,26 +19,56 @@ class BookingConfirmationScreen extends StatefulWidget {
 }
 
 class _BookingConfirmationScreenState extends State<BookingConfirmationScreen> {
-  late final Future<BookingQr> _ticket = APIClient().getBookingQr(
-    widget.bookingId,
-  );
+  final BookingRepository _repo = BookingRepository();
+
+  /// Cached QR bytes loaded as a fallback when the network call fails.
+  Uint8List? _cachedBytes;
+  late Future<BookingQr?> _ticket;
+
+  Future<BookingQr?> _loadWithFallback() async {
+    final ticket = await _repo.getBookingQr(widget.bookingId);
+    if (ticket == null) {
+      _cachedBytes = await _repo.getCachedQRCode(widget.bookingId);
+    }
+    return ticket;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _ticket = _loadWithFallback();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Vé của bạn')),
-      body: FutureBuilder<BookingQr>(
+      body: FutureBuilder<BookingQr?>(
         future: _ticket,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snapshot.hasError) {
-            return Center(
-              child: Text('Không thể tải vé QR: ${snapshot.error}'),
+          final ticket = snapshot.data;
+          if (ticket != null) {
+            return _TicketContent(ticket: ticket);
+          }
+          // Network failed — show cached QR (if any).
+          if (_cachedBytes != null) {
+            return _CachedTicketContent(
+              bookingId: widget.bookingId,
+              imageBytes: _cachedBytes!,
             );
           }
-          return _TicketContent(ticket: snapshot.requireData);
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'Không thể tải vé QR: ${snapshot.error ?? "mất kết nối"}',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
         },
       ),
     );
@@ -102,6 +135,82 @@ class _TicketContent extends StatelessWidget {
           child: const Text('Hoàn tất'),
         ),
       ],
+    );
+  }
+}
+
+class _CachedTicketContent extends StatelessWidget {
+  const _CachedTicketContent({
+    required this.bookingId,
+    required this.imageBytes,
+  });
+
+  final String bookingId;
+  final Uint8List imageBytes;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        _OfflineBadge(),
+        const SizedBox(height: 16),
+        Center(
+          child: Image.memory(
+            imageBytes,
+            width: 300,
+            height: 300,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.medium,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Center(
+          child: Text(
+            'Mã booking: $bookingId',
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+        const SizedBox(height: 24),
+        FilledButton(
+          onPressed: () =>
+              Navigator.of(context).popUntil((route) => route.isFirst),
+          child: const Text('Hoàn tất'),
+        ),
+      ],
+    );
+  }
+}
+
+class _OfflineBadge extends StatelessWidget {
+  const _OfflineBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.warning.withValues(alpha: .12),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AppColors.warning.withValues(alpha: .45)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.cloud_off_rounded, size: 16, color: AppColors.warning),
+            SizedBox(width: 6),
+            Text(
+              'Offline — hiển thị QR đã lưu cục bộ',
+              style: TextStyle(
+                color: AppColors.warning,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

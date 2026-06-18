@@ -26,18 +26,29 @@ dependencies:
   # Local Database
   sqflite: ^2.3.0
   path_provider: ^2.1.1
+  path: ^1.9.0
+
+  # Connectivity
+  connectivity_plus: ^5.0.2
   
   # Authentication
   google_sign_in: ^6.1.6
   
+  # Routing & Deeplink
+  go_router: ^14.2.0
+
   # Push Notifications
   firebase_messaging: ^14.7.9
   firebase_core: ^2.24.2
+  flutter_local_notifications: ^17.2.4
   
   # QR Code
   qr_flutter: ^4.1.0
   mobile_scanner: ^3.5.5
   webview_flutter: ^4.8.0
+  
+  # Device Information
+  device_info_plus: ^10.1.0
   
   # Image Handling
   cached_network_image: ^3.3.1

@@ -26,6 +26,7 @@ import com.cineluxe.exception.ApiException;
 import com.cineluxe.repository.BookingRepository;
 import com.cineluxe.repository.FoodComboRepository;
 import com.cineluxe.repository.ShowtimeSeatRepository;
+import com.cineluxe.repository.UserProfileRepository;
 import com.cineluxe.service.BookingService;
 import com.cineluxe.service.NotificationService;
 import com.cineluxe.websocket.SeatWebSocketHandler;
@@ -33,6 +34,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.Period;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +44,6 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -53,305 +55,310 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class BookingServiceImpl implements BookingService {
 
-  @Value("${booking.hold-duration-minutes}")
-  private int holdDurationMinutes;
+    private static final Duration HOLD_DURATION = Duration.ofMinutes(10);
+    private static final long DEFAULT_SEAT_PRICE = 120_000L;
+    private static final String VNPAY_SECRET = "cineluxe-demo-vnpay-secret-key-123456789";
+    private static final String API_BASE_URL = "http://10.0.2.2:8080";
 
-  @Value("${booking.default-seat-price}")
-  private long defaultSeatPrice;
+    private final ShowtimeSeatRepository seatRepository;
+    private final FoodComboRepository comboRepository;
+    private final BookingRepository bookingRepository;
+    private final SeatWebSocketHandler webSocketHandler;
+    private final NotificationService notificationService;
+    private final UserProfileRepository userProfileRepository;
 
-  @Value("${booking.vnpay-secret}")
-  private String vnpaySecret;
+    private static long offlineSyncVersionCounter = 0L;
 
-  @Value("${booking.api-base-url}")
-  private String apiBaseUrl;
-
-  private final ShowtimeSeatRepository seatRepository;
-  private final FoodComboRepository comboRepository;
-  private final BookingRepository bookingRepository;
-  private final SeatWebSocketHandler webSocketHandler;
-  private final NotificationService notificationService;
-
-  private static long offlineSyncVersionCounter = 0L;
-
-  @Override
-  @Transactional(readOnly = true)
-  public SeatMapResponse getSeats(String showtimeId) {
-    return new SeatMapResponse(
-        showtimeId,
-        seatRepository.findByShowtimeIdOrderBySeatRowAscSeatColumnAsc(showtimeId)
-            .stream().map(SeatDto::from).toList());
-  }
-
-  @Override
-  public HoldResponse holdSeats(String showtimeId, HoldRequest request, String authenticatedUserId) {
-    var userId = request.userId() == null || request.userId().isBlank()
-        ? authenticatedUserId
-        : request.userId();
-    var requestedCodes = request.seatCodes().stream().distinct().sorted().toList();
-    if (requestedCodes.size() > 8) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "Maximum 8 seats per booking");
+    @Override
+    @Transactional(readOnly = true)
+    public SeatMapResponse getSeats(String showtimeId) {
+        return new SeatMapResponse(
+                showtimeId,
+                seatRepository.findByShowtimeIdOrderBySeatRowAscSeatColumnAsc(showtimeId)
+                        .stream().map(SeatDto::from).toList());
     }
 
-    var seats = seatRepository.lockSeats(showtimeId, requestedCodes);
-    if (seats.size() != requestedCodes.size()) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "One or more seat codes do not exist");
-    }
-    var now = Instant.now();
-    var unavailable = seats.stream()
-        .filter(seat -> seat.getStatus() == SeatStatus.booked
-            || (seat.getStatus() == SeatStatus.held
-                && seat.getHoldExpiresAt().isAfter(now)
-                && !userId.equals(seat.getHeldByUserId())))
-        .map(ShowtimeSeat::getCode)
-        .toList();
-    if (!unavailable.isEmpty()) {
-      throw new ApiException(HttpStatus.CONFLICT, "Seats are no longer available", unavailable);
+    @Override
+    public HoldResponse holdSeats(String showtimeId, HoldRequest request, String authenticatedUserId) {
+        var userId = request.userId() == null || request.userId().isBlank()
+                ? authenticatedUserId
+                : request.userId();
+        var requestedCodes = request.seatCodes().stream().distinct().sorted().toList();
+        if (requestedCodes.size() > 8) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Maximum 8 seats per booking");
+        }
+
+        var seats = seatRepository.lockSeats(showtimeId, requestedCodes);
+        if (seats.size() != requestedCodes.size()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "One or more seat codes do not exist");
+        }
+        var now = Instant.now();
+        var unavailable = seats.stream()
+                .filter(seat -> seat.getStatus() == SeatStatus.booked
+                        || (seat.getStatus() == SeatStatus.held
+                        && seat.getHoldExpiresAt().isAfter(now)
+                        && !userId.equals(seat.getHeldByUserId())))
+                .map(ShowtimeSeat::getCode)
+                .toList();
+        if (!unavailable.isEmpty()) {
+            throw new ApiException(HttpStatus.CONFLICT, "Seats are no longer available", unavailable);
+        }
+
+        var existingSeats = seatRepository.findByShowtimeIdAndHeldByUserId(showtimeId, userId).stream()
+                .filter(seat -> seat.getHoldExpiresAt() != null && seat.getHoldExpiresAt().isAfter(now))
+                .toList();
+        var combinedSeats = java.util.stream.Stream.concat(existingSeats.stream(), seats.stream())
+                .distinct()
+                .toList();
+        if (combinedSeats.size() > 8) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Maximum 8 seats per booking");
+        }
+        var existingHoldId = existingSeats.stream()
+                .filter(seat -> seat.getHoldId() != null)
+                .map(ShowtimeSeat::getHoldId)
+                .findFirst();
+        var holdId = existingHoldId.orElseGet(() -> "HOLD-" + UUID.randomUUID());
+        var expiresAt = now.plus(HOLD_DURATION);
+        combinedSeats.forEach(seat -> seat.hold(holdId, userId, expiresAt));
+        seatRepository.saveAll(combinedSeats);
+        webSocketHandler.broadcastAll(showtimeId, combinedSeats);
+        return new HoldResponse(
+                holdId,
+                showtimeId,
+                combinedSeats.stream().map(ShowtimeSeat::getCode).sorted().toList(),
+                expiresAt);
     }
 
-    var existingSeats = seatRepository.findByShowtimeIdAndHeldByUserId(showtimeId, userId).stream()
-        .filter(seat -> seat.getHoldExpiresAt() != null && seat.getHoldExpiresAt().isAfter(now))
-        .toList();
-    var combinedSeats = java.util.stream.Stream.concat(existingSeats.stream(), seats.stream())
-        .distinct()
-        .toList();
-    if (combinedSeats.size() > 8) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "Maximum 8 seats per booking");
-    }
-    var existingHoldId = existingSeats.stream()
-        .filter(seat -> seat.getHoldId() != null)
-        .map(ShowtimeSeat::getHoldId)
-        .findFirst();
-    var holdId = existingHoldId.orElseGet(() -> "HOLD-" + UUID.randomUUID());
-    var expiresAt = now.plus(Duration.ofMinutes(holdDurationMinutes));
-    combinedSeats.forEach(seat -> seat.hold(holdId, userId, expiresAt));
-    seatRepository.saveAll(combinedSeats);
-    webSocketHandler.broadcastAll(showtimeId, combinedSeats);
-    return new HoldResponse(
-        holdId,
-        showtimeId,
-        combinedSeats.stream().map(ShowtimeSeat::getCode).sorted().toList(),
-        expiresAt);
-  }
-
-  @Override
-  @Transactional(readOnly = true)
-  public List<ComboDto> getCombos() {
-    return comboRepository.findByActiveTrue().stream().map(ComboDto::from).toList();
-  }
-
-  @Override
-  public BookingResponse createBooking(CreateBookingRequest request, String authenticatedUserId) {
-    var seats = seatRepository.findByHoldId(request.holdId());
-    if (seats.isEmpty() || seats.stream().anyMatch(
-        seat -> seat.getHoldExpiresAt() == null || seat.getHoldExpiresAt().isBefore(Instant.now()))) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid or expired holdId");
-    }
-    var userId = request.userId() == null || request.userId().isBlank()
-        ? authenticatedUserId
-        : request.userId();
-    var comboSelections = request.combos() == null ? List.<ComboSelection>of() : request.combos();
-    var comboTotal = comboSelections.stream().mapToLong(selection -> {
-      FoodCombo combo = comboRepository.findById(selection.comboId())
-          .filter(FoodCombo::isActive)
-          .orElseThrow(() -> new ApiException(
-              HttpStatus.BAD_REQUEST, "Invalid food combo selection"));
-      return combo.getPrice() * selection.quantity();
-    }).sum();
-    var bookingId = "BK-" + UUID.randomUUID();
-    var total = seats.size() * defaultSeatPrice + comboTotal;
-    var booking = bookingRepository.save(new Booking(
-        bookingId,
-        userId,
-        seats.get(0).getShowtimeId(),
-        total,
-        seats.stream().map(ShowtimeSeat::getCode).toList(),
-        comboSelections.stream()
-            .map(selection -> selection.comboId() + ":" + selection.quantity())
-            .toList()));
-    seats.forEach(ShowtimeSeat::book);
-    seatRepository.saveAll(seats);
-    webSocketHandler.broadcastAll(booking.getShowtimeId(), seats);
-    var paymentParameters = "amount=" + total + "&bookingId=" + bookingId;
-    return new BookingResponse(
-        bookingId,
-        booking.getStatus(),
-        booking.getPaymentStatus(),
-        total,
-        apiBaseUrl + "/api/payments/sandbox/" + bookingId
-            + "?" + paymentParameters + "&signature=" + sign(paymentParameters),
-        booking.getPaymentExpiresAt());
-  }
-
-  @Override
-  @Transactional(readOnly = true)
-  public BookingDetailsResponse getBooking(String bookingId) {
-    return details(requireBooking(bookingId));
-  }
-
-  @Override
-  @Transactional(readOnly = true)
-  public List<BookingDetailsResponse> getUserBookings(String userId, String status) {
-    var bookings = status == null || status.isBlank()
-        ? bookingRepository.findByUserIdOrderByCreatedAtDesc(userId)
-        : bookingRepository.findByUserIdAndStatusOrderByCreatedAtDesc(userId, status);
-    return bookings.stream().map(this::details).toList();
-  }
-
-  @Override
-  @Transactional(readOnly = true)
-  public BookingQrResponse getBookingQr(String bookingId) {
-    var booking = requireBooking(bookingId);
-    if (!"active".equals(booking.getStatus()) || booking.getQrCode() == null) {
-      throw new ApiException(HttpStatus.CONFLICT, "QR ticket is available after successful payment");
-    }
-    return new BookingQrResponse(
-        booking.getId(),
-        booking.getQrCode(),
-        booking.getMovieTitle(),
-        booking.getShowtimeDateTime(),
-        booking.getRoomName(),
-        booking.getCinemaName(),
-        List.copyOf(booking.getSeatCodes()));
-  }
-
-  @Override
-  public CancelBookingResponse cancelBooking(
-      String bookingId, CancelBookingRequest request, String authenticatedUserId) {
-    var booking = requireBooking(bookingId);
-    var userId = request == null || request.userId() == null || request.userId().isBlank()
-        ? authenticatedUserId
-        : request.userId();
-    if (!booking.getUserId().equals(userId)) {
-      throw new ApiException(HttpStatus.FORBIDDEN, "Booking does not belong to requesting user");
-    }
-    if (!"active".equals(booking.getStatus())) {
-      throw new ApiException(HttpStatus.CONFLICT, "Only active bookings can be cancelled");
-    }
-    var now = Instant.now();
-    if (!booking.getShowtimeDateTime().isAfter(now)) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "Cannot cancel after showtime");
-    }
-    var refund = booking.getShowtimeDateTime().isAfter(now.plus(Duration.ofHours(2)))
-        ? booking.getTotalAmount()
-        : booking.getTotalAmount() / 2;
-    booking.cancel(refund);
-    bookingRepository.save(booking);
-    releaseBookingSeats(booking);
-    notificationService.sendBookingCancellation(userId, booking);
-    return new CancelBookingResponse(booking.getId(), booking.getStatus(), refund, "refunded");
-  }
-
-  @Override
-  public ValidationResult validateTicket(
-      String bookingId, ValidateTicketRequest request, String authenticatedStaffId) {
-    var booking = requireBooking(bookingId);
-    if ("used".equals(booking.getStatus())) {
-      throw new ApiException(HttpStatus.CONFLICT, "Ticket already validated");
-    }
-    if ("cancelled".equals(booking.getStatus()) || "refunded".equals(booking.getStatus())) {
-      throw new ApiException(HttpStatus.FORBIDDEN, "Ticket cancelled, entry denied");
-    }
-    if (!"active".equals(booking.getStatus())) {
-      throw new ApiException(HttpStatus.CONFLICT, "Ticket is not active");
-    }
-    if (!booking.getShowtimeId().equals(request.expectedShowtimeId())) {
-      throw new ApiException(
-          HttpStatus.BAD_REQUEST,
-          "Wrong showtime. Ticket belongs to " + booking.getShowtimeId());
-    }
-    var now = Instant.now();
-    var validationOpensAt = booking.getShowtimeDateTime().minus(Duration.ofHours(2));
-    var validationClosesAt = booking.getShowtimeDateTime().plus(Duration.ofMinutes(30));
-    if (now.isBefore(validationOpensAt) || now.isAfter(validationClosesAt)) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "Validation window closed");
-    }
-    var staffId = request.staffId() == null || request.staffId().isBlank()
-        ? authenticatedStaffId
-        : request.staffId();
-    booking.validateTicket(staffId);
-    bookingRepository.save(booking);
-    return new ValidationResult(
-        true,
-        booking.getStatus(),
-        "Ticket validated successfully",
-        booking.getId(),
-        booking.getUserId(),
-        booking.getMovieTitle(),
-        booking.getShowtimeId(),
-        booking.getShowtimeDateTime(),
-        List.copyOf(booking.getSeatCodes()),
-        booking.getValidatedAt());
-  }
-
-  @Override
-  @Transactional(readOnly = true)
-  public List<BookingSearchResult> searchBookings(SearchBookingsRequest request) {
-    var now = Instant.now();
-    var plus24Hours = now.plus(Duration.ofHours(24));
-    var bookingId = request.bookingId() == null ? "" : request.bookingId();
-    var customerName = request.customerName() == null ? "" : request.customerName();
-
-    var bookings = bookingRepository.searchBookingsForValidation(
-        bookingId, customerName, now, plus24Hours);
-    return bookings.stream().map(BookingSearchResult::from).toList();
-  }
-
-  @Override
-  public ValidationResult staffManualValidate(String bookingId, String staffId) {
-    var booking = requireBooking(bookingId);
-
-    // Apply same validation rules as QR code validation
-    if ("used".equals(booking.getStatus())) {
-      throw new ApiException(HttpStatus.CONFLICT, "Ticket already validated");
-    }
-    if ("cancelled".equals(booking.getStatus()) || "refunded".equals(booking.getStatus())) {
-      throw new ApiException(HttpStatus.FORBIDDEN, "Ticket cancelled, entry denied");
-    }
-    if (!"active".equals(booking.getStatus())) {
-      throw new ApiException(HttpStatus.CONFLICT, "Ticket is not active");
+    @Override
+    @Transactional(readOnly = true)
+    public List<ComboDto> getCombos() {
+        return comboRepository.findByActiveTrue().stream().map(ComboDto::from).toList();
     }
 
-    var now = Instant.now();
-    var validationOpensAt = booking.getShowtimeDateTime().minus(Duration.ofHours(2));
-    var validationClosesAt = booking.getShowtimeDateTime().plus(Duration.ofMinutes(30));
-    if (now.isBefore(validationOpensAt) || now.isAfter(validationClosesAt)) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "Validation window closed");
+    @Override
+    public BookingResponse createBooking(CreateBookingRequest request, String authenticatedUserId) {
+        // Age verification for T18 movies — Requirements 7.5, 7.6, 7.7
+        var userId = request.userId() == null || request.userId().isBlank()
+                ? authenticatedUserId
+                : request.userId();
+        if ("T18".equals(request.movieAgeRating())) {
+            var profile = userProfileRepository.findById(userId).orElse(null);
+            if (profile == null || profile.getBirthdate() == null) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "Age verification required for this movie");
+            }
+            int age = Period.between(profile.getBirthdate(), LocalDate.now()).getYears();
+            if (age < 18) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "Age verification required for this movie");
+            }
+        }
+        var seats = seatRepository.findByHoldId(request.holdId());
+        if (seats.isEmpty() || seats.stream().anyMatch(
+                seat -> seat.getHoldExpiresAt() == null || seat.getHoldExpiresAt().isBefore(Instant.now()))) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid or expired holdId");
+        }
+        var comboSelections = request.combos() == null ? List.<ComboSelection>of() : request.combos();
+        var comboTotal = comboSelections.stream().mapToLong(selection -> {
+            FoodCombo combo = comboRepository.findById(selection.comboId())
+                    .filter(FoodCombo::isActive)
+                    .orElseThrow(() -> new ApiException(
+                            HttpStatus.BAD_REQUEST, "Invalid food combo selection"));
+            return combo.getPrice() * selection.quantity();
+        }).sum();
+        var bookingId = "BK-" + UUID.randomUUID();
+        var total = seats.size() * DEFAULT_SEAT_PRICE + comboTotal;
+        var booking = bookingRepository.save(new Booking(
+                bookingId,
+                userId,
+                seats.get(0).getShowtimeId(),
+                total,
+                seats.stream().map(ShowtimeSeat::getCode).toList(),
+                comboSelections.stream()
+                        .map(selection -> selection.comboId() + ":" + selection.quantity())
+                        .toList()));
+        seats.forEach(ShowtimeSeat::book);
+        seatRepository.saveAll(seats);
+        webSocketHandler.broadcastAll(booking.getShowtimeId(), seats);
+        var paymentParameters = "amount=" + total + "&bookingId=" + bookingId;
+        return new BookingResponse(
+                bookingId,
+                booking.getStatus(),
+                booking.getPaymentStatus(),
+                total,
+                API_BASE_URL + "/api/payments/sandbox/" + bookingId
+                        + "?" + paymentParameters + "&signature=" + sign(paymentParameters),
+                booking.getPaymentExpiresAt());
     }
 
-    // Validate the ticket
-    booking.validateTicket(staffId);
-    bookingRepository.save(booking);
-    return new ValidationResult(
-        true,
-        booking.getStatus(),
-        "Ticket validated manually by staff",
-        booking.getId(),
-        booking.getUserId(),
-        booking.getMovieTitle(),
-        booking.getShowtimeId(),
-        booking.getShowtimeDateTime(),
-        List.copyOf(booking.getSeatCodes()),
-        booking.getValidatedAt());
-  }
-
-  @Override
-  @Transactional(readOnly = true)
-  public PaymentStatusResponse getPaymentStatus(String bookingId) {
-    var booking = requireBooking(bookingId);
-    return paymentStatus(booking);
-  }
-
-  @Override
-  @Transactional(readOnly = true)
-  public String sandboxPaymentPage(String bookingId) {
-    var booking = requireBooking(bookingId);
-    if (!"pendingPayment".equals(booking.getStatus())) {
-      return "<html><body><h2>Payment already processed</h2></body></html>";
+    @Override
+    @Transactional(readOnly = true)
+    public BookingDetailsResponse getBooking(String bookingId) {
+        return details(requireBooking(bookingId));
     }
-    var transactionId = "VNP-" + System.currentTimeMillis();
-    var success = paymentReturnUrl(bookingId, "00", transactionId);
-    var failure = paymentReturnUrl(bookingId, "24", transactionId);
-    return """
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<BookingDetailsResponse> getUserBookings(String userId, String status) {
+        var bookings = status == null || status.isBlank()
+                ? bookingRepository.findByUserIdOrderByCreatedAtDesc(userId)
+                : bookingRepository.findByUserIdAndStatusOrderByCreatedAtDesc(userId, status);
+        return bookings.stream().map(this::details).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BookingQrResponse getBookingQr(String bookingId) {
+        var booking = requireBooking(bookingId);
+        if (!"active".equals(booking.getStatus()) || booking.getQrCode() == null) {
+            throw new ApiException(HttpStatus.CONFLICT, "QR ticket is available after successful payment");
+        }
+        return new BookingQrResponse(
+                booking.getId(),
+                booking.getQrCode(),
+                booking.getMovieTitle(),
+                booking.getShowtimeDateTime(),
+                booking.getRoomName(),
+                booking.getCinemaName(),
+                List.copyOf(booking.getSeatCodes()));
+    }
+
+    @Override
+    public CancelBookingResponse cancelBooking(
+            String bookingId, CancelBookingRequest request, String authenticatedUserId) {
+        var booking = requireBooking(bookingId);
+        var userId = request == null || request.userId() == null || request.userId().isBlank()
+                ? authenticatedUserId
+                : request.userId();
+        if (!booking.getUserId().equals(userId)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Booking does not belong to requesting user");
+        }
+        if (!"active".equals(booking.getStatus())) {
+            throw new ApiException(HttpStatus.CONFLICT, "Only active bookings can be cancelled");
+        }
+        var now = Instant.now();
+        if (!booking.getShowtimeDateTime().isAfter(now)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Cannot cancel after showtime");
+        }
+        var refund = booking.getShowtimeDateTime().isAfter(now.plus(Duration.ofHours(2)))
+                ? booking.getTotalAmount()
+                : booking.getTotalAmount() / 2;
+        booking.cancel(refund);
+        bookingRepository.save(booking);
+        releaseBookingSeats(booking);
+        notificationService.sendBookingCancellation(userId, booking);
+        return new CancelBookingResponse(booking.getId(), booking.getStatus(), refund, "refunded");
+    }
+
+    @Override
+    public ValidationResult validateTicket(
+            String bookingId, ValidateTicketRequest request, String authenticatedStaffId) {
+        var booking = requireBooking(bookingId);
+        if ("used".equals(booking.getStatus())) {
+            throw new ApiException(HttpStatus.CONFLICT, "Ticket already validated");
+        }
+        if ("cancelled".equals(booking.getStatus()) || "refunded".equals(booking.getStatus())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Ticket cancelled, entry denied");
+        }
+        if (!"active".equals(booking.getStatus())) {
+            throw new ApiException(HttpStatus.CONFLICT, "Ticket is not active");
+        }
+        if (!booking.getShowtimeId().equals(request.expectedShowtimeId())) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "Wrong showtime. Ticket belongs to " + booking.getShowtimeId());
+        }
+        var now = Instant.now();
+        var validationOpensAt = booking.getShowtimeDateTime().minus(Duration.ofHours(2));
+        var validationClosesAt = booking.getShowtimeDateTime().plus(Duration.ofMinutes(30));
+        if (now.isBefore(validationOpensAt) || now.isAfter(validationClosesAt)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Validation window closed");
+        }
+        var staffId = request.staffId() == null || request.staffId().isBlank()
+                ? authenticatedStaffId
+                : request.staffId();
+        booking.validateTicket(staffId);
+        bookingRepository.save(booking);
+        return new ValidationResult(
+                true,
+                booking.getStatus(),
+                "Ticket validated successfully",
+                booking.getId(),
+                booking.getUserId(),
+                booking.getMovieTitle(),
+                booking.getShowtimeId(),
+                booking.getShowtimeDateTime(),
+                List.copyOf(booking.getSeatCodes()),
+                booking.getValidatedAt());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<BookingSearchResult> searchBookings(SearchBookingsRequest request) {
+        var now = Instant.now();
+        var plus24Hours = now.plus(Duration.ofHours(24));
+        var bookingId = request.bookingId() == null ? "" : request.bookingId();
+        var customerName = request.customerName() == null ? "" : request.customerName();
+
+        var bookings = bookingRepository.searchBookingsForValidation(
+                bookingId, customerName, now, plus24Hours);
+        return bookings.stream().map(BookingSearchResult::from).toList();
+    }
+
+    @Override
+    public ValidationResult staffManualValidate(String bookingId, String staffId) {
+        var booking = requireBooking(bookingId);
+
+        // Apply same validation rules as QR code validation
+        if ("used".equals(booking.getStatus())) {
+            throw new ApiException(HttpStatus.CONFLICT, "Ticket already validated");
+        }
+        if ("cancelled".equals(booking.getStatus()) || "refunded".equals(booking.getStatus())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Ticket cancelled, entry denied");
+        }
+        if (!"active".equals(booking.getStatus())) {
+            throw new ApiException(HttpStatus.CONFLICT, "Ticket is not active");
+        }
+
+        var now = Instant.now();
+        var validationOpensAt = booking.getShowtimeDateTime().minus(Duration.ofHours(2));
+        var validationClosesAt = booking.getShowtimeDateTime().plus(Duration.ofMinutes(30));
+        if (now.isBefore(validationOpensAt) || now.isAfter(validationClosesAt)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Validation window closed");
+        }
+
+        // Validate the ticket
+        booking.validateTicket(staffId);
+        bookingRepository.save(booking);
+        return new ValidationResult(
+                true,
+                booking.getStatus(),
+                "Ticket validated manually by staff",
+                booking.getId(),
+                booking.getUserId(),
+                booking.getMovieTitle(),
+                booking.getShowtimeId(),
+                booking.getShowtimeDateTime(),
+                List.copyOf(booking.getSeatCodes()),
+                booking.getValidatedAt());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaymentStatusResponse getPaymentStatus(String bookingId) {
+        var booking = requireBooking(bookingId);
+        return paymentStatus(booking);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public String sandboxPaymentPage(String bookingId) {
+        var booking = requireBooking(bookingId);
+        if (!"pendingPayment".equals(booking.getStatus())) {
+            return "<html><body><h2>Payment already processed</h2></body></html>";
+        }
+        var transactionId = "VNP-" + System.currentTimeMillis();
+        var success = paymentReturnUrl(bookingId, "00", transactionId);
+        var failure = paymentReturnUrl(bookingId, "24", transactionId);
+        return """
         <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
         <style>body{font-family:sans-serif;padding:32px;background:#f5f5f5}main{max-width:520px;margin:auto;background:white;padding:28px;border-radius:16px}
         a{display:block;margin:16px 0;padding:16px;text-align:center;text-decoration:none;border-radius:8px;background:#111;color:white}
@@ -360,135 +367,135 @@ public class BookingServiceImpl implements BookingService {
         <a href="%s">Complete payment</a><a class="fail" href="%s">Simulate failure</a>
         </main></body></html>
         """.formatted(bookingId, booking.getTotalAmount(), success, failure);
-  }
-
-  @Override
-  public PaymentStatusResponse processPaymentReturn(Map<String, String> parameters) {
-    var bookingId = parameters.getOrDefault("bookingId", "");
-    var responseCode = parameters.getOrDefault("responseCode", "");
-    var transactionId = parameters.getOrDefault("transactionId", "");
-    var signature = parameters.getOrDefault("signature", "");
-    var payload = callbackPayload(bookingId, responseCode, transactionId);
-    if (!MessageDigest.isEqual(
-        sign(payload).getBytes(StandardCharsets.UTF_8),
-        signature.getBytes(StandardCharsets.UTF_8))) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid VNPay signature");
     }
-    var booking = requireBooking(bookingId);
-    if ("pendingPayment".equals(booking.getStatus())) {
-      if ("00".equals(responseCode)) {
-        booking.completePayment(transactionId, responseCode);
-        notificationService.sendPaymentConfirmation(booking.getUserId(), booking);
-      } else {
-        booking.failPayment(transactionId, responseCode);
-        releaseBookingSeats(booking);
-      }
-      bookingRepository.save(booking);
+
+    @Override
+    public PaymentStatusResponse processPaymentReturn(Map<String, String> parameters) {
+        var bookingId = parameters.getOrDefault("bookingId", "");
+        var responseCode = parameters.getOrDefault("responseCode", "");
+        var transactionId = parameters.getOrDefault("transactionId", "");
+        var signature = parameters.getOrDefault("signature", "");
+        var payload = callbackPayload(bookingId, responseCode, transactionId);
+        if (!MessageDigest.isEqual(
+                sign(payload).getBytes(StandardCharsets.UTF_8),
+                signature.getBytes(StandardCharsets.UTF_8))) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid VNPay signature");
+        }
+        var booking = requireBooking(bookingId);
+        if ("pendingPayment".equals(booking.getStatus())) {
+            if ("00".equals(responseCode)) {
+                booking.completePayment(transactionId, responseCode);
+                notificationService.sendPaymentConfirmation(booking.getUserId(), booking);
+            } else {
+                booking.failPayment(transactionId, responseCode);
+                releaseBookingSeats(booking);
+            }
+            bookingRepository.save(booking);
+        }
+        return paymentStatus(booking);
     }
-    return paymentStatus(booking);
-  }
 
-  // ─── Scheduled tasks ───────────────────────────────────────────────────
+    // ─── Scheduled tasks ───────────────────────────────────────────────────
 
-  @Scheduled(fixedDelay = 5_000)
-  public void releaseExpiredHolds() {
-    var expired = seatRepository.findByStatusAndHoldExpiresAtBefore(SeatStatus.held, Instant.now());
-    expired.forEach(ShowtimeSeat::release);
-    seatRepository.saveAll(expired);
-    expired.stream().map(ShowtimeSeat::getShowtimeId).distinct().forEach(showtimeId ->
-        webSocketHandler.broadcastAll(
-            showtimeId,
-            expired.stream().filter(seat -> showtimeId.equals(seat.getShowtimeId())).toList()));
-  }
-
-  @Scheduled(fixedDelay = 30_000)
-  public void cancelExpiredPayments() {
-    bookingRepository.findByStatusAndPaymentExpiresAtBefore("pendingPayment", Instant.now())
-        .forEach(booking -> {
-          booking.failPayment(null, "TIMEOUT");
-          bookingRepository.save(booking);
-          releaseBookingSeats(booking);
-        });
-  }
-
-  // ─── Offline sync ─────────────────────────────────────────────────
-
-  @Override
-  @Transactional(readOnly = true)
-  public StaffOfflineSyncDto getOfflineSyncData() {
-    var now = Instant.now();
-    var windowStart = now.minus(Duration.ofHours(2));
-    var windowEnd = now.plus(Duration.ofHours(24));
-    var bookings = bookingRepository.findActiveBookingsForOfflineSync(windowStart, windowEnd);
-    var syncedAt = Instant.now();
-    var expiresAt = syncedAt.plus(Duration.ofMinutes(30));
-    offlineSyncVersionCounter++;
-    return new StaffOfflineSyncDto(
-        bookings.stream().map(BookingSearchResult::from).toList(),
-        bookings.size(),
-        syncedAt,
-        expiresAt,
-        offlineSyncVersionCounter);
-  }
-
-  // ─── Private helpers ──────────────────────────────────────────────────
-
-  private Booking requireBooking(String bookingId) {
-    return bookingRepository.findById(bookingId)
-        .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Booking not found: " + bookingId));
-  }
-
-  private BookingDetailsResponse details(Booking booking) {
-    return new BookingDetailsResponse(
-        booking.getId(),
-        booking.getUserId(),
-        booking.getShowtimeId(),
-        booking.getMovieTitle(),
-        booking.getRoomName(),
-        booking.getCinemaName(),
-        booking.getShowtimeDateTime(),
-        List.copyOf(booking.getSeatCodes()),
-        List.copyOf(booking.getComboSelections()),
-        booking.getTotalAmount(),
-        booking.getStatus(),
-        booking.getPaymentStatus(),
-        booking.getCreatedAt(),
-        booking.getQrCode());
-  }
-
-  private PaymentStatusResponse paymentStatus(Booking booking) {
-    return new PaymentStatusResponse(
-        booking.getId(),
-        booking.getStatus(),
-        booking.getPaymentStatus(),
-        booking.getTransactionId(),
-        booking.getResponseCode());
-  }
-
-  private void releaseBookingSeats(Booking booking) {
-    var seats = seatRepository.lockSeats(booking.getShowtimeId(), booking.getSeatCodes());
-    seats.forEach(ShowtimeSeat::release);
-    seatRepository.saveAll(seats);
-    webSocketHandler.broadcastAll(booking.getShowtimeId(), seats);
-  }
-
-  private String paymentReturnUrl(String bookingId, String responseCode, String transactionId) {
-    var payload = callbackPayload(bookingId, responseCode, transactionId);
-    return apiBaseUrl + "/api/payments/vnpay/return?" + payload + "&signature=" + sign(payload);
-  }
-
-  private String callbackPayload(String bookingId, String responseCode, String transactionId) {
-    return "bookingId=" + bookingId + "&responseCode=" + responseCode
-        + "&transactionId=" + transactionId;
-  }
-
-  private String sign(String payload) {
-    try {
-      var mac = Mac.getInstance("HmacSHA512");
-      mac.init(new SecretKeySpec(vnpaySecret.getBytes(StandardCharsets.UTF_8), "HmacSHA512"));
-      return HexFormat.of().formatHex(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
-    } catch (Exception exception) {
-      throw new IllegalStateException("Unable to sign VNPay parameters", exception);
+    @Scheduled(fixedDelay = 5_000)
+    public void releaseExpiredHolds() {
+        var expired = seatRepository.findByStatusAndHoldExpiresAtBefore(SeatStatus.held, Instant.now());
+        expired.forEach(ShowtimeSeat::release);
+        seatRepository.saveAll(expired);
+        expired.stream().map(ShowtimeSeat::getShowtimeId).distinct().forEach(showtimeId ->
+                webSocketHandler.broadcastAll(
+                        showtimeId,
+                        expired.stream().filter(seat -> showtimeId.equals(seat.getShowtimeId())).toList()));
     }
-  }
+
+    @Scheduled(fixedDelay = 30_000)
+    public void cancelExpiredPayments() {
+        bookingRepository.findByStatusAndPaymentExpiresAtBefore("pendingPayment", Instant.now())
+                .forEach(booking -> {
+                    booking.failPayment(null, "TIMEOUT");
+                    bookingRepository.save(booking);
+                    releaseBookingSeats(booking);
+                });
+    }
+
+    // ─── Offline sync ─────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public StaffOfflineSyncDto getOfflineSyncData() {
+        var now = Instant.now();
+        var windowStart = now.minus(Duration.ofHours(2));
+        var windowEnd = now.plus(Duration.ofHours(24));
+        var bookings = bookingRepository.findActiveBookingsForOfflineSync(windowStart, windowEnd);
+        var syncedAt = Instant.now();
+        var expiresAt = syncedAt.plus(Duration.ofMinutes(30));
+        offlineSyncVersionCounter++;
+        return new StaffOfflineSyncDto(
+                bookings.stream().map(BookingSearchResult::from).toList(),
+                bookings.size(),
+                syncedAt,
+                expiresAt,
+                offlineSyncVersionCounter);
+    }
+
+    // ─── Private helpers ──────────────────────────────────────────────────
+
+    private Booking requireBooking(String bookingId) {
+        return bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Booking not found: " + bookingId));
+    }
+
+    private BookingDetailsResponse details(Booking booking) {
+        return new BookingDetailsResponse(
+                booking.getId(),
+                booking.getUserId(),
+                booking.getShowtimeId(),
+                booking.getMovieTitle(),
+                booking.getRoomName(),
+                booking.getCinemaName(),
+                booking.getShowtimeDateTime(),
+                List.copyOf(booking.getSeatCodes()),
+                List.copyOf(booking.getComboSelections()),
+                booking.getTotalAmount(),
+                booking.getStatus(),
+                booking.getPaymentStatus(),
+                booking.getCreatedAt(),
+                booking.getQrCode());
+    }
+
+    private PaymentStatusResponse paymentStatus(Booking booking) {
+        return new PaymentStatusResponse(
+                booking.getId(),
+                booking.getStatus(),
+                booking.getPaymentStatus(),
+                booking.getTransactionId(),
+                booking.getResponseCode());
+    }
+
+    private void releaseBookingSeats(Booking booking) {
+        var seats = seatRepository.lockSeats(booking.getShowtimeId(), booking.getSeatCodes());
+        seats.forEach(ShowtimeSeat::release);
+        seatRepository.saveAll(seats);
+        webSocketHandler.broadcastAll(booking.getShowtimeId(), seats);
+    }
+
+    private String paymentReturnUrl(String bookingId, String responseCode, String transactionId) {
+        var payload = callbackPayload(bookingId, responseCode, transactionId);
+        return API_BASE_URL + "/api/payments/vnpay/return?" + payload + "&signature=" + sign(payload);
+    }
+
+    private String callbackPayload(String bookingId, String responseCode, String transactionId) {
+        return "bookingId=" + bookingId + "&responseCode=" + responseCode
+                + "&transactionId=" + transactionId;
+    }
+
+    private String sign(String payload) {
+        try {
+            var mac = Mac.getInstance("HmacSHA512");
+            mac.init(new SecretKeySpec(VNPAY_SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA512"));
+            return HexFormat.of().formatHex(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception exception) {
+            throw new IllegalStateException("Unable to sign VNPay parameters", exception);
+        }
+    }
 }
