@@ -1,29 +1,50 @@
+import 'package:cine_book/services/device_service.dart';
+import 'package:cine_book/services/push_notification_handler.dart';
+import 'package:cine_book/src/core/app_theme.dart';
+import 'package:cine_book/src/models/app_models.dart';
+import 'package:cine_book/src/shared/widgets/glass_card.dart';
+import 'package:cine_book/src/shared/widgets/luxury_scaffold.dart';
+import 'package:cine_book/src/state/cinema_store.dart';
 import 'package:flutter/material.dart';
 
-import '../../core/app_theme.dart';
-import '../../models/app_models.dart';
-import '../../shared/widgets/glass_card.dart';
-import '../../shared/widgets/luxury_scaffold.dart';
-import '../../state/cinema_store.dart';
 import 'staff_customer_support_section.dart';
 import 'staff_room_management_section.dart';
 import 'staff_showtime_bookings_section.dart';
 import 'staff_ticket_verification_section.dart';
 
-class StaffDashboard extends StatelessWidget {
+class StaffDashboard extends StatefulWidget {
   const StaffDashboard({super.key, required this.store});
 
   final CinemaStore store;
 
   @override
+  State<StaffDashboard> createState() => _StaffDashboardState();
+}
+
+class _StaffDashboardState extends State<StaffDashboard> {
+  final _deviceService = DeviceService();
+
+  Future<void> _handleLogout() async {
+    await _deviceService.unregisterDevice();
+    final token = await PushNotificationHandler.instance.getToken();
+    if (token != null) {
+      await _deviceService.refreshToken(
+        newDeviceToken: token,
+        platform: PushNotificationHandler.instance.platform,
+      );
+    }
+    if (mounted) widget.store.logout();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final staff = store.currentUser;
+    final staff = widget.store.currentUser;
     return LuxuryScaffold(
       title: 'Bảng nhân viên',
       actions: [
         IconButton(
           tooltip: 'Đăng xuất',
-          onPressed: store.logout,
+          onPressed: _handleLogout,
           icon: const Icon(Icons.logout_rounded),
         ),
       ],
@@ -32,11 +53,11 @@ class StaffDashboard extends StatelessWidget {
         children: [
           _StaffHeader(user: staff),
           const SizedBox(height: 12),
-          _StaffMetrics(store: store),
-          StaffTicketVerificationSection(store: store),
-          StaffCustomerSupportSection(store: store),
-          StaffRoomManagementSection(store: store),
-          StaffShowtimeBookingsSection(store: store),
+          _StaffMetrics(store: widget.store),
+          StaffTicketVerificationSection(store: widget.store),
+          StaffCustomerSupportSection(store: widget.store),
+          StaffRoomManagementSection(store: widget.store),
+          StaffShowtimeBookingsSection(store: widget.store),
         ],
       ),
     );

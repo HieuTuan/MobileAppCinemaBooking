@@ -18,6 +18,7 @@ import com.cineluxe.dto.response.ComboDto;
 import com.cineluxe.dto.response.HoldResponse;
 import com.cineluxe.dto.response.PaymentStatusResponse;
 import com.cineluxe.dto.response.SeatMapResponse;
+import com.cineluxe.dto.response.StaffOfflineSyncDto;
 import com.cineluxe.dto.response.ValidationResult;
 import com.cineluxe.service.BookingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -204,6 +205,17 @@ public class BookingController {
             @Parameter(description = "Booking ID") @PathVariable String bookingId,
             @Valid @RequestBody StaffValidationRequest request) {
         return success(bookingService.staffManualValidate(bookingId, request.staffId()));
+    }
+
+    @Operation(summary = "Sync offline data for staff app",
+            description = "Returns all active bookings within the offline sync window (2 hours before to 24 hours after now). "
+                    + "Staff app should call this before each shift or periodically to keep local cache up to date.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Sync data retrieved successfully")
+    })
+    @GetMapping("/staff/sync")
+    public ResponseEntity<ApiResponse<StaffOfflineSyncDto>> getOfflineSyncData() {
+        return success(bookingService.getOfflineSyncData());
     }
 
     @Operation(summary = "Get payment status",
