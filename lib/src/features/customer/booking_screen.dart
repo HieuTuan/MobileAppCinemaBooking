@@ -238,6 +238,8 @@ class _BookingScreenState extends State<BookingScreen> {
         _selectedSeats.removeWhere(conflict.unavailableSeats.contains);
         await _showSeatConflict(conflict.unavailableSeats);
         await _syncSeatState(widget.showtime.id);
+      } else if (conflict is ApiAuthorizationException) {
+        if (mounted) _showAgeVerificationRequired();
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Không thể giữ ghế. Vui lòng thử lại.')),
@@ -246,6 +248,25 @@ class _BookingScreenState extends State<BookingScreen> {
     } finally {
       if (mounted) setState(() => _holdingSeats = false);
     }
+  }
+
+  void _showAgeVerificationRequired() {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xác minh độ tuổi yêu cầu'),
+        content: const Text(
+          'Phim này yêu cầu xác minh độ tuổi 18+. '
+          'Vui lòng cập nhật ngày sinh trong hồ sơ.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _showSeatConflict(List<String> seats) {

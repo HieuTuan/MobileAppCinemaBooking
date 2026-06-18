@@ -7,6 +7,9 @@ import '../models/showtime.dart';
 import '../models/paginated_response.dart';
 import '../models/booking_models.dart';
 import '../models/notification_preferences.dart';
+import '../models/user_profile.dart';
+import '../models/update_profile_request.dart';
+import '../models/admin_models.dart';
 import 'interceptors/auth_interceptor.dart';
 import 'interceptors/error_interceptor.dart';
 import 'interceptors/retry_interceptor.dart';
@@ -435,6 +438,56 @@ class APIClient {
     return Movie.fromJson(response.data!);
   }
 
+  /// Create a review for a movie.
+  ///
+  /// **Requirements:**
+  /// - 14.1: Authenticated customers can submit reviews via POST /api/reviews
+  /// - 14.2: Returns 403 Forbidden if the user has not watched the movie
+  /// - 14.3: Request body includes userId, movieId, rating (1-5), and comment
+  ///
+  /// Parameters:
+  /// - [movieId]: ID of the movie to review
+  /// - [rating]: Integer rating from 1 to 5
+  /// - [comment]: Review text (10–500 characters)
+  ///
+  /// Throws [ApiAuthorizationException] (403) when the user has not watched the movie.
+  ///
+  /// Example:
+  /// ```dart
+  /// try {
+  ///   final review = await apiClient.createReview(
+  ///     movieId: 'movie-123',
+  ///     rating: 4,
+  ///     comment: 'Great film with wonderful visuals!',
+  ///   );
+  /// } on ApiAuthorizationException catch (e) {
+  ///   // User hasn't watched the movie yet
+  ///   showError('Bạn cần xem phim trước khi đánh giá');
+  /// }
+  /// ```
+  Future<Review> createReview({
+    required String userId,
+    required String movieId,
+    required int rating,
+    required String comment,
+    CancelToken? cancelToken,
+  }) async {
+    final request = CreateReviewRequest(
+      userId: userId,
+      movieId: movieId,
+      rating: rating,
+      comment: comment,
+    );
+
+    final response = await post<Map<String, dynamic>>(
+      '/api/reviews',
+      data: request.toJson(),
+      cancelToken: cancelToken,
+    );
+
+    return Review.fromJson(response.data!);
+  }
+
   /// Get reviews for a specific movie with pagination.
   ///
   /// **Requirements:**
@@ -819,5 +872,200 @@ class APIClient {
       data: preferences.toJson(),
       cancelToken: cancelToken,
     );
+  }
+
+  // ============================================================================
+  // User Profile Endpoints - Requirements 17.1, 17.6, 17.7
+  // ============================================================================
+
+  /// Get profile data for a user.
+  ///
+  /// **Requirements:**
+  /// - 17.7: GET /api/users/{userId}/profile returns UserProfile with memberRank and points
+  /// - 17.6: Display profile fields including fullName, phone, birthdate, memberRank, points
+  ///
+  /// Parameters:
+  /// - [userId]: User ID to fetch profile for
+  /// - [cancelToken]: Optional Dio cancel token for request cancellation
+  ///
+  /// Returns [UserProfile] with all account and membership details.
+  ///
+  /// Example:
+  /// ```dart
+  /// final profile = await apiClient.getProfile('user-123');
+  /// print('Rank: ${profile.memberRank}, Points: ${profile.points}');
+  /// ```
+  Future<UserProfile> getProfile(
+    String userId, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await get<Map<String, dynamic>>(
+      '/api/users/$userId/profile',
+      cancelToken: cancelToken,
+    );
+    return UserProfile.fromJson(response.data!);
+  }
+
+  /// Update profile data for a user.
+  ///
+  /// **Requirements:**
+  /// - 17.1: PUT /api/users/{userId}/profile with fullName, phone, and birthdate
+  /// - 17.2: Phone number must match format +84 or 0 followed by 9-10 digits
+  /// - 17.3: Birthdate must be a valid date and not in the future
+  ///
+  /// Parameters:
+  /// - [userId]: User ID to update profile for
+  /// - [request]: Update payload with optional fullName, phone, birthdate
+  /// - [cancelToken]: Optional Dio cancel token for request cancellation
+  ///
+  /// Returns updated [UserProfile] on success, throws exception on failure.
+  ///
+  /// Example:
+  /// ```dart
+  /// final request = UpdateProfileRequest(
+  ///   fullName: 'Nguyen Van A',
+  ///   phone: '0901234567',
+  ///   birthdate: DateTime(1995, 6, 15),
+  /// );
+  /// final updated = await apiClient.updateProfile('user-123', request);
+  /// ```
+  Future<UserProfile> updateProfile(
+    String userId,
+    UpdateProfileRequest request, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await put<Map<String, dynamic>>(
+      '/api/users/$userId/profile',
+      data: request.toJson(),
+      cancelToken: cancelToken,
+    );
+    return UserProfile.fromJson(response.data!);
+  }
+
+  // ============================================================================
+  // Admin Dashboard Endpoints - Requirements 25.1, 25.2, 25.3, 25.4, 25.5
+  // ============================================================================
+
+  /// Get dashboard metrics for admin overview.
+  ///
+  /// **Requirements:**
+  /// - 25.1: Today's revenue and booking count
+  /// - 25.2: Active and concurrent user counts
+  /// - 25.3: Upcoming showtimes with occupancy rates
+  /// - 25.4: Top 5 movies by sales
+  /// - 25.5: Last 10 recent bookings
+  ///
+  /// Returns [DashboardMetrics] with all aggregated statistics.
+  ///
+  /// Example:
+  /// ```dart
+  /// final metrics = await apiClient.getDashboardMetrics();
+  /// print('Today revenue: ${metrics.todayRevenue}');
+  /// ```
+  Future<DashboardMetrics> getDashboardMetrics({
+    CancelToken? cancelToken,
+  }) async {
+    final response = await get<Map<String, dynamic>>(
+      '/api/admin/dashboard/metrics',
+      cancelToken: cancelToken,
+    );
+    return DashboardMetrics.fromJson(response.data!);
+  }
+
+  // ============================================================================
+  // Revenue Report Endpoint — Requirements 24.1, 24.2, 24.3, 24.4
+  // ============================================================================
+
+  /// Get a revenue report for a date range.
+  ///
+  /// **Requirements:**
+  /// - 24.1: Revenue breakdown by payment method
+  /// - 24.2: Daily revenue time series
+  /// - 24.3: Summary totals (total revenue, total bookings, average booking value)
+  /// - 24.4: Date range filter via startDate / endDate query params
+  ///
+  /// Parameters:
+  /// - [startDate]: Beginning of the report period (inclusive)
+  /// - [endDate]: End of the report period (inclusive)
+  /// - [cancelToken]: Optional Dio cancel token for request cancellation
+  ///
+  /// Returns [RevenueReport] with totals, per-method breakdown, and daily series.
+  ///
+  /// Example:
+  /// ```dart
+  /// final report = await apiClient.getRevenueReport(
+  ///   DateTime.now().subtract(const Duration(days: 30)),
+  ///   DateTime.now(),
+  /// );
+  /// print('Total revenue: \${report.totalRevenue}');
+  /// ```
+  Future<RevenueReport> getRevenueReport(
+    DateTime startDate,
+    DateTime endDate, {
+    CancelToken? cancelToken,
+  }) async {
+    String _fmtDate(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}-'
+        '${d.month.toString().padLeft(2, '0')}-'
+        '${d.day.toString().padLeft(2, '0')}';
+
+    final response = await get<Map<String, dynamic>>(
+      '/api/admin/reports/revenue',
+      queryParameters: {
+        'startDate': _fmtDate(startDate),
+        'endDate': _fmtDate(endDate),
+      },
+      cancelToken: cancelToken,
+    );
+    return RevenueReport.fromJson(response.data!);
+  }
+
+  // ============================================================================
+  // Booking Report Endpoint — Requirements 24.5, 24.6, 24.7, 24.8, 24.9
+  // ============================================================================
+
+  /// Get a booking report for a date range.
+  ///
+  /// **Requirements:**
+  /// - 24.5: Booking status breakdown (total, confirmed, cancelled, refunded)
+  /// - 24.6: Movie rankings by ticket sales and revenue
+  /// - 24.7: Theater occupancy rates
+  /// - 24.8: Date range filter via startDate / endDate query params
+  /// - 24.9: Summary statistics across the report period
+  ///
+  /// Parameters:
+  /// - [startDate]: Beginning of the report period (inclusive)
+  /// - [endDate]: End of the report period (inclusive)
+  /// - [cancelToken]: Optional Dio cancel token for request cancellation
+  ///
+  /// Returns [BookingReport] with stats, movie rankings, and theater occupancy.
+  ///
+  /// Example:
+  /// ```dart
+  /// final report = await apiClient.getBookingReport(
+  ///   DateTime.now().subtract(const Duration(days: 30)),
+  ///   DateTime.now(),
+  /// );
+  /// print('Total bookings: \${report.stats.total}');
+  /// ```
+  Future<BookingReport> getBookingReport(
+    DateTime startDate,
+    DateTime endDate, {
+    CancelToken? cancelToken,
+  }) async {
+    String _fmtDate(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}-'
+        '${d.month.toString().padLeft(2, '0')}-'
+        '${d.day.toString().padLeft(2, '0')}';
+
+    final response = await get<Map<String, dynamic>>(
+      '/api/admin/reports/bookings',
+      queryParameters: {
+        'startDate': _fmtDate(startDate),
+        'endDate': _fmtDate(endDate),
+      },
+      cancelToken: cancelToken,
+    );
+    return BookingReport.fromJson(response.data!);
   }
 }
