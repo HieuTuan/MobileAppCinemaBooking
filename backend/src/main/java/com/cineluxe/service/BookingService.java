@@ -14,6 +14,7 @@ import com.cineluxe.dto.response.ComboDto;
 import com.cineluxe.dto.response.HoldResponse;
 import com.cineluxe.dto.response.PaymentStatusResponse;
 import com.cineluxe.dto.response.SeatMapResponse;
+import com.cineluxe.dto.response.StaffOfflineSyncDto;
 import com.cineluxe.dto.response.ValidationResult;
 import java.util.List;
 import java.util.Map;
@@ -75,4 +76,12 @@ public interface BookingService {
 
     /** Process the VNPay payment return callback. */
     PaymentStatusResponse processPaymentReturn(Map<String, String> parameters);
+
+    // ─── Offline sync ─────────────────────────────────────────────────
+
+    /**
+     * Trả về payload dữ liệu để app nhân viên cache offline.
+     * Chứa toàn bộ vé active trong khoảng thời gian sync (mở cửa sổ validate).
+     */
+    StaffOfflineSyncDto getOfflineSyncData();
 }

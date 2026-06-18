@@ -27,4 +27,17 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
       @Param("customerName") String customerName,
       @Param("now") Instant now,
       @Param("plus24Hours") Instant plus24Hours);
+
+  /**
+   * Lấy toàn bộ vé active trong khoảng thời gian offline-sync.
+   * Dùng cho app nhân viên cache dữ liệu offline.
+   * Chỉ trả về các vé có thể được validate (active + trong cửa sổ validate).
+   */
+  @Query("SELECT b FROM Booking b WHERE " +
+      "b.status = 'active' " +
+      "AND b.showtimeDateTime BETWEEN :windowStart AND :windowEnd " +
+      "ORDER BY b.showtimeDateTime ASC")
+  List<Booking> findActiveBookingsForOfflineSync(
+      @Param("windowStart") Instant windowStart,
+      @Param("windowEnd") Instant windowEnd);
 }

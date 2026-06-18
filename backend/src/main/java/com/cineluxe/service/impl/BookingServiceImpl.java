@@ -16,6 +16,7 @@ import com.cineluxe.dto.response.HoldResponse;
 import com.cineluxe.dto.response.PaymentStatusResponse;
 import com.cineluxe.dto.response.SeatDto;
 import com.cineluxe.dto.response.SeatMapResponse;
+import com.cineluxe.dto.response.StaffOfflineSyncDto;
 import com.cineluxe.dto.response.ValidationResult;
 import com.cineluxe.entity.Booking;
 import com.cineluxe.entity.FoodCombo;
@@ -26,6 +27,7 @@ import com.cineluxe.repository.BookingRepository;
 import com.cineluxe.repository.FoodComboRepository;
 import com.cineluxe.repository.ShowtimeSeatRepository;
 import com.cineluxe.service.BookingService;
+import com.cineluxe.service.NotificationService;
 import com.cineluxe.websocket.SeatWebSocketHandler;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -39,6 +41,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -50,15 +53,25 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class BookingServiceImpl implements BookingService {
 
-  private static final Duration HOLD_DURATION = Duration.ofMinutes(10);
-  private static final long DEFAULT_SEAT_PRICE = 120_000L;
-  private static final String VNPAY_SECRET = "cineluxe-demo-vnpay-secret-key-123456789";
-  private static final String API_BASE_URL = "http://10.0.2.2:8080";
+  @Value("${booking.hold-duration-minutes}")
+  private int holdDurationMinutes;
+
+  @Value("${booking.default-seat-price}")
+  private long defaultSeatPrice;
+
+  @Value("${booking.vnpay-secret}")
+  private String vnpaySecret;
+
+  @Value("${booking.api-base-url}")
+  private String apiBaseUrl;
 
   private final ShowtimeSeatRepository seatRepository;
   private final FoodComboRepository comboRepository;
   private final BookingRepository bookingRepository;
   private final SeatWebSocketHandler webSocketHandler;
+  private final NotificationService notificationService;
+
+  private static long offlineSyncVersionCounter = 0L;
 
   @Override
   @Transactional(readOnly = true)
@@ -109,7 +122,7 @@ public class BookingServiceImpl implements BookingService {
         .map(ShowtimeSeat::getHoldId)
         .findFirst();
     var holdId = existingHoldId.orElseGet(() -> "HOLD-" + UUID.randomUUID());
-    var expiresAt = now.plus(HOLD_DURATION);
+    var expiresAt = now.plus(Duration.ofMinutes(holdDurationMinutes));
     combinedSeats.forEach(seat -> seat.hold(holdId, userId, expiresAt));
     seatRepository.saveAll(combinedSeats);
     webSocketHandler.broadcastAll(showtimeId, combinedSeats);
@@ -145,7 +158,7 @@ public class BookingServiceImpl implements BookingService {
       return combo.getPrice() * selection.quantity();
     }).sum();
     var bookingId = "BK-" + UUID.randomUUID();
-    var total = seats.size() * DEFAULT_SEAT_PRICE + comboTotal;
+    var total = seats.size() * defaultSeatPrice + comboTotal;
     var booking = bookingRepository.save(new Booking(
         bookingId,
         userId,
@@ -164,7 +177,7 @@ public class BookingServiceImpl implements BookingService {
         booking.getStatus(),
         booking.getPaymentStatus(),
         total,
-        API_BASE_URL + "/api/payments/sandbox/" + bookingId
+        apiBaseUrl + "/api/payments/sandbox/" + bookingId
             + "?" + paymentParameters + "&signature=" + sign(paymentParameters),
         booking.getPaymentExpiresAt());
   }
@@ -224,6 +237,7 @@ public class BookingServiceImpl implements BookingService {
     booking.cancel(refund);
     bookingRepository.save(booking);
     releaseBookingSeats(booking);
+    notificationService.sendBookingCancellation(userId, booking);
     return new CancelBookingResponse(booking.getId(), booking.getStatus(), refund, "refunded");
   }
 
@@ -364,6 +378,7 @@ public class BookingServiceImpl implements BookingService {
     if ("pendingPayment".equals(booking.getStatus())) {
       if ("00".equals(responseCode)) {
         booking.completePayment(transactionId, responseCode);
+        notificationService.sendPaymentConfirmation(booking.getUserId(), booking);
       } else {
         booking.failPayment(transactionId, responseCode);
         releaseBookingSeats(booking);
@@ -394,6 +409,26 @@ public class BookingServiceImpl implements BookingService {
           bookingRepository.save(booking);
           releaseBookingSeats(booking);
         });
+  }
+
+  // ─── Offline sync ─────────────────────────────────────────────────
+
+  @Override
+  @Transactional(readOnly = true)
+  public StaffOfflineSyncDto getOfflineSyncData() {
+    var now = Instant.now();
+    var windowStart = now.minus(Duration.ofHours(2));
+    var windowEnd = now.plus(Duration.ofHours(24));
+    var bookings = bookingRepository.findActiveBookingsForOfflineSync(windowStart, windowEnd);
+    var syncedAt = Instant.now();
+    var expiresAt = syncedAt.plus(Duration.ofMinutes(30));
+    offlineSyncVersionCounter++;
+    return new StaffOfflineSyncDto(
+        bookings.stream().map(BookingSearchResult::from).toList(),
+        bookings.size(),
+        syncedAt,
+        expiresAt,
+        offlineSyncVersionCounter);
   }
 
   // ─── Private helpers ──────────────────────────────────────────────────
@@ -439,7 +474,7 @@ public class BookingServiceImpl implements BookingService {
 
   private String paymentReturnUrl(String bookingId, String responseCode, String transactionId) {
     var payload = callbackPayload(bookingId, responseCode, transactionId);
-    return API_BASE_URL + "/api/payments/vnpay/return?" + payload + "&signature=" + sign(payload);
+    return apiBaseUrl + "/api/payments/vnpay/return?" + payload + "&signature=" + sign(payload);
   }
 
   private String callbackPayload(String bookingId, String responseCode, String transactionId) {
@@ -450,7 +485,7 @@ public class BookingServiceImpl implements BookingService {
   private String sign(String payload) {
     try {
       var mac = Mac.getInstance("HmacSHA512");
-      mac.init(new SecretKeySpec(VNPAY_SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA512"));
+      mac.init(new SecretKeySpec(vnpaySecret.getBytes(StandardCharsets.UTF_8), "HmacSHA512"));
       return HexFormat.of().formatHex(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
     } catch (Exception exception) {
       throw new IllegalStateException("Unable to sign VNPay parameters", exception);
