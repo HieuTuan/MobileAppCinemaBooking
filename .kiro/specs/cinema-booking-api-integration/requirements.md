@@ -6,34 +6,43 @@ This document specifies the requirements for implementing comprehensive backend 
 
 The implementation will transform the existing client-side prototype into a complete client-server application supporting customer booking flows, staff ticket validation, and administrative management operations.
 
+**Technical Architecture:**
+- **Mobile Platforms**: Android and iOS only (Flutter mobile app)
+- **Backend**: Spring Boot 3.4.6 + Java 17 (located in /backend folder)
+- **Database**: PostgreSQL with Spring Data JPA (Code First approach - entities define schema)
+- **Architecture**: Spring MVC with controller/service/repository/entity/dto layers
+- **Package Structure**: com.cineluxe.* with standard Spring Boot organization
+- **Existing Modules**: Booking, ShowtimeSeat, FoodCombo, WebSocket seat updates
+
 ## Glossary
 
-- **API_Client**: HTTP client library for making REST API requests from Flutter application
+- **API_Client**: HTTP client library (Dio) for making REST API requests from Flutter application
 - **Auth_Service**: Authentication service handling OAuth, JWT tokens, and session management
-- **Booking_System**: Backend system managing seat reservations, holds, and booking lifecycle
+- **Booking_Service**: Spring Boot service managing seat reservations, holds, and booking lifecycle
 - **Payment_Gateway**: VNPay payment service integration for processing transactions
 - **QR_Generator**: Service generating QR codes for validated tickets
-- **QR_Scanner**: Service scanning and validating QR code tickets
-- **Seat_Manager**: Real-time seat status synchronization service
-- **Push_Notifier**: Push notification service using FCM/APNs
+- **QR_Scanner**: Mobile scanner service for validating QR code tickets
+- **Seat_Manager**: Real-time seat status synchronization service using WebSocket
+- **Push_Notifier**: Push notification service using FCM (Android) and APNs (iOS)
 - **Cinema_Store**: Flutter state management store (existing)
-- **Backend_API**: RESTful API server providing all backend operations
+- **Spring_Boot_API**: RESTful API server (Spring Boot 3.4.6 + Java 17) providing all backend operations
+- **JPA_Entity**: Java Persistence API entity classes defining database schema (Code First)
 - **JWT_Token**: JSON Web Token for authenticated API requests
 - **Refresh_Token**: Long-lived token for obtaining new access tokens
 - **Hold_Timer**: 10-minute countdown timer for seat reservations
 - **Verified_Review**: Movie review from users with confirmed paid bookings
 - **Age_Gate**: Age verification mechanism for T18-rated movies
 - **Refund_Calculator**: Service calculating refund amounts based on timing rules
-- **WebSocket_Client**: Client for real-time seat status updates
+- **WebSocket_Client**: Flutter client for real-time seat status updates (connects to Spring WebSocket endpoint)
 - **HMAC_Validator**: VNPay payment signature validator using HMAC-SHA512
 
 - **Admin_Dashboard**: Real-time administrative dashboard with metrics
 - **Staff_Terminal**: Staff device for ticket validation operations
-- **Customer_App**: Customer-facing Flutter mobile application
+- **Customer_App**: Customer-facing Flutter mobile application (Android and iOS only)
 - **T18_Rating**: Age rating requiring 18+ verification before booking
-- **Showtime_Seat**: Individual seat entity linked to specific showtime
+- **ShowtimeSeat_Entity**: JPA entity representing individual seat linked to specific showtime
 - **Concurrent_Booking**: Multiple users attempting to book same seats simultaneously
-- **Seat_Lock**: Temporary database lock preventing race conditions
+- **Optimistic_Locking**: JPA @Version field preventing race conditions on ShowtimeSeat updates
 - **Transaction_Log**: Audit trail of all booking and payment operations
 - **Revenue_Report**: Financial reporting with date range filtering
 - **Occupancy_Rate**: Percentage of seats sold for showtimes
@@ -42,6 +51,8 @@ The implementation will transform the existing client-side prototype into a comp
 - **Booking_Timeout**: Automatic cancellation of unpaid bookings after timeout
 - **Response_Time**: API request-to-response duration metric
 - **Uptime_SLA**: Service level agreement for system availability
+- **PostgreSQL**: Relational database management system used for data persistence
+- **Hibernate**: JPA implementation used by Spring Data JPA for ORM
 
 ## Requirements
 
@@ -52,13 +63,13 @@ The implementation will transform the existing client-side prototype into a comp
 #### Acceptance Criteria
 
 1. WHEN a user taps "Sign in with Google", THE Auth_Service SHALL initiate Google OAuth 2.0 flow
-2. WHEN Google OAuth completes successfully, THE Auth_Service SHALL exchange authorization code for JWT_Token and Refresh_Token
-3. WHEN authentication succeeds, THE Backend_API SHALL return user profile data including id, email, fullName, avatar, memberRank, and points
+2. WHEN Google OAuth completes successfully, THE Auth_Service SHALL exchange authorization code for JWT_Token and Refresh_Token via Spring Boot API
+3. WHEN authentication succeeds, THE Spring_Boot_API SHALL return user profile data including id, email, fullName, avatar, memberRank, and points
 4. WHEN JWT_Token expires, THE Auth_Service SHALL automatically refresh using Refresh_Token without user intervention
 5. IF Refresh_Token is invalid or expired, THEN THE Auth_Service SHALL clear local session and redirect to login screen
 6. THE Auth_Service SHALL store JWT_Token and Refresh_Token securely using Flutter Secure Storage
-7. WHEN user logs out, THE Auth_Service SHALL revoke tokens on Backend_API and clear local storage
-8. THE Backend_API SHALL validate JWT_Token signature and expiration on every authenticated request
+7. WHEN user logs out, THE Auth_Service SHALL revoke tokens on Spring_Boot_API and clear local storage
+8. THE Spring_Boot_API SHALL validate JWT_Token signature and expiration on every authenticated request using Spring Security filters
 
 ### Requirement 2: Traditional Email/Password Authentication
 
@@ -66,14 +77,14 @@ The implementation will transform the existing client-side prototype into a comp
 
 #### Acceptance Criteria
 
-1. WHEN a user submits registration form with email, password, fullName, and phone, THE Backend_API SHALL validate email format and uniqueness
-2. WHEN email is already registered, THE Backend_API SHALL return error with message "Email already exists"
-3. WHEN registration is valid, THE Backend_API SHALL hash password using bcrypt and create user account with role customer
-4. WHEN user submits login credentials, THE Backend_API SHALL verify email and password hash match
-5. WHEN credentials are invalid, THE Backend_API SHALL return error with message "Invalid email or password" after 200ms delay to prevent timing attacks
-6. WHEN login succeeds, THE Backend_API SHALL return JWT_Token, Refresh_Token, and user profile
-7. THE Backend_API SHALL enforce password minimum length of 8 characters
-8. THE Backend_API SHALL require password to contain at least one uppercase, one lowercase, one digit, and one special character
+1. WHEN a user submits registration form with email, password, fullName, and phone, THE Spring_Boot_API SHALL validate email format and uniqueness using JPA repository
+2. WHEN email is already registered, THE Spring_Boot_API SHALL return error with message "Email already exists"
+3. WHEN registration is valid, THE Spring_Boot_API SHALL hash password using BCrypt and persist User entity with role customer via Spring Data JPA
+4. WHEN user submits login credentials, THE Spring_Boot_API SHALL verify email and password hash match using Spring Security
+5. WHEN credentials are invalid, THE Spring_Boot_API SHALL return error with message "Invalid email or password" after 200ms delay to prevent timing attacks
+6. WHEN login succeeds, THE Spring_Boot_API SHALL return JWT_Token, Refresh_Token, and user profile
+7. THE Spring_Boot_API SHALL enforce password minimum length of 8 characters using Bean Validation (@Size annotation)
+8. THE Spring_Boot_API SHALL require password to contain at least one uppercase, one lowercase, one digit, and one special character using custom validator
 
 ### Requirement 3: Movie Search and Filtering API
 
@@ -81,14 +92,14 @@ The implementation will transform the existing client-side prototype into a comp
 
 #### Acceptance Criteria
 
-1. WHEN customer requests GET /api/movies with query parameters, THE Backend_API SHALL return matching movies within 300ms
-2. WHEN query parameter contains search text, THE Backend_API SHALL match against title, director, cast members, and genres (case-insensitive)
-3. WHEN genre filter is specified, THE Backend_API SHALL return only movies containing that genre
-4. WHEN status filter is "nowShowing", THE Backend_API SHALL return only movies with status nowShowing
-5. WHEN status filter is "comingSoon", THE Backend_API SHALL return only movies with status comingSoon
-6. WHEN no filters are provided, THE Backend_API SHALL return all active movies sorted by releaseDate descending
-7. THE Backend_API SHALL include movie fields: id, title, description, genres, durationMinutes, director, cast, posterUrl, trailerUrl, rating, ageRating, releaseDate, status
-8. THE Backend_API SHALL support pagination with page and pageSize query parameters defaulting to page 1 and pageSize 20
+1. WHEN customer requests GET /api/movies with query parameters, THE Spring_Boot_API SHALL return matching movies within 300ms using JPA queries
+2. WHEN query parameter contains search text, THE Spring_Boot_API SHALL match against title, director, cast members, and genres using JPQL (case-insensitive)
+3. WHEN genre filter is specified, THE Spring_Boot_API SHALL return only movies containing that genre using @Query annotation
+4. WHEN status filter is "nowShowing", THE Spring_Boot_API SHALL return only movies with status nowShowing
+5. WHEN status filter is "comingSoon", THE Spring_Boot_API SHALL return only movies with status comingSoon
+6. WHEN no filters are provided, THE Spring_Boot_API SHALL return all active movies sorted by releaseDate descending
+7. THE Spring_Boot_API SHALL include movie fields: id, title, description, genres, durationMinutes, director, cast, posterUrl, trailerUrl, rating, ageRating, releaseDate, status
+8. THE Spring_Boot_API SHALL support pagination with page and pageSize query parameters using Spring Data Pageable (defaulting to page 1 and pageSize 20)
 
 ### Requirement 4: Real-time Seat Status Synchronization
 
@@ -96,15 +107,15 @@ The implementation will transform the existing client-side prototype into a comp
 
 #### Acceptance Criteria
 
-1. WHEN customer opens seat selection screen, THE Seat_Manager SHALL establish WebSocket connection to /ws/showtimes/{showtimeId}/seats
-2. WHEN any user selects or releases a seat, THE Seat_Manager SHALL broadcast seat status update to all connected clients within 2 seconds
+1. WHEN customer opens seat selection screen, THE Seat_Manager SHALL establish WebSocket connection to ws://[backend]/ws/showtimes/{showtimeId}/seats using Spring WebSocket endpoint
+2. WHEN any user selects or releases a seat, THE Seat_Manager SHALL broadcast seat status update to all connected clients within 2 seconds using Spring STOMP messaging
 3. WHEN seat status message is received, THE Customer_App SHALL update seat visual state to available, held, booked, or selected
 4. WHEN WebSocket connection drops, THE Seat_Manager SHALL attempt reconnection with exponential backoff starting at 1 second
-5. WHEN reconnection succeeds, THE Seat_Manager SHALL sync complete current seat state from Backend_API
-6. THE Backend_API SHALL maintain held seat status for exactly 10 minutes from hold initiation
-7. WHEN Hold_Timer expires, THE Backend_API SHALL automatically release held seats and broadcast availability update
+5. WHEN reconnection succeeds, THE Seat_Manager SHALL sync complete current seat state from Spring_Boot_API REST endpoint
+6. THE Spring_Boot_API SHALL maintain held seat status for exactly 10 minutes from hold initiation using ShowtimeSeat entity holdExpiresAt field
+7. WHEN Hold_Timer expires, THE Spring_Boot_API SHALL automatically release held seats via scheduled task and broadcast availability update through WebSocket
 8. THE WebSocket_Client SHALL send ping frames every 30 seconds to maintain connection
-9. THE Backend_API SHALL respond with pong frames within 5 seconds or close stale connections
+9. THE Spring_Boot_API SHALL respond with pong frames within 5 seconds or close stale connections
 
 ### Requirement 5: Seat Reservation with Hold Mechanism
 
@@ -113,14 +124,14 @@ The implementation will transform the existing client-side prototype into a comp
 #### Acceptance Criteria
 
 1. WHEN customer selects seats, THE API_Client SHALL POST /api/showtimes/{showtimeId}/seats/hold with seatCodes array and userId
-2. WHEN requested seats are available, THE Booking_System SHALL acquire Seat_Lock and mark seats as held with timestamp
-3. WHEN any requested seat is already held or booked, THE Backend_API SHALL return 409 Conflict with list of unavailable seats
-4. WHEN hold succeeds, THE Backend_API SHALL return holdId, expiresAt timestamp, and confirmation of held seats
-5. WHEN hold is created, THE Backend_API SHALL broadcast seat status change to all WebSocket clients
-6. THE Booking_System SHALL enforce maximum 8 seats per hold request
-7. WHEN hold request exceeds 8 seats, THE Backend_API SHALL return 400 Bad Request with message "Maximum 8 seats per booking"
-8. WHEN user already has active hold for same showtime, THE Backend_API SHALL extend existing hold rather than create duplicate
-9. THE Backend_API SHALL schedule automatic seat release job at expiresAt timestamp
+2. WHEN requested seats are available, THE Booking_Service SHALL update ShowtimeSeat entities to held status using JPA @Transactional method
+3. WHEN any requested seat is already held or booked, THE Spring_Boot_API SHALL return 409 Conflict with list of unavailable seats
+4. WHEN hold succeeds, THE Spring_Boot_API SHALL return holdId, expiresAt timestamp, and confirmation of held seats
+5. WHEN hold is created, THE Spring_Boot_API SHALL broadcast seat status change to all WebSocket clients via Spring STOMP
+6. THE Booking_Service SHALL enforce maximum 8 seats per hold request using Bean Validation
+7. WHEN hold request exceeds 8 seats, THE Spring_Boot_API SHALL return 400 Bad Request with message "Maximum 8 seats per booking"
+8. WHEN user already has active hold for same showtime, THE Spring_Boot_API SHALL extend existing hold rather than create duplicate by querying SeatHold repository
+9. THE Spring_Boot_API SHALL schedule automatic seat release job at expiresAt timestamp using @Scheduled task or Spring Task Scheduler
 
 ### Requirement 6: Concurrent Booking Race Condition Handling
 
@@ -129,14 +140,14 @@ The implementation will transform the existing client-side prototype into a comp
 
 #### Acceptance Criteria
 
-1. WHEN multiple users attempt to hold same seat simultaneously, THE Booking_System SHALL use database row-level locking with SELECT FOR UPDATE
-2. WHEN Seat_Lock is acquired by first transaction, THE Backend_API SHALL block subsequent transactions until lock is released
-3. WHEN first transaction commits seat hold, THE Backend_API SHALL return success to first user and 409 Conflict to subsequent users
-4. THE Booking_System SHALL complete lock acquisition and release within 500ms to prevent timeout
-5. WHEN database deadlock is detected, THE Backend_API SHALL retry transaction up to 3 times with 100ms delay between attempts
-6. IF all retry attempts fail, THEN THE Backend_API SHALL return 503 Service Unavailable with message "Unable to process request, please try again"
-7. THE Booking_System SHALL use optimistic locking with version field on Showtime_Seat records
-8. WHEN version mismatch is detected, THE Backend_API SHALL reject operation and return current state
+1. WHEN multiple users attempt to hold same seat simultaneously, THE Booking_Service SHALL use JPA optimistic locking with @Version field on ShowtimeSeat entity
+2. WHEN version conflict is detected by Hibernate, THE Spring_Boot_API SHALL retry the transaction up to 3 times with exponential backoff
+3. WHEN first transaction commits seat hold successfully, THE Spring_Boot_API SHALL return success to first user and 409 Conflict to subsequent users
+4. THE Booking_Service SHALL complete optimistic lock check and update within 500ms to prevent timeout
+5. WHEN OptimisticLockException is caught after retry attempts, THE Spring_Boot_API SHALL return 409 Conflict with current seat state
+6. IF all retry attempts fail, THEN THE Spring_Boot_API SHALL return 503 Service Unavailable with message "Unable to process request, please try again"
+7. THE Booking_Service SHALL use @Transactional(isolation = READ_COMMITTED) to prevent dirty reads during concurrent updates
+8. WHEN version mismatch is detected, THE Spring_Boot_API SHALL refresh entity from database and return current state to client
 
 ### Requirement 7: Age Verification for T18 Movies
 

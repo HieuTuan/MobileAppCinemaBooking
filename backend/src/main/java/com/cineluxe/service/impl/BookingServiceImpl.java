@@ -25,6 +25,7 @@ import com.cineluxe.exception.ApiException;
 import com.cineluxe.repository.BookingRepository;
 import com.cineluxe.repository.FoodComboRepository;
 import com.cineluxe.repository.ShowtimeSeatRepository;
+import com.cineluxe.repository.UserProfileRepository;
 import com.cineluxe.service.BookingService;
 import com.cineluxe.websocket.SeatWebSocketHandler;
 import java.nio.charset.StandardCharsets;
@@ -59,6 +60,7 @@ public class BookingServiceImpl implements BookingService {
   private final FoodComboRepository comboRepository;
   private final BookingRepository bookingRepository;
   private final SeatWebSocketHandler webSocketHandler;
+  private final UserProfileRepository userProfileRepository;
 
   @Override
   @Transactional(readOnly = true)
@@ -128,14 +130,25 @@ public class BookingServiceImpl implements BookingService {
 
   @Override
   public BookingResponse createBooking(CreateBookingRequest request, String authenticatedUserId) {
+    // Age verification for T18 movies — Requirements 7.5, 7.6, 7.7
+    var userId = request.userId() == null || request.userId().isBlank()
+        ? authenticatedUserId
+        : request.userId();
+    if ("T18".equals(request.movieAgeRating())) {
+      var profile = userProfileRepository.findById(userId).orElse(null);
+      if (profile == null || profile.getBirthdate() == null) {
+        throw new ApiException(HttpStatus.FORBIDDEN, "Age verification required for this movie");
+      }
+      int age = java.time.Period.between(profile.getBirthdate(), java.time.LocalDate.now()).getYears();
+      if (age < 18) {
+        throw new ApiException(HttpStatus.FORBIDDEN, "Age verification required for this movie");
+      }
+    }
     var seats = seatRepository.findByHoldId(request.holdId());
     if (seats.isEmpty() || seats.stream().anyMatch(
         seat -> seat.getHoldExpiresAt() == null || seat.getHoldExpiresAt().isBefore(Instant.now()))) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid or expired holdId");
     }
-    var userId = request.userId() == null || request.userId().isBlank()
-        ? authenticatedUserId
-        : request.userId();
     var comboSelections = request.combos() == null ? List.<ComboSelection>of() : request.combos();
     var comboTotal = comboSelections.stream().mapToLong(selection -> {
       FoodCombo combo = comboRepository.findById(selection.comboId())

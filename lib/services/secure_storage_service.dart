@@ -11,6 +11,7 @@ class SecureStorageService {
   static const String _accessTokenKey = 'access_token';
   static const String _refreshTokenKey = 'refresh_token';
   static const String _tokenExpiryKey = 'token_expiry';
+  static const String _deviceTokenKey = 'device_token';
   
   /// Flutter Secure Storage instance with default options
   final FlutterSecureStorage _storage = const FlutterSecureStorage(
@@ -115,6 +116,42 @@ class SecureStorageService {
       _storage.delete(key: _refreshTokenKey),
       _storage.delete(key: _tokenExpiryKey),
     ]);
+  }
+  
+  // ============================================================================
+  // Device Token Storage Methods
+  // ============================================================================
+  
+  /// Save device token (FCM/APNs) to secure storage
+  /// 
+  /// Used to detect token changes for re-registration
+  /// Requirements: 37.5
+  Future<void> saveDeviceToken(String token) async {
+    await _storage.write(key: _deviceTokenKey, value: token);
+  }
+  
+  /// Get device token from secure storage
+  /// 
+  /// Returns null if no token is stored
+  Future<String?> getDeviceToken() async {
+    return await _storage.read(key: _deviceTokenKey);
+  }
+  
+  /// Check if device token has changed
+  /// 
+  /// Compares current token with stored token
+  /// Returns true if tokens differ or no stored token exists
+  Future<bool> hasDeviceTokenChanged(String currentToken) async {
+    final storedToken = await getDeviceToken();
+    return storedToken != currentToken;
+  }
+  
+  /// Clear device token from secure storage
+  /// 
+  /// Used during logout to remove device token
+  /// Requirements: 37.6
+  Future<void> clearDeviceToken() async {
+    await _storage.delete(key: _deviceTokenKey);
   }
   
   /// Clear all secure storage data

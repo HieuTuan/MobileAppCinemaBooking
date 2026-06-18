@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../api/api_client.dart';
 import '../models/auth_models.dart';
 import 'secure_storage_service.dart';
+import 'push_notification_handler.dart';
 
 /// Authentication service managing authentication flows, token lifecycle, and secure credential storage.
 /// 
@@ -19,6 +20,7 @@ import 'secure_storage_service.dart';
 /// - Requirement 1.7: Logout with token revocation
 /// - Requirement 2.1: Email/password registration
 /// - Requirement 2.3: Email/password sign-in
+/// - Requirement 37.6: Device unregistration on logout
 /// 
 /// Usage:
 /// ```dart
@@ -255,9 +257,22 @@ class AuthService {
   /// Sign out current user
   /// 
   /// Revokes tokens on backend and clears all local storage.
+  /// Unregisters device from push notifications to stop sending notifications.
   /// 
-  /// **Requirements: 1.7**
+  /// **Requirements: 1.7, 37.6**
   Future<void> signOut() async {
+    try {
+      // Unregister device from push notifications
+      // Requirement 37.6: DELETE /api/users/{userId}/devices/{deviceToken}
+      if (_currentUser != null) {
+        final pushHandler = PushNotificationHandler();
+        await pushHandler.unregisterDevice(_currentUser!.id);
+      }
+    } catch (e) {
+      // Continue with logout even if device unregistration fails
+      print('Device unregistration failed: $e');
+    }
+    
     try {
       // Revoke tokens on backend
       await _revokeTokens();
