@@ -1,6 +1,6 @@
-/// Admin dashboard models — plain Dart, no code generation.
-///
-/// Requirements: 24.1, 24.2, 24.3, 24.4, 25.1, 25.2, 25.3, 25.4, 25.5
+// Admin dashboard models — plain Dart, no code generation.
+//
+// Requirements: 24.1, 24.2, 24.3, 24.4, 25.1, 25.2, 25.3, 25.4, 25.5
 
 class ShowtimeOccupancy {
   const ShowtimeOccupancy({
@@ -324,4 +324,449 @@ class BookingReport {
           .toList(),
     );
   }
+}
+
+// ============================================================================
+// Admin CRUD Models — Requirements 19.x, 20.x, 21.x, 22.x, 23.x
+// ============================================================================
+
+class MovieManagementRequest {
+  const MovieManagementRequest({
+    required this.title,
+    required this.description,
+    required this.genres,
+    required this.durationMinutes,
+    required this.director,
+    required this.cast,
+    required this.posterUrl,
+    required this.trailerUrl,
+    required this.ageRating,
+    required this.releaseDate,
+    required this.status,
+  });
+
+  final String title;
+  final String description;
+  final List<String> genres;
+  final int durationMinutes;
+  final String director;
+  final List<String> cast;
+  final String posterUrl;
+  final String trailerUrl;
+  final String ageRating;
+  final DateTime releaseDate;
+  final String status;
+
+  Map<String, dynamic> toJson() => {
+    'title': title,
+    'description': description,
+    'genres': genres,
+    'durationMinutes': durationMinutes,
+    'director': director,
+    'cast': cast,
+    'posterUrl': posterUrl,
+    'trailerUrl': trailerUrl,
+    'ageRating': ageRating,
+    'releaseDate': releaseDate.toIso8601String(),
+    'status': status,
+  };
+}
+
+class FoodComboManagementRequest {
+  const FoodComboManagementRequest({
+    required this.name,
+    required this.description,
+    required this.price,
+    this.imageUrl = '',
+  });
+
+  final String name;
+  final String description;
+  final int price;
+  final String imageUrl;
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'description': description,
+    'price': price,
+    'imageUrl': imageUrl,
+  };
+}
+
+class Theater {
+  const Theater({
+    required this.id,
+    required this.name,
+    required this.address,
+    this.city = '',
+    this.active = true,
+  });
+
+  final String id;
+  final String name;
+  final String address;
+  final String city;
+  final bool active;
+
+  factory Theater.fromJson(Map<String, dynamic> json) {
+    return Theater(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      address: json['address'] as String,
+      city: json['city'] as String? ?? '',
+      active: json['active'] as bool? ?? true,
+    );
+  }
+}
+
+class TheaterRequest {
+  const TheaterRequest({
+    required this.name,
+    required this.address,
+    this.city = '',
+  });
+
+  final String name;
+  final String address;
+  final String city;
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'address': address,
+    if (city.isNotEmpty) 'city': city,
+  };
+}
+
+class Room {
+  const Room({
+    required this.id,
+    required this.theaterId,
+    required this.name,
+    required this.status,
+    required this.totalSeats,
+    this.screenType = '',
+  });
+
+  final String id;
+  final String theaterId;
+  final String name;
+  final String status;
+  final int totalSeats;
+  final String screenType;
+
+  factory Room.fromJson(Map<String, dynamic> json) {
+    return Room(
+      id: json['id'] as String,
+      theaterId: json['theaterId'] as String,
+      name: json['name'] as String,
+      status: json['status'] as String,
+      totalSeats: (json['totalSeats'] as num).toInt(),
+      screenType: json['screenType'] as String? ?? '',
+    );
+  }
+}
+
+class RoomRequest {
+  const RoomRequest({
+    required this.theaterId,
+    required this.name,
+    required this.rows,
+    required this.seatsPerRow,
+    this.screenType = '',
+    this.vipRows = const <String>[],
+    this.coupleRows = const <String>[],
+  });
+
+  final String theaterId;
+  final String name;
+  final int rows;
+  final int seatsPerRow;
+  final String screenType;
+  final List<String> vipRows;
+  final List<String> coupleRows;
+
+  Map<String, dynamic> toJson() => {
+    'theaterId': theaterId,
+    'name': name,
+    'rows': rows,
+    'seatsPerRow': seatsPerRow,
+    if (screenType.isNotEmpty) 'screenType': screenType,
+    'vipRows': vipRows,
+    'coupleRows': coupleRows,
+  };
+}
+
+class ShowtimeScheduleRequest {
+  const ShowtimeScheduleRequest({
+    required this.movieId,
+    required this.roomId,
+    required this.startTime,
+    required this.endTime,
+    required this.basePrice,
+    this.status = 'scheduled',
+  });
+
+  final String movieId;
+  final String roomId;
+  final DateTime startTime;
+  final DateTime endTime;
+  final int basePrice;
+  final String status;
+
+  Map<String, dynamic> toJson() => {
+    'movieId': movieId,
+    'roomId': roomId,
+    'startTime': startTime.toIso8601String(),
+    'endTime': endTime.toIso8601String(),
+    'basePrice': basePrice,
+    'status': status,
+  };
+}
+
+class AdminUser {
+  const AdminUser({
+    required this.userId,
+    required this.fullName,
+    required this.email,
+    required this.role,
+    required this.active,
+    this.permissions = const <String>[],
+  });
+
+  final String userId;
+  final String fullName;
+  final String email;
+  final String role;
+  final bool active;
+  final List<String> permissions;
+
+  factory AdminUser.fromJson(Map<String, dynamic> json) {
+    return AdminUser(
+      userId: json['userId'] as String,
+      fullName: json['fullName'] as String,
+      email: json['email'] as String,
+      role: json['role'] as String,
+      active: json['active'] as bool? ?? true,
+      permissions: (json['permissions'] as List<dynamic>? ?? const [])
+          .map((item) => item as String)
+          .toList(),
+    );
+  }
+}
+
+class CreateStaffUserRequest {
+  const CreateStaffUserRequest({
+    required this.fullName,
+    required this.email,
+    required this.role,
+    required this.permissions,
+  });
+
+  final String fullName;
+  final String email;
+  final String role;
+  final List<String> permissions;
+
+  Map<String, dynamic> toJson() => {
+    'fullName': fullName,
+    'email': email,
+    'role': role,
+    'permissions': permissions,
+  };
+}
+
+class StaffAccountCreationResult {
+  const StaffAccountCreationResult({
+    required this.user,
+    required this.temporaryPassword,
+    required this.welcomeEmailSent,
+  });
+
+  final AdminUser user;
+  final String temporaryPassword;
+  final bool welcomeEmailSent;
+
+  factory StaffAccountCreationResult.fromJson(Map<String, dynamic> json) {
+    return StaffAccountCreationResult(
+      user: AdminUser.fromJson(json['user'] as Map<String, dynamic>),
+      temporaryPassword: json['temporaryPassword'] as String? ?? '',
+      welcomeEmailSent: json['welcomeEmailSent'] as bool? ?? false,
+    );
+  }
+}
+
+// ============================================================================
+// Staff Operations Models — Requirements 27.x, 28.x
+// ============================================================================
+
+class RoomMaintenanceRequest {
+  const RoomMaintenanceRequest({
+    required this.staffId,
+    required this.reason,
+    required this.description,
+  });
+
+  final String staffId;
+  final String reason;
+  final String description;
+
+  Map<String, dynamic> toJson() => {
+    'staffId': staffId,
+    'reason': reason,
+    'description': description,
+  };
+}
+
+class RoomReadyRequest {
+  const RoomReadyRequest({
+    required this.staffId,
+    required this.resolutionNotes,
+  });
+
+  final String staffId;
+  final String resolutionNotes;
+
+  Map<String, dynamic> toJson() => {
+    'staffId': staffId,
+    'resolutionNotes': resolutionNotes,
+  };
+}
+
+class TechnicalIssue {
+  const TechnicalIssue({
+    required this.id,
+    required this.staffId,
+    required this.roomId,
+    required this.description,
+    required this.status,
+    required this.createdAt,
+    this.resolvedAt,
+  });
+
+  final String id;
+  final String staffId;
+  final String roomId;
+  final String description;
+  final String status;
+  final DateTime createdAt;
+  final DateTime? resolvedAt;
+
+  factory TechnicalIssue.fromJson(Map<String, dynamic> json) {
+    return TechnicalIssue(
+      id: json['id'] as String,
+      staffId: json['staffId'] as String,
+      roomId: json['roomId'] as String,
+      description: json['description'] as String,
+      status: json['status'] as String,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      resolvedAt: json['resolvedAt'] == null
+          ? null
+          : DateTime.parse(json['resolvedAt'] as String),
+    );
+  }
+}
+
+class ModifySeatsRequest {
+  const ModifySeatsRequest({required this.staffId, required this.newSeatCodes});
+
+  final String staffId;
+  final List<String> newSeatCodes;
+
+  Map<String, dynamic> toJson() => {
+    'staffId': staffId,
+    'newSeatCodes': newSeatCodes,
+  };
+}
+
+class ModifyCombosRequest {
+  const ModifyCombosRequest({required this.staffId, required this.combos});
+
+  final String staffId;
+  final List<Map<String, dynamic>> combos;
+
+  Map<String, dynamic> toJson() => {'staffId': staffId, 'combos': combos};
+}
+
+class BookingModificationResult {
+  const BookingModificationResult({
+    required this.bookingId,
+    required this.status,
+    required this.totalAmount,
+    required this.priceDifference,
+    required this.requiresAdditionalPayment,
+    this.paymentUrl,
+  });
+
+  final String bookingId;
+  final String status;
+  final int totalAmount;
+  final int priceDifference;
+  final bool requiresAdditionalPayment;
+  final String? paymentUrl;
+
+  factory BookingModificationResult.fromJson(Map<String, dynamic> json) {
+    return BookingModificationResult(
+      bookingId: json['bookingId'] as String,
+      status: json['status'] as String,
+      totalAmount: (json['totalAmount'] as num).toInt(),
+      priceDifference: (json['priceDifference'] as num).toInt(),
+      requiresAdditionalPayment:
+          json['requiresAdditionalPayment'] as bool? ?? false,
+      paymentUrl: json['paymentUrl'] as String?,
+    );
+  }
+}
+
+// ============================================================================
+// Payment Settings Models — Requirements 26.x
+// ============================================================================
+
+class PaymentSettings {
+  const PaymentSettings({
+    required this.terminalId,
+    required this.secretKey,
+    required this.environment,
+    required this.returnUrl,
+    required this.enabled,
+  });
+
+  final String terminalId;
+  final String secretKey;
+  final String environment;
+  final String returnUrl;
+  final bool enabled;
+
+  factory PaymentSettings.fromJson(Map<String, dynamic> json) {
+    return PaymentSettings(
+      terminalId: json['terminalId'] as String,
+      secretKey: json['secretKey'] as String,
+      environment: json['environment'] as String,
+      returnUrl: json['returnUrl'] as String? ?? '',
+      enabled: json['enabled'] as bool? ?? true,
+    );
+  }
+}
+
+class UpdatePaymentSettingsRequest {
+  const UpdatePaymentSettingsRequest({
+    required this.terminalId,
+    required this.secretKey,
+    required this.environment,
+    required this.returnUrl,
+    required this.enabled,
+  });
+
+  final String terminalId;
+  final String secretKey;
+  final String environment;
+  final String returnUrl;
+  final bool enabled;
+
+  Map<String, dynamic> toJson() => {
+    'terminalId': terminalId,
+    'secretKey': secretKey,
+    'environment': environment,
+    'returnUrl': returnUrl,
+    'enabled': enabled,
+  };
 }

@@ -1004,7 +1004,7 @@ class APIClient {
     DateTime endDate, {
     CancelToken? cancelToken,
   }) async {
-    String _fmtDate(DateTime d) =>
+    String fmtDate(DateTime d) =>
         '${d.year.toString().padLeft(4, '0')}-'
         '${d.month.toString().padLeft(2, '0')}-'
         '${d.day.toString().padLeft(2, '0')}';
@@ -1012,8 +1012,8 @@ class APIClient {
     final response = await get<Map<String, dynamic>>(
       '/api/admin/reports/revenue',
       queryParameters: {
-        'startDate': _fmtDate(startDate),
-        'endDate': _fmtDate(endDate),
+        'startDate': fmtDate(startDate),
+        'endDate': fmtDate(endDate),
       },
       cancelToken: cancelToken,
     );
@@ -1053,7 +1053,7 @@ class APIClient {
     DateTime endDate, {
     CancelToken? cancelToken,
   }) async {
-    String _fmtDate(DateTime d) =>
+    String fmtDate(DateTime d) =>
         '${d.year.toString().padLeft(4, '0')}-'
         '${d.month.toString().padLeft(2, '0')}-'
         '${d.day.toString().padLeft(2, '0')}';
@@ -1061,11 +1061,304 @@ class APIClient {
     final response = await get<Map<String, dynamic>>(
       '/api/admin/reports/bookings',
       queryParameters: {
-        'startDate': _fmtDate(startDate),
-        'endDate': _fmtDate(endDate),
+        'startDate': fmtDate(startDate),
+        'endDate': fmtDate(endDate),
       },
       cancelToken: cancelToken,
     );
     return BookingReport.fromJson(response.data!);
+  }
+
+  // ============================================================================
+  // Admin CRUD Endpoints — Requirements 19.x, 20.x, 21.x, 22.x, 23.x
+  // ============================================================================
+
+  Future<Movie> createAdminMovie(
+    MovieManagementRequest request, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/admin/movies',
+      data: request.toJson(),
+      cancelToken: cancelToken,
+    );
+    return Movie.fromJson(response.data!);
+  }
+
+  Future<Movie> updateAdminMovie(
+    String movieId,
+    MovieManagementRequest request, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await put<Map<String, dynamic>>(
+      '/api/admin/movies/$movieId',
+      data: request.toJson(),
+      cancelToken: cancelToken,
+    );
+    return Movie.fromJson(response.data!);
+  }
+
+  Future<void> deleteAdminMovie(
+    String movieId, {
+    CancelToken? cancelToken,
+  }) async {
+    await delete('/api/admin/movies/$movieId', cancelToken: cancelToken);
+  }
+
+  Future<FoodCombo> createAdminFoodCombo(
+    FoodComboManagementRequest request, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/admin/food-combos',
+      data: request.toJson(),
+      cancelToken: cancelToken,
+    );
+    return FoodCombo.fromJson(response.data!);
+  }
+
+  Future<FoodCombo> updateAdminFoodCombo(
+    String comboId,
+    FoodComboManagementRequest request, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await put<Map<String, dynamic>>(
+      '/api/admin/food-combos/$comboId',
+      data: request.toJson(),
+      cancelToken: cancelToken,
+    );
+    return FoodCombo.fromJson(response.data!);
+  }
+
+  Future<FoodCombo> setAdminFoodComboActive(
+    String comboId,
+    bool active, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await patch<Map<String, dynamic>>(
+      '/api/admin/food-combos/$comboId',
+      data: {'active': active},
+      cancelToken: cancelToken,
+    );
+    return FoodCombo.fromJson(response.data!);
+  }
+
+  Future<Theater> createAdminTheater(
+    TheaterRequest request, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/admin/theaters',
+      data: request.toJson(),
+      cancelToken: cancelToken,
+    );
+    return Theater.fromJson(response.data!);
+  }
+
+  Future<Room> createAdminRoom(
+    RoomRequest request, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/admin/rooms',
+      data: request.toJson(),
+      cancelToken: cancelToken,
+    );
+    return Room.fromJson(response.data!);
+  }
+
+  Future<Room> updateAdminRoomStatus(
+    String roomId,
+    String status, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await patch<Map<String, dynamic>>(
+      '/api/admin/rooms/$roomId/status',
+      data: {'status': status},
+      cancelToken: cancelToken,
+    );
+    return Room.fromJson(response.data!);
+  }
+
+  Future<Showtime> createAdminShowtime(
+    ShowtimeScheduleRequest request, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/admin/showtimes',
+      data: request.toJson(),
+      cancelToken: cancelToken,
+    );
+    return Showtime.fromJson(response.data!);
+  }
+
+  Future<Showtime> updateAdminShowtime(
+    String showtimeId,
+    ShowtimeScheduleRequest request, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await put<Map<String, dynamic>>(
+      '/api/admin/showtimes/$showtimeId',
+      data: request.toJson(),
+      cancelToken: cancelToken,
+    );
+    return Showtime.fromJson(response.data!);
+  }
+
+  Future<void> deleteAdminShowtime(
+    String showtimeId, {
+    CancelToken? cancelToken,
+  }) async {
+    await delete('/api/admin/showtimes/$showtimeId', cancelToken: cancelToken);
+  }
+
+  Future<PaginatedResponse<AdminUser>> getAdminUsers({
+    String? role,
+    int page = 1,
+    int pageSize = 20,
+    CancelToken? cancelToken,
+  }) async {
+    final response = await get<Map<String, dynamic>>(
+      '/api/admin/users',
+      queryParameters: {
+        'page': page,
+        'pageSize': pageSize,
+        if (role != null && role.isNotEmpty) 'role': role,
+      },
+      cancelToken: cancelToken,
+    );
+    return PaginatedResponse<AdminUser>.fromJson(
+      response.data!,
+      (json) => AdminUser.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  Future<StaffAccountCreationResult> createAdminUser(
+    CreateStaffUserRequest request, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/admin/users',
+      data: request.toJson(),
+      cancelToken: cancelToken,
+    );
+    return StaffAccountCreationResult.fromJson(response.data!);
+  }
+
+  Future<AdminUser> updateAdminUserStatus(
+    String userId,
+    bool active, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await patch<Map<String, dynamic>>(
+      '/api/admin/users/$userId/status',
+      data: {'active': active},
+      cancelToken: cancelToken,
+    );
+    return AdminUser.fromJson(response.data!);
+  }
+
+  Future<AdminUser> updateAdminUserPermissions(
+    String userId,
+    List<String> permissions, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await patch<Map<String, dynamic>>(
+      '/api/admin/users/$userId/permissions',
+      data: {'permissions': permissions},
+      cancelToken: cancelToken,
+    );
+    return AdminUser.fromJson(response.data!);
+  }
+
+  Future<void> deleteAdminUser(
+    String userId, {
+    CancelToken? cancelToken,
+  }) async {
+    await delete('/api/admin/users/$userId', cancelToken: cancelToken);
+  }
+
+  // ============================================================================
+  // Staff Room Status Endpoints — Requirements 27.x
+  // ============================================================================
+
+  Future<TechnicalIssue> reportRoomMaintenance(
+    String roomId,
+    RoomMaintenanceRequest request, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/staff/rooms/$roomId/maintenance',
+      data: request.toJson(),
+      cancelToken: cancelToken,
+    );
+    return TechnicalIssue.fromJson(response.data!);
+  }
+
+  Future<TechnicalIssue> markRoomReady(
+    String roomId,
+    RoomReadyRequest request, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/staff/rooms/$roomId/ready',
+      data: request.toJson(),
+      cancelToken: cancelToken,
+    );
+    return TechnicalIssue.fromJson(response.data!);
+  }
+
+  // ============================================================================
+  // Staff Customer Support Endpoints — Requirements 28.x
+  // ============================================================================
+
+  Future<BookingModificationResult> modifyBookingSeats(
+    String bookingId,
+    ModifySeatsRequest request, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/staff/bookings/$bookingId/modify-seats',
+      data: request.toJson(),
+      cancelToken: cancelToken,
+    );
+    return BookingModificationResult.fromJson(response.data!);
+  }
+
+  Future<BookingModificationResult> modifyBookingCombos(
+    String bookingId,
+    ModifyCombosRequest request, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/staff/bookings/$bookingId/modify-combos',
+      data: request.toJson(),
+      cancelToken: cancelToken,
+    );
+    return BookingModificationResult.fromJson(response.data!);
+  }
+
+  // ============================================================================
+  // Admin Payment Settings Endpoints — Requirements 26.x
+  // ============================================================================
+
+  Future<PaymentSettings> getPaymentSettings({CancelToken? cancelToken}) async {
+    final response = await get<Map<String, dynamic>>(
+      '/api/admin/settings/payment',
+      cancelToken: cancelToken,
+    );
+    return PaymentSettings.fromJson(response.data!);
+  }
+
+  Future<PaymentSettings> updatePaymentSettings(
+    UpdatePaymentSettingsRequest request, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await put<Map<String, dynamic>>(
+      '/api/admin/settings/payment',
+      data: request.toJson(),
+      cancelToken: cancelToken,
+    );
+    return PaymentSettings.fromJson(response.data!);
   }
 }

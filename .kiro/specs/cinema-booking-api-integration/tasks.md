@@ -457,34 +457,34 @@ This implementation plan transforms the existing Flutter cinema booking prototyp
     - Display occupancy rates per theater
     - _Requirements: 24.5, 24.6, 24.7, 24.8, 24.9_
 
-- [ ] 26. Implement admin CRUD operations
-  - [ ] 26.1 Implement movie management endpoints
+- [x] 26. Implement admin CRUD operations
+  - [x] 26.1 Implement movie management endpoints
     - Implement POST /api/admin/movies for create
     - Implement PUT /api/admin/movies/{id} for update
     - Implement DELETE /api/admin/movies/{id} for delete
     - Handle conflict error when deleting movie with active showtimes
     - _Requirements: 19.1, 19.2, 19.3, 19.4, 19.5, 19.6, 19.7, 19.8_
 
-  - [ ] 26.2 Implement food combo management endpoints
+  - [x] 26.2 Implement food combo management endpoints
     - Implement POST /api/admin/food-combos for create
     - Implement PUT /api/admin/food-combos/{id} for update
     - Implement PATCH /api/admin/food-combos/{id} for activate/deactivate
     - _Requirements: 20.1, 20.2, 20.3, 20.4, 20.5, 20.6, 20.7_
 
-  - [ ] 26.3 Implement theater and room management endpoints
+  - [x] 26.3 Implement theater and room management endpoints
     - Implement POST /api/admin/theaters for create
     - Implement POST /api/admin/rooms for create with seat layout generation
     - Implement PATCH /api/admin/rooms/{id}/status for maintenance status
     - _Requirements: 21.1, 21.2, 21.3, 21.4, 21.5, 21.6, 21.7, 21.8_
 
-  - [ ] 26.4 Implement showtime scheduling endpoints
+  - [x] 26.4 Implement showtime scheduling endpoints
     - Implement POST /api/admin/showtimes for create
     - Implement PUT /api/admin/showtimes/{id} for update
     - Implement DELETE /api/admin/showtimes/{id} for delete
     - Handle scheduling conflict detection and prevention
     - _Requirements: 22.1, 22.2, 22.3, 22.4, 22.5, 22.6, 22.7, 22.8, 22.9, 22.10_
 
-  - [ ] 26.5 Implement user account management endpoints
+  - [x] 26.5 Implement user account management endpoints
     - Implement GET /api/admin/users for list with role filter and pagination
     - Implement POST /api/admin/users for staff account creation with fullName, email, role, and permissions
     - Generate temporary password on staff account creation and send welcome email with credentials
@@ -493,8 +493,8 @@ This implementation plan transforms the existing Flutter cinema booking prototyp
     - Implement DELETE /api/admin/users/{id}; prevent deletion when user has active bookings (return 409 Conflict)
     - _Requirements: 23.1, 23.2, 23.3, 23.4, 23.5, 23.6, 23.7, 23.8, 23.9, 23.10_
 
-- [ ] 27. Implement staff room status management
-  - [ ] 27.1 Implement room maintenance endpoints
+- [x] 27. Implement staff room status management
+  - [x] 27.1 Implement room maintenance endpoints
     - Implement POST /api/staff/rooms/{id}/maintenance for reporting issues with reason and description
     - Implement POST /api/staff/rooms/{id}/ready for resolving issues with resolution notes
     - Verify staff has "Quản lý phòng" permission before allowing operations
@@ -504,8 +504,8 @@ This implementation plan transforms the existing Flutter cinema booking prototyp
     - Close TechnicalIssue record with resolvedAt timestamp when room is set to ready
     - _Requirements: 27.1, 27.2, 27.3, 27.4, 27.5, 27.6, 27.7_
 
-- [ ] 28. Implement staff customer support modifications
-  - [ ] 28.1 Implement booking modification endpoints
+- [x] 28. Implement staff customer support modifications
+  - [x] 28.1 Implement booking modification endpoints
     - Implement POST /api/staff/bookings/{id}/modify-seats for seat changes
     - Implement POST /api/staff/bookings/{id}/modify-combos for combo changes
     - Verify booking status is active and showtime is at least 30 minutes in future before allowing changes
@@ -517,8 +517,8 @@ This implementation plan transforms the existing Flutter cinema booking prototyp
     - Log all modifications with staffId, original values, new values, and timestamp
     - _Requirements: 28.1, 28.2, 28.3, 28.4, 28.5, 28.6, 28.7, 28.8, 28.9_
 
-- [ ] 29. Implement admin VNPay configuration
-  - [ ] 29.1 Implement payment settings endpoints
+- [x] 29. Implement admin VNPay configuration
+  - [x] 29.1 Implement payment settings endpoints
     - Implement GET /api/admin/settings/payment for viewing settings
     - Implement PUT /api/admin/settings/payment for updating settings
     - Validate VNPay terminal ID format (8 alphanumeric characters) and secret key length (32+ chars)
@@ -804,4 +804,3 @@ This implementation plan transforms the existing Flutter cinema booking prototyp
 
 - [ ] 43. Final integration checkpoint
   - Verify all requirements from Req 1-50 have corresponding passing tests or working implementations, confirm full booking flow end-to-end, ask the user if questions arise.
-
