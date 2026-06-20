@@ -2,28 +2,42 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'src/app.dart';
+import 'services/analytics_service.dart';
+import 'services/locale_service.dart';
 
-/// Main entry point for the CineLuxe Booking app
+/// Main entry point for the CineLuxe Booking app.
 ///
-/// Initializes Firebase before running the app to ensure
-/// push notifications and other Firebase services work correctly.
+/// Initialises Firebase, locale preference, and analytics before
+/// running the app.
 ///
 /// **Requirements:**
-/// - Requirement 15.3: Set up Firebase messaging integration
-/// - Requirement 37.1: Initialize Firebase core before app starts
+/// - 15.3 / 37.1: Firebase messaging
+/// - 39.1, 39.2: Language detection and persistence
+/// - 41.1, 41.2: Firebase Analytics setup
 void main() async {
-  // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
-  
+
+  // Initialize Firebase (Core + Analytics + Messaging)
   try {
-    // Initialize Firebase
     await Firebase.initializeApp();
     debugPrint('Main: Firebase initialized successfully');
   } catch (e) {
     debugPrint('Main: Firebase initialization failed: $e');
-    // Continue app startup even if Firebase fails
-    // Push notifications won't work, but core features will
   }
-  
+
+  // Initialize analytics (non-blocking)
+  try {
+    await AnalyticsService.instance.initialize();
+    debugPrint('Main: Analytics initialized');
+  } catch (e) {
+    debugPrint('Main: Analytics init failed: $e');
+  }
+
+  // Initialize locale preference
+  await LocaleService.instance.init();
+
+  // Track app_open event
+  AnalyticsService.instance.trackAppOpen();
+
   runApp(const CineBookingApp());
 }

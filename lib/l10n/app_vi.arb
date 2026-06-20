@@ -1,0 +1,192 @@
+{
+  "@@locale": "vi",
+
+  "appTitle": "CineLuxe Booking",
+  "@appTitle": { "description": "App title" },
+
+  "moviesLabel": "Phim",
+  "@moviesLabel": { "description": "Label for movies section" },
+
+  "showtimesLabel": "Suất chiếu",
+  "@showtimesLabel": { "description": "Label for showtimes section" },
+
+  "nowShowing": "Đang chiếu",
+  "@nowShowing": { "description": "Movie status: now showing" },
+
+  "comingSoon": "Sắp chiếu",
+  "@comingSoon": { "description": "Movie status: coming soon" },
+
+  "allLabel": "Tất cả",
+  "@allLabel": { "description": "All filter option" },
+
+  "bookingLabel": "Đặt vé",
+  "@bookingLabel": { "description": "Book ticket button label" },
+
+  "buyTicketLabel": "Mua vé",
+  "@buyTicketLabel": { "description": "Buy ticket label" },
+
+  "noShowtimesLabel": "Chưa có suất chiếu",
+  "@noShowtimesLabel": { "description": "No showtimes available" },
+
+  "seatLabel": "Ghế",
+  "@seatLabel": { "description": "Seat label" },
+
+  "standardSeat": "Ghế thường",
+  "@standardSeat": { "description": "Standard seat type" },
+
+  "vipSeat": "Ghế VIP",
+  "@vipSeat": { "description": "VIP seat type" },
+
+  "coupleSeat": "Ghế đôi",
+  "@coupleSeat": { "description": "Couple seat type" },
+
+  "totalLabel": "Tổng cộng",
+  "@totalLabel": { "description": "Total price label" },
+
+  "confirmBookingLabel": "Xác nhận đặt vé",
+  "@confirmBookingLabel": { "description": "Confirm booking label" },
+
+  "cancelLabel": "Hủy",
+  "@cancelLabel": { "description": "Cancel button" },
+
+  "saveLabel": "Lưu",
+  "@saveLabel": { "description": "Save button" },
+
+  "editLabel": "Sửa",
+  "@editLabel": { "description": "Edit button" },
+
+  "deleteLabel": "Xóa",
+  "@deleteLabel": { "description": "Delete button" },
+
+  "addLabel": "Thêm",
+  "@addLabel": { "description": "Add button" },
+
+  "searchHint": "Tìm phim, thể loại, diễn viên...",
+  "@searchHint": { "description": "Search placeholder text" },
+
+  "profileLabel": "Hồ sơ",
+  "@profileLabel": { "description": "Profile section label" },
+
+  "logoutLabel": "Đăng xuất",
+  "@logoutLabel": { "description": "Logout button" },
+
+  "loginLabel": "Đăng nhập",
+  "@loginLabel": { "description": "Login button" },
+
+  "registerLabel": "Đăng ký",
+  "@registerLabel": { "description": "Register button" },
+
+  "emailLabel": "Email",
+  "@emailLabel": { "description": "Email field label" },
+
+  "passwordLabel": "Mật khẩu",
+  "@passwordLabel": { "description": "Password field label" },
+
+  "fullNameLabel": "Họ và tên",
+  "@fullNameLabel": { "description": "Full name field label" },
+
+  "phoneLabel": "Số điện thoại",
+  "@phoneLabel": { "description": "Phone field label" },
+
+  "birthdateLabel": "Ngày sinh",
+  "@birthdateLabel": { "description": "Birthdate field label" },
+
+  "paymentLabel": "Thanh toán",
+  "@paymentLabel": { "description": "Payment label" },
+
+  "paymentSuccessLabel": "Thanh toán thành công",
+  "@paymentSuccessLabel": { "description": "Payment success message" },
+
+  "paymentFailedLabel": "Thanh toán thất bại",
+  "@paymentFailedLabel": { "description": "Payment failed message" },
+
+  "ticketsLabel": "Vé của tôi",
+  "@ticketsLabel": { "description": "My tickets label" },
+
+  "activeTicketLabel": "Sắp chiếu",
+  "@activeTicketLabel": { "description": "Active booking status" },
+
+  "usedTicketLabel": "Đã xem",
+  "@usedTicketLabel": { "description": "Used booking status" },
+
+  "cancelledTicketLabel": "Đã hủy",
+  "@cancelledTicketLabel": { "description": "Cancelled booking status" },
+
+  "refundedTicketLabel": "Đã hoàn tiền",
+  "@refundedTicketLabel": { "description": "Refunded booking status" },
+
+  "adminLabel": "Quản trị",
+  "@adminLabel": { "description": "Admin label" },
+
+  "staffLabel": "Nhân viên",
+  "@staffLabel": { "description": "Staff label" },
+
+  "customerLabel": "Khách hàng",
+  "@customerLabel": { "description": "Customer label" },
+
+  "readyLabel": "Sẵn sàng",
+  "@readyLabel": { "description": "Room ready status" },
+
+  "maintenanceLabel": "Bảo trì",
+  "@maintenanceLabel": { "description": "Room maintenance status" },
+
+  "reviewLabel": "Đánh giá",
+  "@reviewLabel": { "description": "Review label" },
+
+  "writeReviewHint": "Bạn nghĩ gì về bộ phim này?",
+  "@writeReviewHint": { "description": "Write review hint text" },
+
+  "sendLabel": "Gửi",
+  "@sendLabel": { "description": "Send button" },
+
+  "settingsLabel": "Cài đặt",
+  "@settingsLabel": { "description": "Settings label" },
+
+  "languageLabel": "Ngôn ngữ",
+  "@languageLabel": { "description": "Language setting label" },
+
+  "vietnameseLabel": "Tiếng Việt",
+  "@vietnameseLabel": { "description": "Vietnamese language option" },
+
+  "englishLabel": "English",
+  "@englishLabel": { "description": "English language option" },
+
+  "offlineBannerText": "Đang hiển thị kết quả đã lưu",
+  "@offlineBannerText": { "description": "Offline cache banner message" },
+
+  "noNetworkLabel": "Không có kết nối mạng",
+  "@noNetworkLabel": { "description": "No network connection message" },
+
+  "retryLabel": "Thử lại",
+  "@retryLabel": { "description": "Retry button" },
+
+  "errorOccurred": "Đã xảy ra lỗi",
+  "@errorOccurred": { "description": "Generic error message" },
+
+  "scanQrLabel": "Quét mã QR",
+  "@scanQrLabel": { "description": "Scan QR code label" },
+
+  "validationSuccessLabel": "Vé hợp lệ",
+  "@validationSuccessLabel": { "description": "Ticket validation success" },
+
+  "validationFailedLabel": "Vé không hợp lệ",
+  "@validationFailedLabel": { "description": "Ticket validation failed" },
+
+  "comboLabel": "Combo đồ ăn",
+  "@comboLabel": { "description": "Food combo label" },
+
+  "revenueLabel": "Doanh thu",
+  "@revenueLabel": { "description": "Revenue label" },
+
+  "bookingsCountLabel": "Lượt đặt vé",
+  "@bookingsCountLabel": { "description": "Bookings count label" },
+
+  "uploadImageLabel": "Tải ảnh lên",
+  "@uploadImageLabel": { "description": "Upload image button label" },
+
+  "privacyPolicyLabel": "Chính sách bảo mật",
+  "@privacyPolicyLabel": { "description": "Privacy policy label" },
+
+  "acceptLabel": "Đồng ý",
+  "@acceptLabel": { "description": "Accept button" }
+}

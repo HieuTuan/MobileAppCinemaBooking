@@ -27,6 +27,7 @@ import com.cineluxe.repository.BookingRepository;
 import com.cineluxe.repository.FoodComboRepository;
 import com.cineluxe.repository.ShowtimeSeatRepository;
 import com.cineluxe.repository.UserProfileRepository;
+import com.cineluxe.service.AnalyticsService;
 import com.cineluxe.service.BookingService;
 import com.cineluxe.service.NotificationService;
 import com.cineluxe.websocket.SeatWebSocketHandler;
@@ -66,6 +67,7 @@ public class BookingServiceImpl implements BookingService {
     private final SeatWebSocketHandler webSocketHandler;
     private final NotificationService notificationService;
     private final UserProfileRepository userProfileRepository;
+    private final AnalyticsService analyticsService;
 
     private static long offlineSyncVersionCounter = 0L;
 
@@ -122,6 +124,10 @@ public class BookingServiceImpl implements BookingService {
         combinedSeats.forEach(seat -> seat.hold(holdId, userId, expiresAt));
         seatRepository.saveAll(combinedSeats);
         webSocketHandler.broadcastAll(showtimeId, combinedSeats);
+
+        // Req 41.5 — funnel: seat_hold
+        analyticsService.logSeatHold(userId, showtimeId, holdId, combinedSeats.size());
+
         return new HoldResponse(
                 holdId,
                 showtimeId,
@@ -179,6 +185,10 @@ public class BookingServiceImpl implements BookingService {
         seatRepository.saveAll(seats);
         webSocketHandler.broadcastAll(booking.getShowtimeId(), seats);
         var paymentParameters = "amount=" + total + "&bookingId=" + bookingId;
+
+        // Req 41.5 — funnel: payment_initiate
+        analyticsService.logPaymentInitiate(userId, bookingId, seats.get(0).getShowtimeId(), total);
+
         return new BookingResponse(
                 bookingId,
                 booking.getStatus(),
@@ -386,9 +396,14 @@ public class BookingServiceImpl implements BookingService {
             if ("00".equals(responseCode)) {
                 booking.completePayment(transactionId, responseCode);
                 notificationService.sendPaymentConfirmation(booking.getUserId(), booking);
+                // Req 41.6 — funnel: payment_complete
+                analyticsService.logPaymentComplete(
+                        booking.getUserId(), bookingId, transactionId, booking.getTotalAmount());
             } else {
                 booking.failPayment(transactionId, responseCode);
                 releaseBookingSeats(booking);
+                // Req 41.6 — funnel: payment_fail
+                analyticsService.logPaymentFail(booking.getUserId(), bookingId, responseCode);
             }
             bookingRepository.save(booking);
         }

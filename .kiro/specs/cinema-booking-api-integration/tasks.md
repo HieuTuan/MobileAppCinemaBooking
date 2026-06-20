@@ -526,8 +526,8 @@ This implementation plan transforms the existing Flutter cinema booking prototyp
     - Encrypt secret key before storing in database
     - _Requirements: 26.1, 26.2, 26.3, 26.4, 26.5, 26.6, 26.7_
 
-- [ ] 30. Implement image upload for admin
-  - [ ] 30.1 Implement image upload endpoint
+- [x] 30. Implement image upload for admin
+  - [x] 30.1 Implement image upload endpoint
     - Implement POST /api/admin/upload with multipart form data
     - Validate file type (JPEG, PNG, WebP) and size (<5MB)
     - Generate unique filename with UUID
@@ -535,48 +535,48 @@ This implementation plan transforms the existing Flutter cinema booking prototyp
     - Return CDN URL in response
     - _Requirements: 40.1, 40.2, 40.3, 40.4, 40.5, 40.6, 40.7_
 
-  - [ ] 30.2 Implement image caching in customer app
+  - [x] 30.2 Implement image caching in customer app
     - Use cached_network_image package for efficient image loading
     - Display placeholder while loading, error icon on failure
     - Fall back to direct origin URL if CDN is unavailable
     - _Requirements: 40.8, 40.9, 49.6_
 
-- [ ] 31. Checkpoint - Admin and staff features complete
+- [x] 31. Checkpoint - Admin and staff features complete
   - Ensure admin dashboard, reports, CRUD operations, staff modifications, and image upload work correctly, ask the user if questions arise.
 
-- [ ] 32. Implement localization support
-  - [ ] 32.1 Set up flutter_localizations and ARB files
+- [x] 32. Implement localization support
+  - [x] 32.1 Set up flutter_localizations and ARB files
     - Add flutter_localizations package
     - Create ARB files for Vietnamese and English translations
     - Set up localization delegates
     - _Requirements: 39.3_
 
-  - [ ] 32.2 Implement language detection and switching
+  - [x] 32.2 Implement language detection and switching
     - Detect device language on first launch and default to Vietnamese or English
     - Implement language switcher in settings
     - Update UI immediately on language change without restart
     - Persist language preference in local storage
     - _Requirements: 39.1, 39.2, 39.7_
 
-  - [ ] 32.3 Implement locale-specific formatting
+  - [x] 32.3 Implement locale-specific formatting
     - Format currency as Vietnamese Dong (₫) or USD ($) based on selected language
     - Format dates and times using locale-appropriate formatting
     - Send Accept-Language header in API requests
     - _Requirements: 39.4, 39.5, 39.6_
 
-- [ ] 33. Implement analytics tracking
-  - [ ] 33.1 Set up Firebase Analytics or Mixpanel
+- [x] 33. Implement analytics tracking
+  - [x] 33.1 Set up Firebase Analytics or Mixpanel
     - Add analytics package to pubspec.yaml
     - Configure analytics project
     - _Requirements: 41.2_
 
-  - [ ] 33.2 Implement event tracking
+  - [x] 33.2 Implement event tracking
     - Track events: app_open, login, movie_view, seat_selection_start, booking_complete, payment_success, payment_fail
     - Include event properties: userId, movieId, showtimeId, totalAmount, seatCount
     - Track screen views with name and duration
     - _Requirements: 41.1, 41.3, 41.4_
 
-  - [ ] 33.3 Implement privacy-compliant tracking
+  - [x] 33.3 Implement privacy-compliant tracking
     - Anonymize IP addresses
     - Comply with GDPR requirements
     - _Requirements: 41.7_

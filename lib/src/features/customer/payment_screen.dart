@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../../api/api_client.dart';
 import '../../../api/exceptions/api_exceptions.dart';
 import '../../../models/booking_models.dart' as api_models;
+import '../../../services/analytics_service.dart';
 import '../../../services/payment_service.dart';
 import '../../core/app_theme.dart';
 import '../../core/formatters.dart';
@@ -150,6 +151,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
           userId: widget.store.currentUser?.id,
         ),
       );
+
+      // Track booking_complete event (Req 41.1)
+      final userId = widget.store.currentUser?.id ?? '';
+      AnalyticsService.instance.trackBookingComplete(
+        userId: userId,
+        showtimeId: widget.showtime.id,
+        movieId: widget.movie.id,
+        totalAmount: widget.total,
+        seatCount: widget.selectedSeats.length,
+      );
+
       if (!mounted) return;
       final result = await _paymentService.processPayment(
         context,
@@ -159,6 +171,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
       if (!mounted) return;
       setState(() => _processing = false);
       if (result.isSuccess) {
+        // Track payment_success (Req 41.1)
+        AnalyticsService.instance.trackPaymentSuccess(
+          userId: userId,
+          bookingId: booking.bookingId,
+          totalAmount: widget.total,
+        );
         await Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) =>
@@ -167,6 +185,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
         );
         return;
       }
+      // Track payment_fail (Req 41.1)
+      AnalyticsService.instance.trackPaymentFail(
+        userId: userId,
+        bookingId: booking.bookingId,
+        reason: result.status.name,
+      );
       await _showPaymentFailure(result);
     } on DioException catch (error) {
       if (!mounted) return;

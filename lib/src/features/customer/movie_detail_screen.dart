@@ -1,14 +1,16 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/formatters.dart';
 import '../../models/app_models.dart';
 import '../../state/cinema_store.dart';
+import '../../../services/analytics_service.dart';
 import 'booking_screen.dart';
 import 'movie_reviews_section.dart';
 import 'showtime_selection_screen.dart';
 
-class MovieDetailScreen extends StatelessWidget {
+class MovieDetailScreen extends StatefulWidget {
   const MovieDetailScreen({
     super.key,
     required this.store,
@@ -19,7 +21,30 @@ class MovieDetailScreen extends StatelessWidget {
   final Movie movie;
 
   @override
+  State<MovieDetailScreen> createState() => _MovieDetailScreenState();
+}
+
+class _MovieDetailScreenState extends State<MovieDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Track movie_view event (Req 41.1, 41.3)
+    AnalyticsService.instance.trackMovieView(
+      movieId: widget.movie.id,
+      movieTitle: widget.movie.title,
+      genre: widget.movie.genres.isNotEmpty ? widget.movie.genres.first : null,
+    );
+    // Track screen view (Req 41.4)
+    AnalyticsService.instance.trackScreenView(
+      screenName: 'movie_detail',
+      screenClass: 'MovieDetailScreen',
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final store = widget.store;
+    final movie = widget.movie;
     final showtimes = store.showtimesForMovie(movie.id);
     final firstOpenShowtime = showtimes
         .where((item) => store.roomById(item.roomId).status == RoomStatus.ready)
@@ -114,12 +139,18 @@ class _MovieHero extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              movie.posterUrl,
+            child: CachedNetworkImage(
+              imageUrl: movie.posterUrl,
               width: 126,
               height: 180,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
+              placeholder: (_, __) => Container(
+                width: 126,
+                height: 180,
+                color: Color(movie.heroColor).withValues(alpha: .15),
+                child: const Center(child: CircularProgressIndicator()),
+              ),
+              errorWidget: (_, __, ___) => Container(
                 width: 126,
                 height: 180,
                 color: Color(movie.heroColor).withValues(alpha: .25),
@@ -468,12 +499,25 @@ class _CastCard extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              'https://api.dicebear.com/8.x/initials/png?seed=${Uri.encodeComponent(name)}&backgroundColor=fce7f3,ddd6fe,e0f2fe,fee2e2',
+            child: CachedNetworkImage(
+              imageUrl: 'https://api.dicebear.com/8.x/initials/png?seed=${Uri.encodeComponent(name)}&backgroundColor=fce7f3,ddd6fe,e0f2fe,fee2e2',
               width: 116,
               height: 112,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
+              placeholder: (_, __) => Container(
+                width: 116,
+                height: 112,
+                color: AppColors.pearl,
+                alignment: Alignment.center,
+                child: Text(
+                  _initials(name),
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              errorWidget: (_, __, ___) => Container(
                 width: 116,
                 height: 112,
                 color: AppColors.pearl,

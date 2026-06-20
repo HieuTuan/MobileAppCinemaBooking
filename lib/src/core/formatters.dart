@@ -1,17 +1,42 @@
 import 'package:intl/intl.dart';
 
-final _moneyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: 'VNĐ');
-final _dateFormat = DateFormat('dd/MM/yyyy');
-final _timeFormat = DateFormat('HH:mm');
-final _dateTimeFormat = DateFormat('dd/MM/yyyy HH:mm');
+import '../services/locale_service.dart';
 
-String money(int value) => _moneyFormat.format(value);
+/// Returns a locale-aware money formatter.
+///
+/// Vietnamese → ₫ (VND), English → $ (USD, 1 VND ≈ 0.000039 USD, but
+/// for display purposes we keep VND value and switch symbol/format).
+NumberFormat _moneyFormat() {
+  final langCode = LocaleService.instance.locale.languageCode;
+  if (langCode == 'en') {
+    return NumberFormat.currency(locale: 'en_US', symbol: '₫');
+  }
+  return NumberFormat.currency(locale: 'vi_VN', symbol: 'VNĐ');
+}
 
-String shortDate(DateTime value) => _dateFormat.format(value);
+DateFormat _dateFormat() {
+  final langCode = LocaleService.instance.locale.languageCode;
+  return langCode == 'en'
+      ? DateFormat('MM/dd/yyyy')
+      : DateFormat('dd/MM/yyyy');
+}
 
-String shortTime(DateTime value) => _timeFormat.format(value);
+DateFormat _timeFormat() => DateFormat('HH:mm');
 
-String fullDateTime(DateTime value) => _dateTimeFormat.format(value);
+DateFormat _dateTimeFormat() {
+  final langCode = LocaleService.instance.locale.languageCode;
+  return langCode == 'en'
+      ? DateFormat('MM/dd/yyyy HH:mm')
+      : DateFormat('dd/MM/yyyy HH:mm');
+}
+
+String money(int value) => _moneyFormat().format(value);
+
+String shortDate(DateTime value) => _dateFormat().format(value);
+
+String shortTime(DateTime value) => _timeFormat().format(value);
+
+String fullDateTime(DateTime value) => _dateTimeFormat().format(value);
 
 String compactId(DateTime value) =>
     value.microsecondsSinceEpoch.toString().substring(8);

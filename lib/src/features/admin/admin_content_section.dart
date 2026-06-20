@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
@@ -51,16 +52,28 @@ class AdminContentSection extends StatelessWidget {
               contentPadding: EdgeInsets.zero,
               leading: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  movie.posterUrl,
+                child: CachedNetworkImage(
+                  imageUrl: movie.posterUrl,
                   width: 48,
                   height: 64,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
+                  placeholder: (_, __) => Container(
                     width: 48,
                     height: 64,
                     color: AppColors.pearl,
-                    child: const Icon(Icons.movie_filter_rounded),
+                    child: const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    width: 48,
+                    height: 64,
+                    color: AppColors.pearl,
+                    child: const Icon(Icons.broken_image_outlined),
                   ),
                 ),
               ),

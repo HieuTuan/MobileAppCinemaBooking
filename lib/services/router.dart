@@ -6,11 +6,14 @@ import 'package:cine_book/src/features/staff/staff_dashboard.dart';
 import 'package:cine_book/src/state/cinema_store.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'analytics_service.dart';
 import 'push_notification_handler.dart';
 
 GoRouter createRouter(CinemaStore store) {
   return GoRouter(
     initialLocation: '/',
+    // Req 41.4 — auto-track screen views via FirebaseAnalyticsObserver
+    observers: [AnalyticsService.instance.observer],
     routes: [
       GoRoute(
         path: '/',

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../services/analytics_service.dart';
 import '../../core/app_theme.dart';
 import '../../models/app_models.dart';
 import '../../shared/widgets/glass_card.dart';
@@ -110,6 +111,11 @@ class _AuthScreenState extends State<AuthScreen> {
         phone: _phone.text.trim(),
         password: _password.text,
       );
+      // Track login after register (Req 41.1, 41.3)
+      final user = widget.store.currentUser;
+      if (user != null) {
+        AnalyticsService.instance.trackLogin(userId: user.id, method: 'email');
+      }
       return;
     }
     final ok = widget.store.login(_email.text, _password.text);
@@ -117,6 +123,12 @@ class _AuthScreenState extends State<AuthScreen> {
       setState(() {
         _message = 'Thông tin đăng nhập không đúng hoặc tài khoản đã bị khóa.';
       });
+    } else {
+      // Track login event (Req 41.1, 41.3)
+      final user = widget.store.currentUser;
+      if (user != null) {
+        AnalyticsService.instance.trackLogin(userId: user.id, method: 'email');
+      }
     }
   }
 }

@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../../services/analytics_service.dart';
 import '../../core/app_theme.dart';
 import '../../models/app_models.dart';
 import '../../repositories/movie_repository.dart';
@@ -49,6 +51,8 @@ class _MovieListScreenState extends State<MovieListScreen> {
   @override
   void initState() {
     super.initState();
+    // Track screen view (Req 41.4)
+    AnalyticsService.instance.trackScreenView(screenName: 'movie_list');
     _movieRepo.startAutoSync();
     _changesSub = _movieRepo.changes.listen((_) {
       if (!mounted) return;
@@ -520,11 +524,16 @@ class _FeaturedMovieCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Image.network(
-                      movie.posterUrl,
+                    CachedNetworkImage(
+                      imageUrl: movie.posterUrl,
                       fit: BoxFit.cover,
                       filterQuality: FilterQuality.medium,
-                      errorBuilder: (_, __, ___) => Container(
+                      placeholder: (_, __) => Container(
+                        color: Color(movie.heroColor).withValues(alpha: .12),
+                        alignment: Alignment.center,
+                        child: const CircularProgressIndicator(),
+                      ),
+                      errorWidget: (_, __, ___) => Container(
                         color: Color(movie.heroColor).withValues(alpha: .24),
                         alignment: Alignment.center,
                         child: const Icon(Icons.local_movies_rounded, size: 52),
@@ -738,11 +747,16 @@ class _MovieCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Image.network(
-                      movie.posterUrl,
+                    CachedNetworkImage(
+                      imageUrl: movie.posterUrl,
                       fit: BoxFit.cover,
                       filterQuality: FilterQuality.medium,
-                      errorBuilder: (_, __, ___) => Container(
+                      placeholder: (_, __) => Container(
+                        color: Color(movie.heroColor).withValues(alpha: .1),
+                        alignment: Alignment.center,
+                        child: const CircularProgressIndicator(),
+                      ),
+                      errorWidget: (_, __, ___) => Container(
                         color: Color(movie.heroColor).withValues(alpha: .2),
                         alignment: Alignment.center,
                         child: const Icon(Icons.local_movies_rounded, size: 42),

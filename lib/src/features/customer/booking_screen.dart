@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../../api/api_client.dart';
 import '../../../api/exceptions/api_exceptions.dart';
+import '../../../services/analytics_service.dart';
 import '../../../services/secure_storage_service.dart';
 import '../../../websocket/websocket_client.dart' as realtime;
 import '../../core/app_theme.dart';
@@ -60,6 +61,14 @@ class _BookingScreenState extends State<BookingScreen> {
       if (mounted) setState(() => _connectionState = state);
     });
     _initializeRealtimeSeats();
+
+    // Track seat_selection_start (Req 41.1)
+    AnalyticsService.instance.trackSeatSelectionStart(
+      showtimeId: widget.showtime.id,
+      movieId: widget.movie.id,
+    );
+    // Track screen view (Req 41.4)
+    AnalyticsService.instance.trackScreenView(screenName: 'seat_selection');
   }
 
   @override

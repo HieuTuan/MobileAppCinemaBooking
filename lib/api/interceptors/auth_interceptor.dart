@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import '../../services/locale_service.dart';
 import '../../services/secure_storage_service.dart';
 
 /// Authentication interceptor for automatic token management
@@ -58,6 +59,11 @@ class AuthInterceptor extends Interceptor {
           print('🔐 AuthInterceptor: Added Authorization header');
         }
       }
+
+      // Req 39.6 – send Accept-Language header so backend can respond
+      // in the user's selected language (vi or en).
+      final langCode = LocaleService.instance.locale.languageCode;
+      options.headers['Accept-Language'] = langCode;
 
       handler.next(options);
     } catch (e) {
