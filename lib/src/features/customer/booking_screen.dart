@@ -87,11 +87,9 @@ class _BookingScreenState extends State<BookingScreen> {
   Future<void> _initializeRealtimeSeats() async {
     try {
       await _syncSeatState(widget.showtime.id);
-      String token = 'demo-token';
-      try {
-        token = await SecureStorageService().getAccessToken() ?? token;
-      } catch (_) {
-        // Demo mode can connect without a persisted token.
+      final token = await SecureStorageService().getAccessToken();
+      if (token == null) {
+        throw StateError('Missing access token for realtime seat updates');
       }
       await _webSocketClient.connect(widget.showtime.id, token);
       if (mounted) setState(() => _loadError = null);

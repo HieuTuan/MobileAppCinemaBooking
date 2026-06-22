@@ -143,7 +143,9 @@ class _NotificationPreferencesScreenState
     return Scaffold(
       appBar: AppBar(
         title: const Text('Cài đặt thông báo'),
-        backgroundColor: AppColors.primary,
+        // Use theme's primary color instead of AppColors.primary (doesn't exist)
+        backgroundColor: AppColors.ink,
+        foregroundColor: Colors.white,
       ),
       body: _buildBody(),
     );
@@ -278,7 +280,7 @@ class _NotificationPreferencesScreenState
         onChanged: _isSaving ? null : onChanged,
         title: Row(
           children: [
-            Icon(icon, size: 24, color: AppColors.primary),
+            Icon(icon, size: 24, color: AppColors.gold),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -301,7 +303,7 @@ class _NotificationPreferencesScreenState
             ),
           ),
         ),
-        activeColor: AppColors.primary,
+        activeColor: AppColors.gold,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       ),
     );

@@ -7,12 +7,18 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Index;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import java.time.Instant;
 
 @Entity
-@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"showtimeId", "code"}))
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"showtimeId", "code"}),
+       indexes = {
+           @Index(name = "idx_showtime_seat_showtime_id", columnList = "showtimeId"),
+           @Index(name = "idx_showtime_seat_status", columnList = "status"),
+           @Index(name = "idx_showtime_seat_hold_expires", columnList = "holdExpiresAt")
+       })
 public class ShowtimeSeat {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

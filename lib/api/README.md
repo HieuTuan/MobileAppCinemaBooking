@@ -89,7 +89,25 @@ Set the base URL using environment variables:
 flutter run --dart-define=API_BASE_URL=https://api.cineluxe.com
 ```
 
-Default base URL: `https://api.cineluxe.example.com`
+For a real Android phone on the same Wi-Fi as the backend machine, pass the PC
+LAN IP once. The app derives both REST and WebSocket URLs from it:
+
+```bash
+flutter run -d <device-id> --dart-define=DEV_SERVER_HOST=192.168.1.15
+```
+
+Equivalent explicit configuration:
+
+```bash
+flutter run -d <device-id> \
+  --dart-define=API_BASE_URL=http://192.168.1.15:8080 \
+  --dart-define=WS_BASE_URL=ws://192.168.1.15:8080/ws/showtimes
+```
+
+Defaults:
+- Web: `http://localhost:8080`
+- Android emulator: `http://10.0.2.2:8080`
+- Real phone: use `DEV_SERVER_HOST=<your-pc-lan-ip>`
 
 ### Timeouts
 - Standard requests: 30 seconds

@@ -14,7 +14,7 @@ import java.util.Optional;
  * - Requirement 38.3: Update preferences by userId
  */
 @Repository
-public interface NotificationPreferencesRepository extends JpaRepository<NotificationPreferences, Long> {
+public interface NotificationPreferencesRepository extends JpaRepository<NotificationPreferences, String> {
     
     /**
      * Find notification preferences by user ID

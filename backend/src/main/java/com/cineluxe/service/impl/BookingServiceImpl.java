@@ -37,6 +37,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Period;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -163,13 +164,24 @@ public class BookingServiceImpl implements BookingService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid or expired holdId");
         }
         var comboSelections = request.combos() == null ? List.<ComboSelection>of() : request.combos();
-        var comboTotal = comboSelections.stream().mapToLong(selection -> {
+        var selectedCombos = new ArrayList<FoodCombo>();
+        long comboTotal = 0;
+        for (var selection : comboSelections) {
             FoodCombo combo = comboRepository.findById(selection.comboId())
                     .filter(FoodCombo::isActive)
                     .orElseThrow(() -> new ApiException(
                             HttpStatus.BAD_REQUEST, "Invalid food combo selection"));
-            return combo.getPrice() * selection.quantity();
-        }).sum();
+            if (combo.getQuantity() < selection.quantity()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST,
+                        "Không đủ số lượng cho combo: " + combo.getName());
+            }
+            comboTotal += combo.getPrice() * selection.quantity();
+            combo.setQuantity(combo.getQuantity() - selection.quantity());
+            if (combo.getQuantity() == 0) {
+                combo.setActive(false);
+            }
+            selectedCombos.add(combo);
+        }
         var bookingId = "BK-" + UUID.randomUUID();
         var total = seats.size() * DEFAULT_SEAT_PRICE + comboTotal;
         var booking = bookingRepository.save(new Booking(
@@ -183,6 +195,7 @@ public class BookingServiceImpl implements BookingService {
                         .toList()));
         seats.forEach(ShowtimeSeat::book);
         seatRepository.saveAll(seats);
+        comboRepository.saveAll(selectedCombos);
         webSocketHandler.broadcastAll(booking.getShowtimeId(), seats);
         var paymentParameters = "amount=" + total + "&bookingId=" + bookingId;
 

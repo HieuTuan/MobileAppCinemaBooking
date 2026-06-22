@@ -1,5 +1,4 @@
-import 'package:cine_book/services/device_service.dart';
-import 'package:cine_book/services/push_notification_handler.dart';
+import 'package:cine_book/services/logout_service.dart';
 import 'package:cine_book/src/shared/widgets/luxury_scaffold.dart';
 import 'package:cine_book/src/state/cinema_store.dart';
 import 'package:flutter/material.dart';
@@ -20,18 +19,9 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   int _tab = 0;
-  final _deviceService = DeviceService();
 
   Future<void> _handleLogout() async {
-    await _deviceService.unregisterDevice();
-    final token = await PushNotificationHandler.instance.getToken();
-    if (token != null) {
-      await _deviceService.refreshToken(
-        newDeviceToken: token,
-        platform: PushNotificationHandler.instance.platform,
-      );
-    }
-    if (mounted) widget.store.logout();
+    await LogoutService.signOut(context: context, store: widget.store);
   }
 
   @override

@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../config/backend_config.dart';
 import 'seat_update.dart';
 
 typedef ChannelFactory = WebSocketChannel Function(Uri uri);
@@ -19,14 +20,14 @@ class WebSocketClient with WidgetsBindingObserver {
     Duration pongTimeout = const Duration(seconds: 5),
   }) : _baseUrl = baseUrl ?? _defaultBaseUrl,
        _channelFactory = channelFactory ?? WebSocketChannel.connect,
+       // ignore: prefer_initializing_formals
        _onStateSync = onStateSync,
+       // ignore: prefer_initializing_formals
        _pingInterval = pingInterval,
+       // ignore: prefer_initializing_formals
        _pongTimeout = pongTimeout;
 
-  static const String _defaultBaseUrl = String.fromEnvironment(
-    'WS_BASE_URL',
-    defaultValue: 'ws://10.0.2.2:8080/ws/showtimes',
-  );
+  static String get _defaultBaseUrl => BackendConfig.wsShowtimesBaseUrl;
   static const Duration _initialReconnectDelay = Duration(seconds: 1);
   static const Duration _maxReconnectDelay = Duration(seconds: 30);
 

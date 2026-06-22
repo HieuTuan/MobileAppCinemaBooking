@@ -4,9 +4,13 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import '../firebase_options.dart';
 import '../api/api_client.dart';
 import '../services/secure_storage_service.dart';
 import '../services/navigation_service.dart';
+
+/// Platform identifier for push notifications.
+enum NotificationPlatform { android, ios, web }
 
 /// Push Notification Handler
 ///
@@ -36,6 +40,9 @@ import '../services/navigation_service.dart';
 /// - Requirement 37.5: Update registration when device token changes (app reinstall)
 class PushNotificationHandler {
   static final PushNotificationHandler _instance = PushNotificationHandler._internal();
+
+  /// Singleton accessor — use this instead of the factory constructor.
+  static PushNotificationHandler get instance => _instance;
   
   factory PushNotificationHandler() {
     return _instance;
@@ -83,7 +90,11 @@ class PushNotificationHandler {
     
     try {
       // Ensure Firebase is initialized
-      await Firebase.initializeApp();
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+      }
       debugPrint('PushNotificationHandler: Firebase initialized');
       
       // Initialize Firebase Messaging instance
@@ -332,6 +343,16 @@ class PushNotificationHandler {
     } else {
       return 'unknown';
     }
+  }
+
+  /// Get current device token (alias used by admin/staff/customer shells).
+  Future<String?> getToken() => getDeviceToken();
+
+  /// Get [NotificationPlatform] enum value for the current platform.
+  NotificationPlatform get platform {
+    if (Platform.isAndroid) return NotificationPlatform.android;
+    if (Platform.isIOS) return NotificationPlatform.ios;
+    return NotificationPlatform.web;
   }
   
   // ============================================================================

@@ -1,5 +1,5 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 /// Centralised analytics service wrapping Firebase Analytics.
 ///
@@ -18,8 +18,10 @@ class AnalyticsService {
   AnalyticsService._();
   static final AnalyticsService instance = AnalyticsService._();
 
-  late final FirebaseAnalytics _analytics;
+  FirebaseAnalytics? _analytics;
   bool _initialized = false;
+
+  bool get isInitialized => _initialized;
 
   // ── Init ───────────────────────────────────────────────────────────────────
 
@@ -31,7 +33,7 @@ class AnalyticsService {
       // Req 41.7 – anonymise user data / GDPR compliance
       // Disable ad personalisation and analytics collection can be toggled
       // by user consent; we start with collection enabled but no ad ID.
-      await _analytics.setAnalyticsCollectionEnabled(true);
+      await _analytics!.setAnalyticsCollectionEnabled(true);
 
       // No personally-identifying user properties by default.
       // IP is anonymised server-side by Firebase (GA4 default behaviour).
@@ -46,9 +48,9 @@ class AnalyticsService {
 
   /// Call with `false` when user revokes analytics consent (GDPR Req 41.7).
   Future<void> setAnalyticsEnabled({required bool enabled}) async {
-    if (!_initialized) return;
+    if (!_initialized || _analytics == null) return;
     try {
-      await _analytics.setAnalyticsCollectionEnabled(enabled);
+      await _analytics!.setAnalyticsCollectionEnabled(enabled);
     } catch (e) {
       debugPrint('AnalyticsService: setEnabled failed – $e');
     }
@@ -59,9 +61,9 @@ class AnalyticsService {
   /// Set the current user ID (hashed / anonymised caller-side).
   /// Pass null to clear on logout.
   Future<void> setUserId(String? userId) async {
-    if (!_initialized) return;
+    if (!_initialized || _analytics == null) return;
     try {
-      await _analytics.setUserId(id: userId);
+      await _analytics!.setUserId(id: userId);
     } catch (_) {}
   }
 
@@ -72,9 +74,9 @@ class AnalyticsService {
     required String screenName,
     String? screenClass,
   }) async {
-    if (!_initialized) return;
+    if (!_initialized || _analytics == null) return;
     try {
-      await _analytics.logScreenView(
+      await _analytics!.logScreenView(
         screenName: screenName,
         screenClass: screenClass ?? screenName,
       );
@@ -86,9 +88,9 @@ class AnalyticsService {
 
   /// app_open – called once per cold start (Req 41.1).
   Future<void> trackAppOpen() async {
-    if (!_initialized) return;
+    if (!_initialized || _analytics == null) return;
     try {
-      await _analytics.logAppOpen();
+      await _analytics!.logAppOpen();
     } catch (_) {}
   }
 
@@ -99,9 +101,9 @@ class AnalyticsService {
     required String userId,
     required String method,
   }) async {
-    if (!_initialized) return;
+    if (!_initialized || _analytics == null) return;
     try {
-      await _analytics.logLogin(loginMethod: method);
+      await _analytics!.logLogin(loginMethod: method);
       await setUserId(userId);
     } catch (_) {}
   }
@@ -118,9 +120,9 @@ class AnalyticsService {
     required String movieTitle,
     String? genre,
   }) async {
-    if (!_initialized) return;
+    if (!_initialized || _analytics == null) return;
     try {
-      await _analytics.logEvent(
+      await _analytics!.logEvent(
         name: 'movie_view',
         parameters: {
           'movie_id': movieId,
@@ -136,9 +138,9 @@ class AnalyticsService {
     required String showtimeId,
     required String movieId,
   }) async {
-    if (!_initialized) return;
+    if (!_initialized || _analytics == null) return;
     try {
-      await _analytics.logEvent(
+      await _analytics!.logEvent(
         name: 'seat_selection_start',
         parameters: {
           'showtime_id': showtimeId,
@@ -156,9 +158,9 @@ class AnalyticsService {
     required int totalAmount,
     required int seatCount,
   }) async {
-    if (!_initialized) return;
+    if (!_initialized || _analytics == null) return;
     try {
-      await _analytics.logEvent(
+      await _analytics!.logEvent(
         name: 'booking_complete',
         parameters: {
           'user_id': userId,
@@ -177,9 +179,9 @@ class AnalyticsService {
     required String bookingId,
     required int totalAmount,
   }) async {
-    if (!_initialized) return;
+    if (!_initialized || _analytics == null) return;
     try {
-      await _analytics.logEvent(
+      await _analytics!.logEvent(
         name: 'payment_success',
         parameters: {
           'user_id': userId,
@@ -196,9 +198,9 @@ class AnalyticsService {
     required String bookingId,
     String? reason,
   }) async {
-    if (!_initialized) return;
+    if (!_initialized || _analytics == null) return;
     try {
-      await _analytics.logEvent(
+      await _analytics!.logEvent(
         name: 'payment_fail',
         parameters: {
           'user_id': userId,
@@ -212,6 +214,11 @@ class AnalyticsService {
   // ── Convenience getter for NavigatorObserver ───────────────────────────────
 
   /// Use as a [NavigatorObserver] to auto-track route changes.
-  FirebaseAnalyticsObserver get observer =>
-      FirebaseAnalyticsObserver(analytics: _analytics);
+  NavigatorObserver get observer {
+    final analytics = _analytics;
+    if (!_initialized || analytics == null) {
+      return NavigatorObserver();
+    }
+    return FirebaseAnalyticsObserver(analytics: analytics);
+  }
 }

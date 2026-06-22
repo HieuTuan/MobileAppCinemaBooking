@@ -581,48 +581,48 @@ This implementation plan transforms the existing Flutter cinema booking prototyp
     - Comply with GDPR requirements
     - _Requirements: 41.7_
 
-- [ ] 34. Implement graceful degradation and resilience
-  - [ ] 34.1 Implement WebSocket-to-polling fallback
+- [x] 34. Implement graceful degradation and resilience
+  - [x] 34.1 Implement WebSocket-to-polling fallback
     - When WebSocket connection fails after 3+ reconnection attempts, fall back to polling seat status every 5 seconds
     - Display "Limited real-time updates" indicator to user
     - Attempt WebSocket reconnection every 60 seconds in background
     - _Requirements: 49.1_
 
-  - [ ] 34.2 Implement circuit breaker for external services
+  - [x] 34.2 Implement circuit breaker for external services
     - Implement circuit breaker pattern for VNPay, FCM, and CDN calls
     - Open circuit after 5 consecutive failures, reset after 30-second timeout
     - _Requirements: 49.7_
 
-  - [ ] 34.3 Implement payment gateway fallback
+  - [x] 34.3 Implement payment gateway fallback
     - When VNPay is unreachable, offer "Pay at counter" option with booking reference code
     - Display appropriate message to user
     - _Requirements: 49.3_
 
-  - [ ] 34.4 Implement push notification fallback
+  - [x] 34.4 Implement push notification fallback
     - When FCM/APNs registration fails, log failure and continue booking flow without blocking
     - Fall back to in-app polling for notifications every 5 minutes
     - _Requirements: 49.4_
 
-- [ ] 35. Implement automated seat release scheduled job (backend)
-  - [ ] 35.1 Create scheduled task for expired seat hold cleanup
+- [x] 35. Implement automated seat release scheduled job (backend)
+  - [x] 35.1 Create scheduled task for expired seat hold cleanup
     - Implement @Scheduled job running every 60 seconds in Spring Boot
     - Query ShowtimeSeat entities where holdExpiresAt < current time and status = held
     - Update matching seats back to available status via Spring Data JPA
     - _Requirements: 29.1, 29.2_
 
-  - [ ] 35.2 Broadcast seat release via WebSocket
+  - [x] 35.2 Broadcast seat release via WebSocket
     - After releasing expired holds, broadcast seat availability update to all connected WebSocket clients via Spring STOMP
     - Log hold release with holdId, showtimeId, seatCodes, and releaseReason "timeout"
     - Delete hold records after seat release
     - _Requirements: 29.3, 29.4, 29.5_
 
-  - [ ] 35.3 Ensure scheduled job safety for concurrent execution
+  - [x] 35.3 Ensure scheduled job safety for concurrent execution
     - Use distributed lock (database-based or Redis) to prevent duplicate processing when running multiple API instances
     - Ensure job completes within 30 seconds of expiration time
     - _Requirements: 29.6, 29.7_
 
-- [ ] 36. Implement API performance, error handling, and security (backend)
-  - [ ] 36.1 Implement consistent error response format
+- [x] 36. Implement API performance, error handling, and security (backend)
+  - [x] 36.1 Implement consistent error response format
     - Return all errors in JSON format with fields: code, message, timestamp, path
     - Return 400 with detailed fieldErrors array for validation failures
     - Return 401 with "Invalid or expired token" for authentication failures
@@ -630,13 +630,13 @@ This implementation plan transforms the existing Flutter cinema booking prototyp
     - Return 404 with identifying message for missing resources
     - _Requirements: 30.1, 30.2, 30.3, 30.4, 30.5, 30.6_
 
-  - [ ] 36.2 Implement API rate limiting
+  - [x] 36.2 Implement API rate limiting
     - Enforce 100 requests/minute per IP for unauthenticated endpoints
     - Enforce 500 requests/minute per userId for authenticated endpoints
     - Return 429 Too Many Requests with Retry-After header when limit exceeded
     - _Requirements: 31.1, 31.2, 31.3_
 
-  - [ ] 36.3 Implement input validation and security controls
+  - [x] 36.3 Implement input validation and security controls
     - Validate all request parameters against defined JSON schemas before processing
     - Reject requests with unexpected fields and return 400 Bad Request
     - Validate string fields against maximum length, numeric fields against min/max bounds
@@ -650,37 +650,37 @@ This implementation plan transforms the existing Flutter cinema booking prototyp
     - Implement request size limits: 1KB for GET query strings, 10MB for POST bodies
     - _Requirements: 31.4, 31.5, 31.6, 31.7, 31.8, 50.1, 50.2, 50.3, 50.4, 50.5, 50.6, 50.7, 50.8, 50.9, 50.10_
 
-  - [ ] 36.4 Implement health and readiness endpoints
+  - [x] 36.4 Implement health and readiness endpoints
     - Expose GET /health endpoint returning status up/down and database connectivity
     - Expose GET /ready endpoint for load balancer readiness checks
     - _Requirements: 30.10, 43.4_
 
-  - [ ] 36.5 Implement request logging and performance monitoring
+  - [x] 36.5 Implement request logging and performance monitoring
     - Log all requests with method, path, responseTime, statusCode, and userId
     - Ensure GET endpoints respond within 300ms for 95% of requests
     - Ensure all endpoints respond within 500ms for 95% of requests
     - _Requirements: 30.7, 30.8, 30.9_
 
-- [ ] 37. Implement database schema and migrations (backend)
-  - [ ] 37.1 Verify and complete JPA entity definitions
+- [x] 37. Implement database schema and migrations (backend)
+  - [x] 37.1 Verify and complete JPA entity definitions
     - Ensure all required entities exist: Users, Movies, Theaters, Rooms, RoomSeats, Showtimes, ShowtimeSeats, SeatHolds, Bookings, Payments, Reviews, FoodCombos, BookingCombos, Notifications, TechnicalIssues
     - Verify foreign key constraints and referential integrity in entity relationships
     - Ensure createdAt/updatedAt timestamps on all entities
     - Implement soft deletes with deletedAt column for Users, Movies, and Bookings
     - _Requirements: 32.1, 32.2, 32.6, 32.8_
 
-  - [ ] 37.2 Verify and add required database indexes
+  - [x] 37.2 Verify and add required database indexes
     - Index: Users.email, Bookings.userId, Bookings.showtimeId, ShowtimeSeats.showtimeId, Payments.bookingId
     - Add any missing indexes for frequently queried columns
     - _Requirements: 32.3_
 
-  - [ ] 37.3 Implement schema migration strategy
+  - [x] 37.3 Implement schema migration strategy
     - Use Flyway or Liquibase for database migrations with timestamp-based naming (YYYYMMDDHHMMSS_description)
     - Ensure all schema changes have up and down migration scripts
     - _Requirements: 32.4, 32.5_
 
-- [ ] 38. Implement API documentation (backend)
-  - [ ] 38.1 Configure OpenAPI 3.0 spec generation
+- [x] 38. Implement API documentation (backend)
+  - [x] 38.1 Configure OpenAPI 3.0 spec generation
     - Verify SpringDoc OpenAPI configuration in OpenApiConfig.java
     - Add @Operation, @Parameter, @ApiResponse annotations to all controllers
     - Host Swagger UI at /api-docs
@@ -688,83 +688,83 @@ This implementation plan transforms the existing Flutter cinema booking prototyp
     - Document all error codes and their meanings
     - _Requirements: 47.1, 47.2, 47.3, 47.4, 47.5_
 
-  - [ ] 38.2 Implement API versioning
+  - [x] 38.2 Implement API versioning
     - Add URL prefix /api/v1/ to all existing endpoints
     - Document version compatibility policy (backward compatibility for 2 minor versions)
     - _Requirements: 47.6, 47.7_
 
-- [ ] 39. Implement data privacy and compliance (backend)
-  - [ ] 39.1 Implement data security controls
+- [x] 39. Implement data privacy and compliance (backend)
+  - [x] 39.1 Implement data security controls
     - Ensure BCrypt with cost factor 12 is used for all password hashing
     - Encrypt sensitive data at rest: payment tokens, VNPay secretKey
     - Ensure PCI-DSS compliance by never storing full payment card details
     - _Requirements: 45.1, 45.2, 45.9_
 
-  - [ ] 39.2 Implement user data management endpoints
+  - [x] 39.2 Implement user data management endpoints
     - Implement GET /api/users/{userId}/data-export for full user data export in JSON format
     - Implement DELETE /api/users/{userId} for account deletion removing all PII within 30 days
     - Anonymize deleted user data in historical records (replace name/email with "Deleted User")
     - _Requirements: 45.4, 45.5, 45.6_
 
-  - [ ] 39.3 Implement data access logging
+  - [x] 39.3 Implement data access logging
     - Log all access to sensitive data with userId, action, and timestamp
     - Implement data retention policy: booking records retained 2 years then archived
     - _Requirements: 45.3, 45.7_
 
-  - [ ] 39.4 Implement privacy policy acceptance
+  - [x] 39.4 Implement privacy policy acceptance
     - Display privacy policy acceptance screen during registration in Customer_App
     - _Requirements: 45.8_
 
-- [ ] 40. Implement monitoring and observability (backend)
-  - [ ] 40.1 Implement structured logging
+- [x] 40. Implement monitoring and observability (backend)
+  - [x] 40.1 Implement structured logging
     - Use structured logging with fields: timestamp, level, message, userId, requestId, duration
     - Integrate with logging aggregation service (ELK Stack or CloudWatch Logs)
     - _Requirements: 44.1, 44.2_
 
-  - [ ] 40.2 Implement metrics emission
+  - [x] 40.2 Implement metrics emission
     - Emit metrics: request_count, response_time_histogram, error_rate, database_query_duration
     - Expose /metrics endpoint in Prometheus format
     - Set up alerts for: error_rate > 1%, response_time_p95 > 1s, database connection pool exhausted
     - _Requirements: 43.8, 44.3, 44.4_
 
-  - [ ] 40.3 Implement distributed tracing
+  - [x] 40.3 Implement distributed tracing
     - Integrate OpenTelemetry or Jaeger for tracing requests across services
     - Track WebSocket connection count and message throughput
     - Log all payment transactions with full request/response data for audit
     - _Requirements: 44.5, 44.6, 44.7_
 
-- [ ] 41. Implement deployment and DevOps configuration
-  - [ ] 41.1 Create Docker configuration
+- [x] 41. Implement deployment and DevOps configuration
+  - [x] 41.1 Create Docker configuration
     - Create Dockerfile with multi-stage build for backend
     - Configure environment variables: DATABASE_URL, JWT_SECRET, VNPAY_SECRET, FCM_KEY
     - _Requirements: 43.1, 43.3_
 
-  - [ ] 41.2 Implement database connection pooling and graceful shutdown
+  - [x] 41.2 Implement database connection pooling and graceful shutdown
     - Configure connection pool with minimum 5 and maximum 20 connections
     - Implement graceful shutdown handling in-flight requests up to 30 seconds
     - _Requirements: 43.5, 43.6_
 
-  - [ ] 41.3 Implement backend analytics conversion tracking
+  - [x] 41.3 Implement backend analytics conversion tracking
     - Log conversion funnel stages: showtime_view, seat_hold, payment_initiate, payment_complete
     - Calculate and store conversion rates: seat_hold→payment_initiate, payment_initiate→payment_complete
     - _Requirements: 41.5, 41.6_
 
-  - [ ] 41.4 Configure disaster recovery and backup procedures
+  - [x] 41.4 Configure disaster recovery and backup procedures
     - Document and configure automated daily database backups at 2:00 AM with 30-day retention
     - Configure backup encryption using AES-256 and offsite backup storage
     - Enable transaction log-based point-in-time recovery up to 24 hours
     - Document RTO of 4 hours and RPO of 1 hour in runbook
     - _Requirements: 46.1, 46.2, 46.3, 46.5, 46.6, 46.7_
 
-  - [ ] 41.5 Implement feature flags integration
+  - [x] 41.5 Implement feature flags integration
     - Integrate feature flag service (LaunchDarkly or custom solution)
     - Implement feature checks for: new_payment_flow, enhanced_seat_selection, loyalty_rewards
     - Support percentage-based rollouts and user segmentation (memberRank, city)
     - Fetch and cache feature flags on app start in Customer_App
     - _Requirements: 48.1, 48.2, 48.3, 48.4, 48.5, 48.6_
 
-- [ ] 42. Implement testing and quality assurance
-  - [ ] 42.1 Write unit tests for core backend business logic
+- [x] 42. Implement testing and quality assurance
+  - [x] 42.1 Write unit tests for core backend business logic
     - Write unit tests for Refund_Calculator (100%/50%/0% refund rules and edge cases)
     - Write unit tests for HMAC_Validator signature verification
     - Write unit tests for password strength validation rules
@@ -772,7 +772,7 @@ This implementation plan transforms the existing Flutter cinema booking prototyp
     - Write unit tests for QR code format parsing and validation
     - _Requirements: 42.1, 42.2, 42.3_
 
-  - [ ] 42.2 Write integration tests for critical API endpoints
+  - [x] 42.2 Write integration tests for critical API endpoints
     - Write integration tests for authentication flow (register, login, refresh, logout)
     - Write integration tests for seat booking race condition (concurrent holds, only 1 succeeds)
     - Write integration tests for VNPay payment callback (valid signature, invalid signature, duplicate)
@@ -782,25 +782,25 @@ This implementation plan transforms the existing Flutter cinema booking prototyp
     - Use TestContainers with isolated PostgreSQL test database
     - _Requirements: 42.1, 42.2, 42.3, 42.6, 42.8_
 
-  - [ ] 42.3 Write Flutter widget tests for critical UI flows
+  - [x] 42.3 Write Flutter widget tests for critical UI flows
     - Write widget tests for login flow (valid credentials, invalid credentials, network error)
     - Write widget tests for seat selection flow (select, held seat error, max seats error, hold timer)
     - Write widget tests for payment flow (success animation, failure with retry, timeout)
     - Write widget tests for ticket display (QR code shown, offline mode from cache)
     - _Requirements: 42.4, 42.5_
 
-  - [ ] 42.4 Write Flutter unit tests for API client and state management
+  - [x] 42.4 Write Flutter unit tests for API client and state management
     - Write unit tests for APIClient (token attachment, auto-refresh on 401, error mapping)
     - Write unit tests for WebSocketClient (reconnection logic, ping/pong, message parsing)
     - Write unit tests for CacheManager (CRUD operations, TTL staleness check)
     - Write unit tests for email, phone, and birthdate validation
     - _Requirements: 42.5_
 
-  - [ ] 42.5 Write load tests for concurrent seat selection
+  - [x] 42.5 Write load tests for concurrent seat selection
     - Simulate 1,000 concurrent seat selection requests to verify race condition handling under load
     - Verify system correctly rejects duplicate seat holds and returns 409 Conflict to losing requests
     - Verify response times remain within SLA (95th percentile < 500ms) under concurrent load
     - _Requirements: 42.7_
 
-- [ ] 43. Final integration checkpoint
+- [x] 43. Final integration checkpoint
   - Verify all requirements from Req 1-50 have corresponding passing tests or working implementations, confirm full booking flow end-to-end, ask the user if questions arise.

@@ -222,6 +222,15 @@ class _ComboTile extends StatelessWidget {
                     money(combo.price),
                     style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
+                  Text(
+                    combo.quantity > 0 ? 'Còn ${combo.quantity}' : 'Hết hàng',
+                    style: TextStyle(
+                      color: combo.quantity > 0
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.error,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -234,7 +243,9 @@ class _ComboTile extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w900),
             ),
             IconButton(
-              onPressed: () => onChanged(quantity + 1),
+              onPressed: quantity >= combo.quantity
+                  ? null
+                  : () => onChanged(quantity + 1),
               icon: const Icon(Icons.add_circle_outline),
             ),
           ],

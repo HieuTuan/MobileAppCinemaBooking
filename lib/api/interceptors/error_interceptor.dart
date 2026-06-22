@@ -74,7 +74,7 @@ class ErrorInterceptor extends Interceptor {
       case DioExceptionType.connectionError:
         exception = ApiNetworkException(
           'Network connection failed. Please check your internet connection.',
-          err.error as Exception?,
+          err.error is Exception ? err.error as Exception : null,
         );
         break;
 
@@ -91,7 +91,7 @@ class ErrorInterceptor extends Interceptor {
       default:
         exception = ApiNetworkException(
           'An unexpected error occurred: ${err.message}',
-          err.error as Exception?,
+          err.error is Exception ? err.error as Exception : null,
         );
         break;
     }
@@ -124,7 +124,7 @@ class ErrorInterceptor extends Interceptor {
     // Try to parse ApiError from response body
     ApiError? apiError;
     try {
-      if (data is Map<String, dynamic>) {
+      if (data is Map) {
         apiError = _parseApiError(data, response.requestOptions.path);
       }
     } catch (e) {
@@ -135,7 +135,7 @@ class ErrorInterceptor extends Interceptor {
 
     // If we couldn't parse the error, create a generic one
     apiError ??= ApiError(
-      code: 'HTTP_$statusCode',
+      code: (statusCode ?? 500).toString(),
       message: _getDefaultMessageForStatus(statusCode ?? 500),
       timestamp: DateTime.now(),
       path: response.requestOptions.path,
@@ -199,15 +199,15 @@ class ErrorInterceptor extends Interceptor {
   /// Parse ApiError from response data
   ///
   /// Handles both standard error format and variations
-  ApiError _parseApiError(Map<String, dynamic> data, String path) {
+  ApiError _parseApiError(Map data, String path) {
     // Handle standard format with all fields
     if (data.containsKey('code') && data.containsKey('message')) {
       return ApiError.fromJson({
-        'code': data['code'],
-        'message': data['message'],
+        'code': data['code']?.toString() ?? 'ERROR',
+        'message': data['message']?.toString() ?? 'An error occurred',
         'timestamp': data['timestamp'] ?? DateTime.now().toIso8601String(),
-        'path': data['path'] ?? path,
-        'fieldErrors': data['fieldErrors'],
+        'path': data['path']?.toString() ?? path,
+        'fieldErrors': _normalizeFieldErrors(data['fieldErrors']),
       });
     }
 
@@ -215,9 +215,11 @@ class ErrorInterceptor extends Interceptor {
     if (data.containsKey('error') || data.containsKey('message')) {
       return ApiError(
         code: 'ERROR',
-        message: data['error'] ?? data['message'] ?? 'An error occurred',
+        message: (data['error'] ?? data['message'] ?? 'An error occurred')
+            .toString(),
         timestamp: DateTime.now(),
         path: path,
+        fieldErrors: _normalizeFieldErrors(data['fieldErrors']),
       );
     }
 
@@ -228,6 +230,25 @@ class ErrorInterceptor extends Interceptor {
       timestamp: DateTime.now(),
       path: path,
     );
+  }
+
+  Map<String, dynamic>? _normalizeFieldErrors(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is List) {
+      final normalized = <String, dynamic>{};
+      for (final item in raw) {
+        if (item is Map) {
+          final field = item['field']?.toString();
+          final message = item['message']?.toString();
+          if (field != null && message != null) {
+            normalized[field] = message;
+          }
+        }
+      }
+      return normalized.isEmpty ? null : normalized;
+    }
+    return null;
   }
 
   /// Get default error message for HTTP status code

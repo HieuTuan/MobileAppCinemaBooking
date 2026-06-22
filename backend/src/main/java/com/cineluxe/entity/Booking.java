@@ -3,11 +3,23 @@ package com.cineluxe.entity;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Booking entity with database indexes (Req 32.3) and soft-delete support (Req 32.8).
+ */
 @Entity
+@Table(name = "bookings",
+    indexes = {
+        @Index(name = "idx_booking_user_id",     columnList = "userId"),
+        @Index(name = "idx_booking_showtime_id", columnList = "showtimeId"),
+        @Index(name = "idx_booking_status",      columnList = "status")
+    })
 public class Booking {
   @Id
   private String id;
@@ -34,6 +46,25 @@ public class Booking {
   private List<String> seatCodes = new ArrayList<>();
   @ElementCollection
   private List<String> comboSelections = new ArrayList<>();
+
+  /** Soft delete timestamp — null means not deleted (Req 32.8). */
+  private Instant deletedAt;
+
+  /** Last modification timestamp (Req 32.6). */
+  private Instant updatedAt;
+
+  @PreUpdate
+  protected void onUpdate() {
+    this.updatedAt = Instant.now();
+  }
+
+  /** Soft-delete this booking (Req 32.8). */
+  public void softDelete() {
+    this.deletedAt = Instant.now();
+  }
+
+  public Instant getDeletedAt() { return deletedAt; }
+  public Instant getUpdatedAt() { return updatedAt; }
 
   protected Booking() {}
 

@@ -1,10 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/formatters.dart';
 import '../../models/app_models.dart';
 import '../../state/cinema_store.dart';
+import '../../../api/api_client.dart';
 import '../../../services/analytics_service.dart';
 import 'booking_screen.dart';
 import 'movie_reviews_section.dart';
@@ -25,6 +27,10 @@ class MovieDetailScreen extends StatefulWidget {
 }
 
 class _MovieDetailScreenState extends State<MovieDetailScreen> {
+  final _api = APIClient();
+  bool _loadingShowtimes = true;
+  String? _showtimeError;
+
   @override
   void initState() {
     super.initState();
@@ -39,6 +45,26 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       screenName: 'movie_detail',
       screenClass: 'MovieDetailScreen',
     );
+    _loadShowtimes();
+  }
+
+  Future<void> _loadShowtimes() async {
+    setState(() {
+      _loadingShowtimes = true;
+      _showtimeError = null;
+    });
+    try {
+      final showtimes = await _api.getShowtimes(widget.movie.id);
+      if (!mounted) return;
+      widget.store.replaceShowtimesFromApi(showtimes);
+      setState(() => _loadingShowtimes = false);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingShowtimes = false;
+        _showtimeError = 'Không thể tải suất chiếu từ API.';
+      });
+    }
   }
 
   @override
@@ -112,7 +138,14 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           const _SectionDivider(),
           _CastSection(movie: movie),
           const _SectionDivider(),
-          _ShowtimeSection(store: store, movie: movie, showtimes: showtimes),
+          _ShowtimeSection(
+            store: store,
+            movie: movie,
+            showtimes: showtimes,
+            loading: _loadingShowtimes,
+            error: _showtimeError,
+            onRetry: _loadShowtimes,
+          ),
           const _SectionDivider(),
           MovieReviewsSection(
             movieId: movie.id,
@@ -500,7 +533,8 @@ class _CastCard extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: CachedNetworkImage(
-              imageUrl: 'https://api.dicebear.com/8.x/initials/png?seed=${Uri.encodeComponent(name)}&backgroundColor=fce7f3,ddd6fe,e0f2fe,fee2e2',
+              imageUrl:
+                  'https://api.dicebear.com/8.x/initials/png?seed=${Uri.encodeComponent(name)}&backgroundColor=fce7f3,ddd6fe,e0f2fe,fee2e2',
               width: 116,
               height: 112,
               fit: BoxFit.cover,
@@ -567,11 +601,17 @@ class _ShowtimeSection extends StatelessWidget {
     required this.store,
     required this.movie,
     required this.showtimes,
+    required this.loading,
+    required this.error,
+    required this.onRetry,
   });
 
   final CinemaStore store;
   final Movie movie;
   final List<Showtime> showtimes;
+  final bool loading;
+  final String? error;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -585,7 +625,17 @@ class _ShowtimeSection extends StatelessWidget {
             child: _SectionHeading('Suất chiếu gần nhất'),
           ),
           const SizedBox(height: 12),
-          if (showtimes.isEmpty)
+          if (loading)
+            const Padding(
+              padding: EdgeInsets.only(right: 18),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (error != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 18),
+              child: _InlineApiError(message: error!, onRetry: onRetry),
+            )
+          else if (showtimes.isEmpty)
             const Padding(
               padding: EdgeInsets.only(right: 18),
               child: Text('Phim này chưa mở lịch chiếu.'),
@@ -606,15 +656,30 @@ class _ShowtimeSection extends StatelessWidget {
                     room: room,
                     enabled: ready,
                     onTap: ready
-                        ? () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => BookingScreen(
-                                store: store,
-                                movie: movie,
-                                showtime: showtime,
+                        ? () {
+                            if (!store.isLoggedIn) {
+                              ScaffoldMessenger.of(context)
+                                ..clearSnackBars()
+                                ..showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Vui lòng đăng nhập để đặt vé.',
+                                    ),
+                                  ),
+                                );
+                              context.go('/auth');
+                              return;
+                            }
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => BookingScreen(
+                                  store: store,
+                                  movie: movie,
+                                  showtime: showtime,
+                                ),
                               ),
-                            ),
-                          )
+                            );
+                          }
                         : null,
                   );
                 },
@@ -676,6 +741,35 @@ class _ShowtimeTile extends StatelessWidget {
                 fontWeight: FontWeight.w900,
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineApiError extends StatelessWidget {
+  const _InlineApiError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.pearl,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            const Icon(Icons.cloud_off_rounded, color: AppColors.muted),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message)),
+            TextButton(onPressed: onRetry, child: const Text('Thử lại')),
           ],
         ),
       ),

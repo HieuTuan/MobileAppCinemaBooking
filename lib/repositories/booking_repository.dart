@@ -154,7 +154,7 @@ class BookingRepository {
       final imageSize = 512.0;
       final recorder = ui.PictureRecorder();
       final canvas = ui.Canvas(recorder);
-      painter.paint(canvas, const Size(imageSize, imageSize));
+      painter.paint(canvas, Size(imageSize, imageSize));
       final picture = recorder.endRecording();
       final image = await picture.toImage(imageSize.toInt(), imageSize.toInt());
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);

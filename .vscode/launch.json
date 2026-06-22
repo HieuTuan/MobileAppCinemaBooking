@@ -1,0 +1,41 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "🖥️ Emulator (Debug)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "debug",
+      "program": "lib/main.dart",
+      "args": []
+    },
+    {
+      "name": "📱 Physical Device (Debug)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "debug",
+      "program": "lib/main.dart",
+      "args": [
+        "--dart-define=DEV_SERVER_HOST=10.11.64.190"
+      ]
+    },
+    {
+      "name": "🖥️ Emulator (Profile)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "profile",
+      "program": "lib/main.dart",
+      "args": []
+    },
+    {
+      "name": "📱 Physical Device (Profile)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "profile",
+      "program": "lib/main.dart",
+      "args": [
+        "--dart-define=DEV_SERVER_HOST=10.11.64.190"
+      ]
+    }
+  ]
+}

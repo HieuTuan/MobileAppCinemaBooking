@@ -87,8 +87,8 @@ class QRCacheService {
       
       final painter = QrPainter.withQr(
         qr: qrCode,
-        color: const Color(0xFF000000),
-        emptyColor: const Color(0xFFFFFFFF),
+        color: const ui.Color(0xFF000000),
+        emptyColor: const ui.Color(0xFFFFFFFF),
         gapless: true,
       );
 

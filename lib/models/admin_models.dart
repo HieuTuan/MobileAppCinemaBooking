@@ -343,6 +343,7 @@ class MovieManagementRequest {
     required this.ageRating,
     required this.releaseDate,
     required this.status,
+    this.rating = 0.0,
   });
 
   final String title;
@@ -356,6 +357,7 @@ class MovieManagementRequest {
   final String ageRating;
   final DateTime releaseDate;
   final String status;
+  final double rating;
 
   Map<String, dynamic> toJson() => {
     'title': title,
@@ -367,8 +369,9 @@ class MovieManagementRequest {
     'posterUrl': posterUrl,
     'trailerUrl': trailerUrl,
     'ageRating': ageRating,
-    'releaseDate': releaseDate.toIso8601String(),
+    'releaseDate': releaseDate.toIso8601String().split('T').first,
     'status': status,
+    'rating': rating,
   };
 }
 
@@ -377,20 +380,100 @@ class FoodComboManagementRequest {
     required this.name,
     required this.description,
     required this.price,
+    required this.quantity,
     this.imageUrl = '',
+    this.isActive = true,
   });
 
   final String name;
   final String description;
   final int price;
+  final int quantity;
   final String imageUrl;
+  final bool isActive;
 
   Map<String, dynamic> toJson() => {
     'name': name,
     'description': description,
     'price': price,
+    'quantity': quantity,
     'imageUrl': imageUrl,
+    'isActive': isActive,
   };
+}
+
+/// Admin food combo model – includes isActive (not present in public FoodCombo)
+class ActorManagementRequest {
+  const ActorManagementRequest({
+    required this.name,
+    this.avatarUrl = '',
+    this.description = '',
+  });
+
+  final String name;
+  final String avatarUrl;
+  final String description;
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'avatarUrl': avatarUrl,
+    'description': description,
+  };
+}
+
+class AdminActor {
+  const AdminActor({
+    required this.id,
+    required this.name,
+    required this.avatarUrl,
+    required this.description,
+  });
+
+  final String id;
+  final String name;
+  final String avatarUrl;
+  final String description;
+
+  factory AdminActor.fromJson(Map<String, dynamic> json) {
+    return AdminActor(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      avatarUrl: json['avatarUrl'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+    );
+  }
+}
+
+class AdminFoodCombo {
+  const AdminFoodCombo({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.price,
+    required this.quantity,
+    required this.imageUrl,
+    required this.isActive,
+  });
+
+  final String id;
+  final String name;
+  final String description;
+  final int price;
+  final int quantity;
+  final String imageUrl;
+  final bool isActive;
+
+  factory AdminFoodCombo.fromJson(Map<String, dynamic> json) {
+    return AdminFoodCombo(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      description: json['description'] as String? ?? '',
+      price: (json['price'] as num).toInt(),
+      quantity: (json['quantity'] as num?)?.toInt() ?? 0,
+      imageUrl: json['imageUrl'] as String? ?? '',
+      isActive: json['isActive'] as bool? ?? true,
+    );
+  }
 }
 
 class Theater {
@@ -466,33 +549,48 @@ class Room {
   }
 }
 
+class RoomSeatLayout {
+  const RoomSeatLayout({
+    required this.seatCode,
+    required this.row,
+    required this.column,
+    required this.seatType,
+  });
+
+  final String seatCode;
+  final String row;
+  final int column;
+  final String seatType;
+
+  Map<String, dynamic> toJson() => {
+    'seatCode': seatCode,
+    'row': row,
+    'column': column,
+    'seatType': seatType,
+  };
+}
+
 class RoomRequest {
   const RoomRequest({
     required this.theaterId,
     required this.name,
-    required this.rows,
-    required this.seatsPerRow,
-    this.screenType = '',
-    this.vipRows = const <String>[],
-    this.coupleRows = const <String>[],
+    required this.capacity,
+    required this.screenType,
+    required this.seatLayout,
   });
 
   final String theaterId;
   final String name;
-  final int rows;
-  final int seatsPerRow;
+  final int capacity;
   final String screenType;
-  final List<String> vipRows;
-  final List<String> coupleRows;
+  final List<RoomSeatLayout> seatLayout;
 
   Map<String, dynamic> toJson() => {
     'theaterId': theaterId,
     'name': name,
-    'rows': rows,
-    'seatsPerRow': seatsPerRow,
-    if (screenType.isNotEmpty) 'screenType': screenType,
-    'vipRows': vipRows,
-    'coupleRows': coupleRows,
+    'capacity': capacity,
+    'screenType': screenType,
+    'seatLayout': seatLayout.map((seat) => seat.toJson()).toList(),
   };
 }
 

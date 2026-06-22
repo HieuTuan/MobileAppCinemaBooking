@@ -29,11 +29,19 @@ import org.springframework.web.multipart.MultipartFile;
 public class ImageUploadServiceImpl implements ImageUploadService {
 
     private static final long MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+    private static final long MAX_VIDEO_SIZE_BYTES = 80 * 1024 * 1024; // 80 MB
+    private static final double MAX_VIDEO_DURATION_SECONDS = 60.0;
 
     private static final List<String> ALLOWED_MIME_TYPES = List.of(
             "image/jpeg",
             "image/png",
             "image/webp"
+    );
+
+    private static final List<String> ALLOWED_VIDEO_MIME_TYPES = List.of(
+            "video/mp4",
+            "video/quicktime",
+            "video/webm"
     );
 
     // Magic byte signatures for JPEG, PNG, WebP
@@ -102,6 +110,63 @@ public class ImageUploadServiceImpl implements ImageUploadService {
     }
 
     // ── helpers ──────────────────────────────────────────────────
+
+    @Override
+    public ImageUploadResponse uploadVideo(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Tệp video không được để trống");
+        }
+
+        if (file.getSize() > MAX_VIDEO_SIZE_BYTES) {
+            throw new IllegalArgumentException("Video vượt quá giới hạn 80 MB");
+        }
+
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_VIDEO_MIME_TYPES.contains(contentType.toLowerCase())) {
+            throw new IllegalArgumentException("Chỉ chấp nhận video MP4, MOV hoặc WebM");
+        }
+
+        String publicId = "cineluxe/trailers/" + UUID.randomUUID();
+
+        try {
+            Map<?, ?> result = cloudinary.uploader().upload(
+                    file.getBytes(),
+                    ObjectUtils.asMap(
+                            "public_id", publicId,
+                            "overwrite", false,
+                            "resource_type", "video",
+                            "access_mode", "public"
+                    )
+            );
+
+            String resPublicId = (String) result.get("public_id");
+            Object durationValue = result.get("duration");
+            double duration = durationValue instanceof Number
+                    ? ((Number) durationValue).doubleValue()
+                    : 0.0;
+
+            if (duration > MAX_VIDEO_DURATION_SECONDS) {
+                cloudinary.uploader().destroy(
+                        resPublicId,
+                        ObjectUtils.asMap("resource_type", "video")
+                );
+                throw new IllegalArgumentException("Trailer phải dài tối đa 60 giây");
+            }
+
+            String cdnUrl = (String) result.get("secure_url");
+            long bytes = ((Number) result.get("bytes")).longValue();
+
+            log.info("Video uploaded: publicId={}, duration={}s, size={} bytes, url={}",
+                    resPublicId, duration, bytes, cdnUrl);
+
+            return new ImageUploadResponse(cdnUrl, resPublicId,
+                    file.getOriginalFilename(), bytes);
+
+        } catch (IOException ex) {
+            log.error("Cloudinary video upload failed", ex);
+            throw new RuntimeException("Upload trailer thất bại, vui lòng thử lại", ex);
+        }
+    }
 
     private byte[] safeReadHeader(MultipartFile file, int length) {
         try {

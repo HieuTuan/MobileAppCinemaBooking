@@ -1,6 +1,6 @@
 import 'package:intl/intl.dart';
 
-import '../services/locale_service.dart';
+import '../../services/locale_service.dart';
 
 /// Returns a locale-aware money formatter.
 ///

@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:async';
 
 import 'package:dio/dio.dart';
@@ -337,6 +339,8 @@ class AuthInterceptor extends Interceptor {
     return path.contains('/api/auth/login') ||
         path.contains('/api/auth/register') ||
         path.contains('/api/auth/refresh') ||
+        path.contains('/api/auth/forgot-password') ||
+        path.contains('/api/auth/reset-password') ||
         path.contains('/api/auth/google');
   }
 }

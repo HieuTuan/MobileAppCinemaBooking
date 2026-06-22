@@ -1,6 +1,6 @@
 # State Management
 
-This directory contains the existing Cinema_Store state management.
+This directory contains the Cinema_Store state management.
 
 ## Current Implementation
 
@@ -8,24 +8,17 @@ This directory contains the existing Cinema_Store state management.
 - User authentication state (currentUser)
 - Movie, cinema, room, showtime data
 - Booking and payment state
-- Seed data for development
+- API-backed movie/showtime/session state
 - Business logic methods
 
 ## Integration with New Modules
 
-The Cinema_Store will be enhanced to integrate with the new API and WebSocket modules:
+The Cinema_Store integrates with the API, cache, and WebSocket modules:
 
-### Phase 1: Current State (Local/Mock Data)
-- All data is loaded from `SeedData` (lib/src/data/seed_data.dart)
-- State management using ChangeNotifier
-- No external API calls
+### API Integration
 
-### Phase 2: API Integration (Planned)
-The Cinema_Store will be updated to:
-
-1. **Replace mock data with API calls**
+1. **API-backed data**
    - Use `lib/api/` APIClient for all backend communication
-   - Remove seed data initialization
    - Fetch data from REST endpoints
 
 2. **Integrate real-time updates**
@@ -85,10 +78,9 @@ class CinemaStore extends ChangeNotifier {
 
 1. Keep existing Cinema_Store structure
 2. Add new dependencies (APIClient, WebSocketClient, etc.) as constructor parameters
-3. Gradually replace mock methods with API calls
+3. Keep UI screens wired to repositories/services instead of local fixtures
 4. Add error handling and loading states
 5. Test each integration incrementally
-6. Remove seed data once API integration is complete
 
 ## Related Modules
 

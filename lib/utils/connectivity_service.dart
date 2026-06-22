@@ -20,7 +20,7 @@ class ConnectivityService {
       StreamController<bool>.broadcast();
 
   bool _isOnline = true;
-  StreamSubscription<List<ConnectivityResult>>? _subscription;
+  StreamSubscription<ConnectivityResult>? _subscription;
 
   /// Current connectivity state. `true` = online.
   bool get isOnline => _isOnline;
@@ -35,8 +35,8 @@ class ConnectivityService {
     } catch (_) {
       // Keep optimistic default on failure.
     }
-    _subscription = _connectivity.onConnectivityChanged.listen((results) {
-      _emit(_toBool(results));
+    _subscription = _connectivity.onConnectivityChanged.listen((result) {
+      _emit(_toBool(result));
     });
   }
 
@@ -48,10 +48,7 @@ class ConnectivityService {
     }
   }
 
-  bool _toBool(List<ConnectivityResult> results) {
-    if (results.isEmpty) return false;
-    return results.any((r) => r != ConnectivityResult.none);
-  }
+  bool _toBool(ConnectivityResult result) => result != ConnectivityResult.none;
 
   /// Releases the internal subscription and closes the broadcast stream.
   /// Called on app shutdown by the owner of the singleton.

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import '../models/booking_models.dart';
@@ -195,6 +196,20 @@ class CacheManager {
     });
   }
 
+  /// Compatibility wrapper used by repositories.
+  Future<List<BookingDetails>> readBookings({String? status}) async {
+    final bookings = await getCachedBookings();
+    if (status == null || status.isEmpty) return bookings;
+    return bookings.where((booking) => booking.status == status).toList();
+  }
+
+  /// Compatibility wrapper used by repositories.
+  Future<void> upsertBookings(List<BookingDetails> bookings) async {
+    for (final booking in bookings) {
+      await cacheBooking(booking);
+    }
+  }
+
   /// Get a specific cached booking by ID.
   ///
   /// Returns null if booking not found in cache.
@@ -227,6 +242,11 @@ class CacheManager {
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
       qrCode: map['qr_code'] as String?,
     );
+  }
+
+  /// Compatibility wrapper used by repositories.
+  Future<BookingDetails?> readBooking(String bookingId) {
+    return getCachedBooking(bookingId);
   }
 
   /// Clear all cached bookings.
@@ -303,6 +323,40 @@ class CacheManager {
         status: map['status'] as String,
       );
     });
+  }
+
+  /// Compatibility wrapper used by repositories.
+  Future<List<Movie>> readMovies({int? limit}) async {
+    final movies = await getCachedMovies();
+    if (limit == null || limit >= movies.length) return movies;
+    return movies.take(limit).toList();
+  }
+
+  /// Compatibility wrapper used by repositories.
+  Future<void> upsertMovies(List<Movie> movies) {
+    return cacheMovies(movies);
+  }
+
+  /// Compatibility wrapper used by repositories.
+  Future<bool> isMoviesStale() {
+    return isCacheStale();
+  }
+
+  /// Timestamp of the latest movie cache write, or null when empty.
+  Future<DateTime?> moviesLastWrittenAt() async {
+    final db = await database;
+    final List<Map<String, dynamic>> result = await db.query(
+      _moviesTable,
+      columns: ['MAX(cached_at) as latest_cache'],
+    );
+
+    if (result.isEmpty || result.first['latest_cache'] == null) {
+      return null;
+    }
+
+    return DateTime.fromMillisecondsSinceEpoch(
+      result.first['latest_cache'] as int,
+    );
   }
 
   /// Check if movie cache is stale (older than 1 hour).
@@ -401,6 +455,18 @@ class CacheManager {
     if (maps.isEmpty) return null;
 
     return maps[0]['qr_code_data'] as List<int>;
+  }
+
+  /// Compatibility wrapper used by repositories.
+  Future<void> upsertQRCode(String bookingId, List<int> imageData) {
+    return cacheQRCode(bookingId, imageData);
+  }
+
+  /// Compatibility wrapper used by repositories.
+  Future<Uint8List?> readQRCode(String bookingId) async {
+    final bytes = await getCachedQRCode(bookingId);
+    if (bytes == null) return null;
+    return bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
   }
 
   /// Delete a specific cached QR code.

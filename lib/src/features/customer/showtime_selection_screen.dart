@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/formatters.dart';
@@ -48,7 +49,17 @@ class _ShowtimeSelectionScreenState extends State<ShowtimeSelectionScreen> {
           showtime.startTime.day == selectedDate.day;
       return sameDate && selectedSlot.matches(showtime.startTime);
     }).toList();
-    final cinema = store.cinemas.first;
+    final cinema = store.cinemas.isNotEmpty
+        ? store.cinemas.first
+        : const Cinema(
+            id: 'cinema-api',
+            name: 'CineLuxe',
+            address: '',
+            city: '',
+            latitude: 0,
+            longitude: 0,
+            phone: '',
+          );
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -565,6 +576,16 @@ Future<void> _navigateToBooking(
   required Movie movie,
   required Showtime showtime,
 }) async {
+  if (!store.isLoggedIn) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập để đặt vé.')),
+      );
+    context.go('/auth');
+    return;
+  }
+
   if (movie.ageRating == 'T18' && !AgeGateSession.isConfirmed(movie.id)) {
     final confirmed = await showAgeGate(context, movie.id);
     if (!confirmed) return; // user dismissed or underage — stay on this screen
@@ -572,11 +593,8 @@ Future<void> _navigateToBooking(
   if (!context.mounted) return;
   Navigator.of(context).push(
     MaterialPageRoute(
-      builder: (_) => BookingScreen(
-        store: store,
-        movie: movie,
-        showtime: showtime,
-      ),
+      builder: (_) =>
+          BookingScreen(store: store, movie: movie, showtime: showtime),
     ),
   );
 }
