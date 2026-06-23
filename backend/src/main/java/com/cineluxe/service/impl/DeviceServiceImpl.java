@@ -55,6 +55,25 @@ public class DeviceServiceImpl implements DeviceService {
 
   @Override
   @Transactional
+  public void unregisterDevice(String userId, String deviceToken) {
+    var device = deviceRepository.findByToken(deviceToken);
+    if (device.isEmpty()) {
+      log.debug("No device found for token during unregister: {}", deviceToken);
+      return;
+    }
+    var existing = device.get();
+    if (!existing.getUserId().equals(userId)) {
+      log.debug("Device token belongs to another user. tokenUser={}, requestUser={}",
+          existing.getUserId(), userId);
+      return;
+    }
+    existing.deactivate();
+    deviceRepository.save(existing);
+    log.debug("Deactivated device token for user: {}", userId);
+  }
+
+  @Override
+  @Transactional
   public void refreshToken(String userId, String newDeviceToken) {
     var devices = deviceRepository.findAllByUserIdAndActiveTrue(userId);
     if (devices.isEmpty()) {

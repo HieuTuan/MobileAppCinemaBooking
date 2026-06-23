@@ -7,7 +7,8 @@ public record ComboDto(
     String name,
     String description,
     long price,
-    String imageUrl
+    String imageUrl,
+    int quantity
 ) {
   public static ComboDto from(FoodCombo combo) {
     return new ComboDto(
@@ -15,6 +16,7 @@ public record ComboDto(
         combo.getName(),
         combo.getDescription(),
         combo.getPrice(),
-        combo.getImageUrl());
+        combo.getImageUrl(),
+        combo.getQuantity());
   }
 }

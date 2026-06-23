@@ -16,14 +16,11 @@ import java.time.LocalDateTime;
 @Table(name = "notification_preferences")
 public class NotificationPreferences {
     
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    
     /**
-     * User ID - unique constraint ensures one preference record per user
+     * User ID - primary key ensures one preference record per user
      */
-    @Column(name = "user_id", nullable = false, unique = true)
+    @Id
+    @Column(name = "user_id", nullable = false)
     private String userId;
     
     /**
@@ -82,14 +79,6 @@ public class NotificationPreferences {
     }
     
     // Getters and Setters
-    
-    public Long getId() {
-        return id;
-    }
-    
-    public void setId(Long id) {
-        this.id = id;
-    }
     
     public String getUserId() {
         return userId;

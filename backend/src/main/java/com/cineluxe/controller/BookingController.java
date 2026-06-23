@@ -14,7 +14,6 @@ import com.cineluxe.dto.response.BookingQrResponse;
 import com.cineluxe.dto.response.BookingResponse;
 import com.cineluxe.dto.response.BookingSearchResult;
 import com.cineluxe.dto.response.CancelBookingResponse;
-import com.cineluxe.dto.response.ComboDto;
 import com.cineluxe.dto.response.HoldResponse;
 import com.cineluxe.dto.response.PaymentStatusResponse;
 import com.cineluxe.dto.response.SeatMapResponse;
@@ -79,14 +78,6 @@ public class BookingController {
             @Valid @RequestBody HoldRequest request,
             @RequestHeader(value = "X-User-Id", defaultValue = "demo-user") String userId) {
         return success(bookingService.holdSeats(showtimeId, request, userId));
-    }
-
-    @Operation(summary = "Get all food combos",
-            description = "Retrieve list of available food and beverage combos")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Successfully retrieved food combos")
-    @GetMapping("/food-combos")
-    public ResponseEntity<ApiResponse<List<ComboDto>>> getFoodCombos() {
-        return success(bookingService.getCombos());
     }
 
     @Operation(summary = "Create a new booking",

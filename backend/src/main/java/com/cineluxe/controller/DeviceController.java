@@ -10,6 +10,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -39,6 +41,17 @@ public class DeviceController {
     return ApiResponse.success(response, "Đăng ký thiết bị thành công");
   }
 
+  @Operation(summary = "Register user device for push notifications",
+      description = "Requirement-compatible endpoint: POST /api/users/{userId}/devices")
+  @PostMapping("/users/{userId}/devices")
+  public ResponseEntity<ApiResponse<DeviceRegistrationResponse>> registerUserDevice(
+      @PathVariable String userId,
+      @Valid @RequestBody RegisterDeviceRequest request) {
+    deviceService.registerDevice(userId, request);
+    var response = new DeviceRegistrationResponse(request.deviceToken(), userId, true);
+    return ApiResponse.success(response, "Đăng ký thiết bị thành công");
+  }
+
   @Operation(summary = "Unregister device on logout",
       description = "Clear all device tokens for the authenticated user when logging out")
   @ApiResponses(value = {
@@ -49,6 +62,16 @@ public class DeviceController {
       @RequestHeader(value = "X-User-Id", defaultValue = "demo-user") String userId) {
     deviceService.unregisterDevice(userId);
     return ApiResponse.success(null, "Đã hủy đăng ký thiết bị");
+  }
+
+  @Operation(summary = "Unregister one user device on logout",
+      description = "Requirement-compatible endpoint: DELETE /api/users/{userId}/devices/{deviceToken}")
+  @DeleteMapping("/users/{userId}/devices/{deviceToken}")
+  public ResponseEntity<Void> unregisterUserDevice(
+      @PathVariable String userId,
+      @PathVariable String deviceToken) {
+    deviceService.unregisterDevice(userId, deviceToken);
+    return ResponseEntity.noContent().build();
   }
 
   @Operation(summary = "Refresh device token",

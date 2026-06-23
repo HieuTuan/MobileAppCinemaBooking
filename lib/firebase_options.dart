@@ -4,10 +4,9 @@ import 'package:flutter/foundation.dart'
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
-/// Run `flutterfire configure` to generate actual configuration
-/// and replace these placeholder values.
-///
-/// Requirements: 15.3 - Firebase project configuration for Android and iOS
+/// Project  : tuan-27904
+/// Package  : com.sky_cinema.sky_cinema
+/// SHA-1    : aa310f783148f4e0f6357d0a9223496fe0615815
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
@@ -22,13 +21,11 @@ class DefaultFirebaseOptions {
         return macos;
       case TargetPlatform.windows:
         throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for Windows - '
-          'run `flutterfire configure` to generate actual configuration.',
+          'DefaultFirebaseOptions have not been configured for Windows.',
         );
       case TargetPlatform.linux:
         throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for Linux - '
-          'run `flutterfire configure` to generate actual configuration.',
+          'DefaultFirebaseOptions have not been configured for Linux.',
         );
       default:
         throw UnsupportedError(
@@ -37,39 +34,44 @@ class DefaultFirebaseOptions {
     }
   }
 
-  // Replace with actual values from Firebase Console after running flutterfire configure
+  // Web / OAuth web client (type 3)
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'YOUR_WEB_API_KEY',
-    appId: 'YOUR_WEB_APP_ID',
-    messagingSenderId: 'YOUR_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
-    storageBucket: 'YOUR_PROJECT_ID.appspot.com',
+    apiKey: 'AIzaSyA7vyy19ll8t0hFOzWve5qXlflbL97ehpw',
+    appId: '1:455475441924:android:97ac0d1c114313e7c0a051',
+    messagingSenderId: '455475441924',
+    projectId: 'tuan-27904',
+    authDomain: 'tuan-27904.firebaseapp.com',
+    storageBucket: 'tuan-27904.firebasestorage.app',
   );
 
+  // Android – com.sky_cinema.sky_cinema
+  // Android OAuth client ID (type 1): 455475441924-96ql5mfn3gubv0asv35ns2ap4s8jh7kc
+  // Web OAuth client ID   (type 3): 455475441924-n2lkna08fkg8erdqf4fkfspmrtr6e2th
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'YOUR_ANDROID_API_KEY',
-    appId: 'YOUR_ANDROID_APP_ID',
-    messagingSenderId: 'YOUR_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_PROJECT_ID.appspot.com',
+    apiKey: 'AIzaSyA7vyy19ll8t0hFOzWve5qXlflbL97ehpw',
+    appId: '1:455475441924:android:97ac0d1c114313e7c0a051',
+    messagingSenderId: '455475441924',
+    projectId: 'tuan-27904',
+    storageBucket: 'tuan-27904.firebasestorage.app',
   );
 
+  // iOS – chưa cấu hình
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'YOUR_IOS_API_KEY',
-    appId: 'YOUR_IOS_APP_ID',
-    messagingSenderId: 'YOUR_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_PROJECT_ID.appspot.com',
-    iosBundleId: 'com.example.cineBook',
+    apiKey: 'AIzaSyA7vyy19ll8t0hFOzWve5qXlflbL97ehpw',
+    appId: '1:455475441924:ios:placeholder',
+    messagingSenderId: '455475441924',
+    projectId: 'tuan-27904',
+    storageBucket: 'tuan-27904.firebasestorage.app',
+    iosBundleId: 'com.sky_cinema.skyCinema',
   );
 
+  // macOS – chưa cấu hình
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'YOUR_MACOS_API_KEY',
-    appId: 'YOUR_MACOS_APP_ID',
-    messagingSenderId: 'YOUR_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_PROJECT_ID.appspot.com',
-    iosBundleId: 'com.example.cineBook.RunnerTests',
+    apiKey: 'AIzaSyA7vyy19ll8t0hFOzWve5qXlflbL97ehpw',
+    appId: '1:455475441924:ios:placeholder',
+    messagingSenderId: '455475441924',
+    projectId: 'tuan-27904',
+    storageBucket: 'tuan-27904.firebasestorage.app',
+    iosBundleId: 'com.sky_cinema.skyCinema',
   );
 }

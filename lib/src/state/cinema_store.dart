@@ -1,34 +1,29 @@
 import 'package:flutter/foundation.dart';
 
 import '../core/formatters.dart';
-import '../data/seed_data.dart';
 import '../models/app_models.dart';
+import '../../models/movie.dart' as api_movie;
+import '../../models/showtime.dart' as api_showtime;
+import '../../models/user_profile.dart' as api_user;
 import '../../models/booking_models.dart' as api_models;
 import '../../websocket/seat_update.dart' as ws_models;
 
 class CinemaStore extends ChangeNotifier {
-  CinemaStore() {
-    users = SeedData.users();
-    movies = SeedData.movies();
-    cinemas = SeedData.cinemas();
-    rooms = SeedData.rooms();
-    showtimes = SeedData.showtimes();
-    seats = SeedData.seats();
-    combos = SeedData.combos();
-    banners = SeedData.banners();
-    vnpayConfig = SeedData.vnpayConfig();
-    _seedBookings();
-  }
+  CinemaStore();
 
-  late List<AppUser> users;
-  late List<Movie> movies;
-  late List<Cinema> cinemas;
-  late List<Room> rooms;
-  late List<Showtime> showtimes;
-  late List<SeatSpot> seats;
-  late List<FoodCombo> combos;
-  late List<AppBanner> banners;
-  late VnpayConfig vnpayConfig;
+  List<AppUser> users = [];
+  List<Movie> movies = [];
+  List<Cinema> cinemas = [];
+  List<Room> rooms = [];
+  List<Showtime> showtimes = [];
+  List<SeatSpot> seats = [];
+  List<FoodCombo> combos = [];
+  List<AppBanner> banners = [];
+  VnpayConfig vnpayConfig = const VnpayConfig(
+    terminalId: '',
+    secretKey: '',
+    environment: 'API',
+  );
   final List<String> customGenres = [];
   AppLanguage language = AppLanguage.vi;
 
@@ -52,21 +47,76 @@ class CinemaStore extends ChangeNotifier {
 
   bool get isLoggedIn => currentUser != null;
 
-  bool login(String email, String password) {
-    final normalized = email.trim().toLowerCase();
-    final user = users.where((item) {
-      return item.email.toLowerCase() == normalized &&
-          item.password == password &&
-          item.isActive;
-    }).firstOrNull;
-    if (user == null) return false;
+  void setCurrentUserFromProfile(api_user.UserProfile profile) {
+    final user = AppUser(
+      id: profile.id,
+      fullName: profile.fullName,
+      email: profile.email,
+      password: '',
+      phone: profile.phone ?? '',
+      role: _roleFromApi(profile.role),
+      avatar: profile.avatarUrl ?? '',
+      memberRank: profile.memberRank,
+      points: profile.points,
+      isActive: profile.isActive,
+      permissions: profile.permissions ?? const [],
+    );
     currentUser = user;
+    users = [user, ...users.where((item) => item.id != user.id)];
     notifyListeners();
-    return true;
   }
 
-  void demoLogin(UserRole role) {
-    currentUser = users.firstWhere((user) => user.role == role);
+  UserRole _roleFromApi(String role) {
+    return switch (role.toLowerCase()) {
+      'admin' => UserRole.admin,
+      'staff' => UserRole.staff,
+      _ => UserRole.customer,
+    };
+  }
+
+  void replaceMoviesFromApi(List<api_movie.Movie> apiMovies) {
+    movies = apiMovies.map(_movieFromApi).toList();
+    notifyListeners();
+  }
+
+  void replaceShowtimesFromApi(List<api_showtime.Showtime> apiShowtimes) {
+    final nextCinemas = <String, Cinema>{
+      for (final cinema in cinemas) cinema.id: cinema,
+    };
+    final nextRooms = <String, Room>{for (final room in rooms) room.id: room};
+
+    showtimes = apiShowtimes.map((item) {
+      final cinemaId = _stableCinemaId(item.cinemaName, item.cinemaAddress);
+      nextCinemas[cinemaId] = Cinema(
+        id: cinemaId,
+        name: item.cinemaName,
+        address: item.cinemaAddress,
+        city: '',
+        latitude: 0,
+        longitude: 0,
+        phone: '',
+      );
+      nextRooms[item.roomId] = Room(
+        id: item.roomId,
+        cinemaId: cinemaId,
+        name: item.roomName,
+        capacity: 0,
+        screenType: _screenTypeFromRoomName(item.roomName),
+        status: item.isCancelled ? RoomStatus.maintenance : RoomStatus.ready,
+      );
+      return Showtime(
+        id: item.id,
+        movieId: item.movieId,
+        roomId: item.roomId,
+        startTime: item.startTime,
+        endTime: item.endTime,
+        basePrice: item.basePrice,
+        status: item.status,
+      );
+    }).toList()..sort((a, b) => a.startTime.compareTo(b.startTime));
+
+    cinemas = nextCinemas.values.toList();
+    rooms = nextRooms.values.toList();
     notifyListeners();
   }
 
@@ -105,6 +155,39 @@ class CinemaStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  Movie _movieFromApi(api_movie.Movie movie) {
+    return Movie(
+      id: movie.id,
+      title: movie.title,
+      description: movie.description,
+      genres: movie.genres,
+      durationMinutes: movie.durationMinutes,
+      director: movie.director,
+      cast: movie.cast,
+      posterUrl: movie.posterUrl,
+      trailerUrl: movie.trailerUrl,
+      rating: movie.rating <= 5 ? movie.rating * 2 : movie.rating,
+      ageRating: movie.ageRating,
+      releaseDate: movie.releaseDate,
+      status: movie.isComingSoon
+          ? MovieStatus.comingSoon
+          : MovieStatus.nowShowing,
+      heroColor: 0xFFC9A44C,
+    );
+  }
+
+  String _stableCinemaId(String name, String address) {
+    final raw = '$name|$address'.trim().toLowerCase();
+    return raw.isEmpty ? 'cinema-api' : 'cinema-${raw.hashCode.abs()}';
+  }
+
+  String _screenTypeFromRoomName(String roomName) {
+    final upper = roomName.toUpperCase();
+    if (upper.contains('IMAX')) return 'IMAX';
+    if (upper.contains('3D')) return '3D';
+    return '2D';
+  }
+
   List<Movie> searchMovies(String query, String genre, MovieStatus? status) {
     final text = query.trim().toLowerCase();
     return movies.where((movie) {
@@ -122,16 +205,38 @@ class CinemaStore extends ChangeNotifier {
   }
 
   List<String> get genres {
-    return ['Táº¥t cáº£', ...movies.expand((movie) => movie.genres).toSet()];
+    final values = {...customGenres, ...movies.expand((movie) => movie.genres)};
+    return ['Táº¥t cáº£', ...values];
   }
 
   Movie movieById(String id) => movies.firstWhere((movie) => movie.id == id);
 
-  Room roomById(String id) => rooms.firstWhere((room) => room.id == id);
+  Room roomById(String id) => rooms.firstWhere(
+    (room) => room.id == id,
+    orElse: () => Room(
+      id: id,
+      cinemaId: 'cinema-api',
+      name: 'Phòng chiếu',
+      capacity: 0,
+      screenType: '2D',
+      status: RoomStatus.ready,
+    ),
+  );
 
   Cinema cinemaForRoom(String roomId) {
     final room = roomById(roomId);
-    return cinemas.firstWhere((cinema) => cinema.id == room.cinemaId);
+    return cinemas.firstWhere(
+      (cinema) => cinema.id == room.cinemaId,
+      orElse: () => const Cinema(
+        id: 'cinema-api',
+        name: 'CineLuxe',
+        address: '',
+        city: '',
+        latitude: 0,
+        longitude: 0,
+        phone: '',
+      ),
+    );
   }
 
   List<Showtime> showtimesForMovie(String movieId) {
@@ -184,10 +289,26 @@ class CinemaStore extends ChangeNotifier {
   }
 
   void applySeatMap(api_models.SeatMap seatMap) {
+    seats = seatMap.seats.map((seat) {
+      return SeatSpot(
+        code: seat.code,
+        row: seat.row,
+        column: seat.column,
+        type: _seatTypeFromApi(seat.type),
+      );
+    }).toList();
     _remoteSeatStatuses[seatMap.showtimeId] = {
       for (final seat in seatMap.seats) seat.code: _appSeatStatus(seat.status),
     };
     notifyListeners();
+  }
+
+  SeatType _seatTypeFromApi(String type) {
+    return switch (type.toLowerCase()) {
+      'vip' => SeatType.vip,
+      'couple' => SeatType.couple,
+      _ => SeatType.standard,
+    };
   }
 
   void applySeatUpdate(String showtimeId, ws_models.SeatUpdate update) {
@@ -349,6 +470,30 @@ class CinemaStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  void updateGenre(String oldGenre, String newGenre) {
+    final oldValue = oldGenre.trim();
+    final newValue = newGenre.trim();
+    if (oldValue.isEmpty || newValue.isEmpty || oldValue == newValue) return;
+    if (genres.contains(newValue)) return;
+
+    final index = customGenres.indexOf(oldValue);
+    if (index == -1) {
+      customGenres.add(newValue);
+    } else {
+      customGenres[index] = newValue;
+    }
+
+    movies = movies.map((movie) {
+      if (!movie.genres.contains(oldValue)) return movie;
+      final nextGenres = movie.genres
+          .map((item) => item == oldValue ? newValue : item)
+          .toSet()
+          .toList();
+      return movie.copyWith(genres: nextGenres);
+    }).toList();
+    notifyListeners();
+  }
+
   void deleteGenre(String genre) {
     customGenres.remove(genre);
     movies = movies.map((movie) {
@@ -395,6 +540,13 @@ class CinemaStore extends ChangeNotifier {
             : RoomStatus.ready,
       );
     }).toList();
+    notifyListeners();
+  }
+
+  void setRoomStatus(String roomId, RoomStatus status) {
+    rooms = rooms
+        .map((room) => room.id == roomId ? room.copyWith(status: status) : room)
+        .toList();
     notifyListeners();
   }
 
@@ -462,6 +614,11 @@ class CinemaStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  void replaceRooms(List<Room> nextRooms) {
+    rooms = List.unmodifiable(nextRooms);
+    notifyListeners();
+  }
+
   void saveShowtime(Showtime showtime) {
     final exists = showtimes.any((item) => item.id == showtime.id);
     showtimes = exists
@@ -525,10 +682,11 @@ class CinemaStore extends ChangeNotifier {
     return result;
   }
 
-  void _seedBookings() {
+  // ignore: unused_element
+  void _disabledBookingFixture() {
     final showtime = showtimes.first;
     final booking = Booking(
-      id: 'BK-DEMO01',
+      id: '',
       userId: 'U001',
       customerName: 'Nguyá»…n Minh Anh',
       showtimeId: showtime.id,
@@ -538,7 +696,7 @@ class CinemaStore extends ChangeNotifier {
       totalAmount: 469000,
       status: BookingStatus.active,
       createdAt: DateTime.now().subtract(const Duration(hours: 2)),
-      qrCode: 'CINELUXE|BK-DEMO01|U001|ST001|C4-C5',
+      qrCode: '',
     );
     bookings.add(booking);
     payments.add(
@@ -548,7 +706,7 @@ class CinemaStore extends ChangeNotifier {
         method: 'vnpay',
         amount: booking.totalAmount,
         status: PaymentStatus.success,
-        vnpayTransactionId: 'VNP-DEMO-0001',
+        vnpayTransactionId: '',
         vnpayResponseCode: '00',
         paidAt: DateTime.now().subtract(const Duration(hours: 2)),
       ),

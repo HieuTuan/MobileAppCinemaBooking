@@ -61,4 +61,23 @@ public class UploadController {
             return ApiResponse.error(500, ex.getMessage());
         }
     }
+
+    @PostMapping(value = "/upload/video", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(
+            summary = "Upload trailer video",
+            description = "Accepts MP4, MOV, or WebM trailer videos up to 60 seconds."
+    )
+    public ResponseEntity<ApiResponse<ImageUploadResponse>> uploadVideo(
+            @Parameter(description = "Trailer video file (MP4 / MOV / WebM, max 60 seconds)")
+            @RequestParam("file") MultipartFile file) {
+
+        try {
+            ImageUploadResponse result = imageUploadService.uploadVideo(file);
+            return ApiResponse.success(result, "Upload trailer thành công");
+        } catch (IllegalArgumentException ex) {
+            return ApiResponse.error(400, ex.getMessage());
+        } catch (RuntimeException ex) {
+            return ApiResponse.error(500, ex.getMessage());
+        }
+    }
 }

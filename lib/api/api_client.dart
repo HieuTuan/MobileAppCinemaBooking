@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import '../config/backend_config.dart';
 import '../services/secure_storage_service.dart';
 import '../models/movie.dart';
 import '../models/review.dart';
@@ -41,17 +42,21 @@ class APIClient {
   /// Callback invoked when authentication fails and user needs to login
   Function()? onUnauthorized;
 
-  /// Base URL for the API - loaded from environment variables
-  static const String _defaultBaseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8080',
-  );
+  /// Base URL for the API - loaded from environment variables.
+  ///
+  /// For a physical phone on the same Wi-Fi as your PC, run Flutter with:
+  /// --dart-define=DEV_SERVER_HOST=<your-pc-lan-ip>
+  static String get _defaultBaseUrl => BackendConfig.restBaseUrl;
 
   /// Standard timeout for regular API requests (30 seconds)
   static const Duration _standardTimeout = Duration(seconds: 30);
 
   /// Extended timeout for payment operations (60 seconds)
   static const Duration _paymentTimeout = Duration(seconds: 60);
+
+  /// Extended timeout for file upload operations (5 minutes)
+  /// Video files can be large and Cloudinary processing takes time.
+  static const Duration _uploadTimeout = Duration(minutes: 5);
 
   /// Singleton instance
   static final APIClient _instance = APIClient._internal();
@@ -199,6 +204,17 @@ class APIClient {
       contentType: contentType,
       sendTimeout: _standardTimeout,
       receiveTimeout: _standardTimeout,
+    );
+  }
+
+  /// Create options with extended timeout for file upload operations (5 minutes)
+  ///
+  /// Used for image and video uploads to Cloudinary.
+  Options createUploadOptions() {
+    return Options(
+      contentType: 'multipart/form-data',
+      sendTimeout: _uploadTimeout,
+      receiveTimeout: _uploadTimeout,
     );
   }
 
@@ -405,9 +421,20 @@ class APIClient {
       cancelToken: cancelToken,
     );
 
-    return PaginatedResponse<Movie>.fromJson(
-      response.data!,
-      (json) => Movie.fromJson(json as Map<String, dynamic>),
+    // Unwrap our ApiResponse wrapper: {"status":200,"data":[...]}
+    final raw = response.data!;
+    final List<dynamic> items = _extractList(raw);
+    final movies = items
+        .map((json) => Movie.fromJson(json as Map<String, dynamic>))
+        .toList();
+    return PaginatedResponse<Movie>(
+      data: movies,
+      page: page,
+      pageSize: pageSize,
+      totalItems: movies.length,
+      totalPages: 1,
+      hasNext: false,
+      hasPrevious: false,
     );
   }
 
@@ -434,8 +461,12 @@ class APIClient {
       '/api/movies/$movieId',
       cancelToken: cancelToken,
     );
-
-    return Movie.fromJson(response.data!);
+    // Unwrap ApiResponse wrapper if present
+    final raw = response.data!;
+    final data = raw.containsKey('data') && raw['data'] is Map
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    return Movie.fromJson(data);
   }
 
   /// Create a review for a movie.
@@ -608,10 +639,234 @@ class APIClient {
   }
 
   Future<List<FoodCombo>> getFoodCombos() async {
-    final response = await get<List<dynamic>>('/api/food-combos');
-    return response.data!
+    final response = await get<Map<String, dynamic>>('/api/food-combos');
+    final items = _extractList(response.data!);
+    return items
         .map((item) => FoodCombo.fromJson(item as Map<String, dynamic>))
         .toList();
+  }
+
+  // ============================================================================
+  // Admin Movie CRUD Endpoints - R19
+  // ============================================================================
+
+  /// POST /api/admin/movies – Tạo phim mới
+  Future<Movie> adminCreateMovie(MovieManagementRequest req) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/admin/movies',
+      data: req.toJson(),
+    );
+    final raw = response.data!;
+    final data = raw.containsKey('data') && raw['data'] is Map
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    return Movie.fromJson(data);
+  }
+
+  /// PUT /api/admin/movies/{id} – Cập nhật phim
+  Future<Movie> adminUpdateMovie(String id, MovieManagementRequest req) async {
+    final response = await put<Map<String, dynamic>>(
+      '/api/admin/movies/$id',
+      data: req.toJson(),
+    );
+    final raw = response.data!;
+    final data = raw.containsKey('data') && raw['data'] is Map
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    return Movie.fromJson(data);
+  }
+
+  /// DELETE /api/admin/movies/{id} – Xóa phim
+  /// Throws [ApiConflictException] (409) nếu còn showtime active.
+  Future<void> adminDeleteMovie(String id) async {
+    await delete<Map<String, dynamic>>('/api/admin/movies/$id');
+  }
+
+  /// POST /api/admin/upload - uploads an image to Cloudinary and returns the CDN URL.
+  Future<String> adminUploadImage({
+    required List<int> bytes,
+    required String filename,
+    required String contentType,
+  }) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/admin/upload',
+      data: FormData.fromMap({
+        'file': MultipartFile.fromBytes(
+          bytes,
+          filename: filename,
+          contentType: DioMediaType.parse(contentType),
+        ),
+      }),
+      options: createUploadOptions(),
+    );
+    final raw = response.data!;
+    final data = raw.containsKey('data') && raw['data'] is Map
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    return data['url'] as String;
+  }
+
+  /// POST /api/admin/upload/video - uploads a trailer video to Cloudinary.
+  Future<String> adminUploadVideo({
+    required List<int> bytes,
+    required String filename,
+    required String contentType,
+  }) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/admin/upload/video',
+      data: FormData.fromMap({
+        'file': MultipartFile.fromBytes(
+          bytes,
+          filename: filename,
+          contentType: DioMediaType.parse(contentType),
+        ),
+      }),
+      options: createUploadOptions(),
+    );
+    final raw = response.data!;
+    final data = raw.containsKey('data') && raw['data'] is Map
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    return data['url'] as String;
+  }
+
+  Future<List<AdminActor>> adminGetActors() async {
+    final response = await get<Map<String, dynamic>>('/api/admin/actors');
+    final items = _extractList(response.data!);
+    return items
+        .map((item) => AdminActor.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<AdminActor> adminCreateActor(ActorManagementRequest req) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/admin/actors',
+      data: req.toJson(),
+    );
+    final raw = response.data!;
+    final data = raw.containsKey('data') && raw['data'] is Map
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    return AdminActor.fromJson(data);
+  }
+
+  Future<AdminActor> adminUpdateActor(
+    String id,
+    ActorManagementRequest req,
+  ) async {
+    final response = await put<Map<String, dynamic>>(
+      '/api/admin/actors/$id',
+      data: req.toJson(),
+    );
+    final raw = response.data!;
+    final data = raw.containsKey('data') && raw['data'] is Map
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    return AdminActor.fromJson(data);
+  }
+
+  Future<void> adminDeleteActor(String id) async {
+    await delete<Map<String, dynamic>>('/api/admin/actors/$id');
+  }
+
+  // ============================================================================
+  // Admin Food Combo CRUD Endpoints - R20
+  // ============================================================================
+
+  /// GET /api/admin/food-combos – Tất cả combo (bao gồm inactive)
+  Future<List<AdminFoodCombo>> adminGetFoodCombos() async {
+    final response = await get<Map<String, dynamic>>('/api/admin/food-combos');
+    final items = _extractList(response.data!);
+    return items
+        .map((item) => AdminFoodCombo.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /api/admin/food-combos – Tạo combo
+  Future<AdminFoodCombo> adminCreateFoodCombo(
+    FoodComboManagementRequest req,
+  ) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/admin/food-combos',
+      data: req.toJson(),
+    );
+    final raw = response.data!;
+    final data = raw.containsKey('data') && raw['data'] is Map
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    return AdminFoodCombo.fromJson(data);
+  }
+
+  /// PUT /api/admin/food-combos/{id} – Cập nhật combo
+  Future<AdminFoodCombo> adminUpdateFoodCombo(
+    String id,
+    FoodComboManagementRequest req,
+  ) async {
+    final response = await put<Map<String, dynamic>>(
+      '/api/admin/food-combos/$id',
+      data: req.toJson(),
+    );
+    final raw = response.data!;
+    final data = raw.containsKey('data') && raw['data'] is Map
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    return AdminFoodCombo.fromJson(data);
+  }
+
+  /// PATCH /api/admin/food-combos/{id} – Toggle isActive
+  Future<AdminFoodCombo> adminToggleFoodCombo(
+    String id, {
+    required bool isActive,
+  }) async {
+    final response = await patch<Map<String, dynamic>>(
+      '/api/admin/food-combos/$id',
+      data: {'isActive': isActive},
+    );
+    final raw = response.data!;
+    final data = raw.containsKey('data') && raw['data'] is Map
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    return AdminFoodCombo.fromJson(data);
+  }
+
+  Future<List<AdminFoodCombo>> staffGetFoodCombos() async {
+    final response = await get<Map<String, dynamic>>('/api/staff/food-combos');
+    final items = _extractList(response.data!);
+    return items
+        .map((item) => AdminFoodCombo.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<AdminFoodCombo> staffUpdateFoodComboStatus(
+    String id, {
+    required bool isActive,
+  }) async {
+    final response = await patch<Map<String, dynamic>>(
+      '/api/staff/food-combos/$id/status',
+      data: {'isActive': isActive},
+    );
+    final raw = response.data!;
+    final data = raw.containsKey('data') && raw['data'] is Map
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    return AdminFoodCombo.fromJson(data);
+  }
+
+  // ── private helper ─────────────────────────────────────────────────────────
+
+  /// Unwraps our backend's {"status":200,"data":[...]} envelope.
+  List<dynamic> _extractList(Map<String, dynamic> raw) {
+    if (raw.containsKey('data') && raw['data'] is List) {
+      return raw['data'] as List<dynamic>;
+    }
+    return [];
+  }
+
+  Map<String, dynamic> _extractDataMap(Map<String, dynamic> raw) {
+    if (raw.containsKey('data') && raw['data'] is Map) {
+      return raw['data'] as Map<String, dynamic>;
+    }
+    return raw;
   }
 
   Future<BookingResponse> createBooking(CreateBookingRequest request) async {
@@ -806,8 +1061,9 @@ class APIClient {
     required String deviceToken,
     CancelToken? cancelToken,
   }) async {
+    final encodedToken = Uri.encodeComponent(deviceToken);
     await delete(
-      '/api/users/$userId/devices/$deviceToken',
+      '/api/users/$userId/devices/$encodedToken',
       cancelToken: cancelToken,
     );
   }
@@ -1164,7 +1420,18 @@ class APIClient {
       data: request.toJson(),
       cancelToken: cancelToken,
     );
-    return Room.fromJson(response.data!);
+    return Room.fromJson(_extractDataMap(response.data!));
+  }
+
+  Future<List<Room>> adminGetRooms({CancelToken? cancelToken}) async {
+    final response = await get<Map<String, dynamic>>(
+      '/api/admin/rooms',
+      cancelToken: cancelToken,
+    );
+    final items = _extractList(response.data!);
+    return items
+        .map((item) => Room.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   Future<Room> updateAdminRoomStatus(
@@ -1177,7 +1444,7 @@ class APIClient {
       data: {'status': status},
       cancelToken: cancelToken,
     );
-    return Room.fromJson(response.data!);
+    return Room.fromJson(_extractDataMap(response.data!));
   }
 
   Future<Showtime> createAdminShowtime(

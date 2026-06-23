@@ -8,5 +8,7 @@ public interface DeviceService {
 
   void unregisterDevice(String userId);
 
+  void unregisterDevice(String userId, String deviceToken);
+
   void refreshToken(String userId, String newDeviceToken);
 }

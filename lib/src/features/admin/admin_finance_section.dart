@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../core/formatters.dart';
 import '../../core/labels.dart';
-import '../../models/admin_models.dart';
+import '../../../models/admin_models.dart';
 import '../../models/app_models.dart';
 import '../../shared/widgets/glass_card.dart';
 import '../../state/cinema_store.dart';

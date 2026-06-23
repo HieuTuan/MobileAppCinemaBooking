@@ -63,6 +63,7 @@ class FoodCombo {
     required this.name,
     required this.description,
     required this.price,
+    this.quantity = 0,
     this.imageUrl = '',
   });
 
@@ -70,6 +71,7 @@ class FoodCombo {
   final String name;
   final String description;
   final int price;
+  final int quantity;
   final String imageUrl;
 
   factory FoodCombo.fromJson(Map<String, dynamic> json) =>

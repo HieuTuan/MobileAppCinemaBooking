@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
+import 'firebase_options.dart';
 import 'src/app.dart';
 import 'services/analytics_service.dart';
 import 'services/locale_service.dart';
@@ -19,7 +20,9 @@ void main() async {
 
   // Initialize Firebase (Core + Analytics + Messaging)
   try {
-    await Firebase.initializeApp();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
     debugPrint('Main: Firebase initialized successfully');
   } catch (e) {
     debugPrint('Main: Firebase initialization failed: $e');
@@ -28,7 +31,11 @@ void main() async {
   // Initialize analytics (non-blocking)
   try {
     await AnalyticsService.instance.initialize();
-    debugPrint('Main: Analytics initialized');
+    if (AnalyticsService.instance.isInitialized) {
+      debugPrint('Main: Analytics initialized');
+    } else {
+      debugPrint('Main: Analytics unavailable');
+    }
   } catch (e) {
     debugPrint('Main: Analytics init failed: $e');
   }
@@ -37,7 +44,7 @@ void main() async {
   await LocaleService.instance.init();
 
   // Track app_open event
-  AnalyticsService.instance.trackAppOpen();
+  await AnalyticsService.instance.trackAppOpen();
 
   runApp(const CineBookingApp());
 }

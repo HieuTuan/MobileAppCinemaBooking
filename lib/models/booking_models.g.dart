@@ -63,6 +63,7 @@ FoodCombo _$FoodComboFromJson(Map<String, dynamic> json) => FoodCombo(
   name: json['name'] as String,
   description: json['description'] as String,
   price: (json['price'] as num).toInt(),
+  quantity: (json['quantity'] as num?)?.toInt() ?? 0,
   imageUrl: json['imageUrl'] as String? ?? '',
 );
 
@@ -71,6 +72,7 @@ Map<String, dynamic> _$FoodComboToJson(FoodCombo instance) => <String, dynamic>{
   'name': instance.name,
   'description': instance.description,
   'price': instance.price,
+  'quantity': instance.quantity,
   'imageUrl': instance.imageUrl,
 };
 

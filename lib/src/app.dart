@@ -13,6 +13,13 @@ import '../services/router.dart';
 import '../widgets/notification_banner.dart';
 import 'shared/widgets/analytics_consent_banner.dart';
 
+/// Typed route payload from a push notification tap.
+class NotificationRoute {
+  const NotificationRoute({required this.path, this.queryParams = const {}});
+  final String path;
+  final Map<String, String> queryParams;
+}
+
 class CineBookingApp extends StatefulWidget {
   const CineBookingApp({super.key});
 

@@ -15,4 +15,6 @@ public interface ImageUploadService {
      * @return {@link ImageUploadResponse} with the CDN URL
      */
     ImageUploadResponse upload(MultipartFile file);
+
+    ImageUploadResponse uploadVideo(MultipartFile file);
 }

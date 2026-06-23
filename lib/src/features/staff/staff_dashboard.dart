@@ -1,5 +1,4 @@
-import 'package:cine_book/services/device_service.dart';
-import 'package:cine_book/services/push_notification_handler.dart';
+import 'package:cine_book/services/logout_service.dart';
 import 'package:cine_book/src/core/app_theme.dart';
 import 'package:cine_book/src/models/app_models.dart';
 import 'package:cine_book/src/shared/widgets/glass_card.dart';
@@ -8,6 +7,7 @@ import 'package:cine_book/src/state/cinema_store.dart';
 import 'package:flutter/material.dart';
 
 import 'staff_customer_support_section.dart';
+import 'staff_food_combo_section.dart';
 import 'staff_room_management_section.dart';
 import 'staff_showtime_bookings_section.dart';
 import 'staff_ticket_verification_section.dart';
@@ -22,18 +22,8 @@ class StaffDashboard extends StatefulWidget {
 }
 
 class _StaffDashboardState extends State<StaffDashboard> {
-  final _deviceService = DeviceService();
-
   Future<void> _handleLogout() async {
-    await _deviceService.unregisterDevice();
-    final token = await PushNotificationHandler.instance.getToken();
-    if (token != null) {
-      await _deviceService.refreshToken(
-        newDeviceToken: token,
-        platform: PushNotificationHandler.instance.platform,
-      );
-    }
-    if (mounted) widget.store.logout();
+    await LogoutService.signOut(context: context, store: widget.store);
   }
 
   @override
@@ -55,6 +45,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
           const SizedBox(height: 12),
           _StaffMetrics(store: widget.store),
           StaffTicketVerificationSection(store: widget.store),
+          const StaffFoodComboSection(),
           StaffCustomerSupportSection(store: widget.store),
           StaffRoomManagementSection(store: widget.store),
           StaffShowtimeBookingsSection(store: widget.store),

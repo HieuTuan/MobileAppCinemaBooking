@@ -2,8 +2,9 @@ package com.cineluxe.service.impl;
 
 import com.cineluxe.entity.Booking;
 import com.cineluxe.entity.Device;
+import com.cineluxe.entity.NotificationPreferences;
 import com.cineluxe.repository.DeviceRepository;
-import com.cineluxe.repository.NotificationPreferenceRepository;
+import com.cineluxe.repository.NotificationPreferencesRepository;
 import com.cineluxe.service.NotificationService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Implementation of NotificationService.
  *
  * <p>Critical notifications (payment confirmation, booking cancellation) are always sent.
- * All other notification types respect the user's {@link com.cineluxe.entity.NotificationPreference}.
+ * All other notification types respect the user's {@link NotificationPreferences}.
  *
  * <p>FCM/APNs token delivery is delegated to the configured push provider.
  * When no provider is configured (e.g., in development), notifications are logged only.
@@ -27,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class NotificationServiceImpl implements NotificationService {
 
   private final DeviceRepository deviceRepository;
-  private final NotificationPreferenceRepository preferenceRepository;
+  private final NotificationPreferencesRepository preferenceRepository;
 
   // ─── Critical notifications — always sent regardless of preferences ────────
 
@@ -57,7 +58,7 @@ public class NotificationServiceImpl implements NotificationService {
 
   @Override
   public void sendShowtimeReminder(String userId, Booking booking) {
-    if (!isEnabled(userId, pref -> pref.isShowtimeReminders())) {
+    if (!isEnabled(userId, pref -> pref.getShowtimeReminders())) {
       log.debug("Showtime reminder skipped for user={} (disabled)", userId);
       return;
     }
@@ -71,7 +72,7 @@ public class NotificationServiceImpl implements NotificationService {
 
   @Override
   public void sendPromotion(String userId, String title, String body) {
-    if (!isEnabled(userId, pref -> pref.isPromotions())) {
+    if (!isEnabled(userId, pref -> pref.getPromotions())) {
       log.debug("Promotion skipped for user={} (disabled)", userId);
       return;
     }
@@ -81,7 +82,7 @@ public class NotificationServiceImpl implements NotificationService {
 
   @Override
   public void sendNewMovieAnnouncement(String userId, String title, String body) {
-    if (!isEnabled(userId, pref -> pref.isNewMovies())) {
+    if (!isEnabled(userId, pref -> pref.getNewMovies())) {
       log.debug("New movie announcement skipped for user={} (disabled)", userId);
       return;
     }
@@ -91,7 +92,7 @@ public class NotificationServiceImpl implements NotificationService {
 
   @Override
   public void sendBookingUpdate(String userId, String title, String body) {
-    if (!isEnabled(userId, pref -> pref.isBookingUpdates())) {
+    if (!isEnabled(userId, pref -> pref.getBookingUpdates())) {
       log.debug("Booking update skipped for user={} (disabled)", userId);
       return;
     }
@@ -122,7 +123,7 @@ public class NotificationServiceImpl implements NotificationService {
 
   @FunctionalInterface
   private interface PreferenceCheck {
-    boolean test(com.cineluxe.entity.NotificationPreference pref);
+    boolean test(NotificationPreferences pref);
   }
 
   private boolean isEnabled(String userId, PreferenceCheck check) {

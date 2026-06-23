@@ -35,6 +35,9 @@ class _MovieListScreenState extends State<MovieListScreen> {
   // Cache status (driven by repository + connectivity stream).
   bool _fromCache = false;
   DateTime? _cachedAt;
+  bool _loading = true;
+  bool _loadInFlight = false;
+  String? _error;
   StreamSubscription? _changesSub;
   StreamSubscription? _connectivitySub;
 
@@ -54,12 +57,10 @@ class _MovieListScreenState extends State<MovieListScreen> {
     // Track screen view (Req 41.4)
     AnalyticsService.instance.trackScreenView(screenName: 'movie_list');
     _movieRepo.startAutoSync();
+    _loadMovies();
     _changesSub = _movieRepo.changes.listen((_) {
       if (!mounted) return;
-      setState(() {
-        _fromCache = false;
-        _cachedAt = DateTime.now();
-      });
+      _loadMovies();
     });
     _connectivitySub = _connectivity.connectivityStream.listen((_) {
       if (!mounted) return;
@@ -77,12 +78,34 @@ class _MovieListScreenState extends State<MovieListScreen> {
   }
 
   Future<void> _pullRefresh() async {
-    final result = await _movieRepo.getMovies(forceRefresh: true);
-    if (!mounted) return;
+    await _loadMovies(forceRefresh: true);
+  }
+
+  Future<void> _loadMovies({bool forceRefresh = false}) async {
+    if (_loadInFlight) return;
+    _loadInFlight = true;
     setState(() {
-      _fromCache = result.fromCache;
-      _cachedAt = result.cachedAt;
+      _loading = true;
+      _error = null;
     });
+    try {
+      final result = await _movieRepo.getMovies(forceRefresh: forceRefresh);
+      if (!mounted) return;
+      widget.store.replaceMoviesFromApi(result.items);
+      setState(() {
+        _fromCache = result.fromCache;
+        _cachedAt = result.cachedAt;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Không thể tải danh sách phim từ API.';
+      });
+    } finally {
+      _loadInFlight = false;
+    }
   }
 
   @override
@@ -99,15 +122,19 @@ class _MovieListScreenState extends State<MovieListScreen> {
             fromCache: _fromCache || !_connectivity.isOnline,
             cachedAt: _cachedAt,
           ),
-          _FeaturedMovieCarousel(
-            movies: store.movies,
-            controller: _carouselController,
-            page: _featuredPage,
-            onMovieTap: (movie) => _openMovie(store, movie),
-          ),
-          const SizedBox(height: 14),
-          _HeroBanner(store: store),
-          const SizedBox(height: 14),
+          if (store.movies.isNotEmpty) ...[
+            _FeaturedMovieCarousel(
+              movies: store.movies,
+              controller: _carouselController,
+              page: _featuredPage,
+              onMovieTap: (movie) => _openMovie(store, movie),
+            ),
+            const SizedBox(height: 14),
+          ],
+          if (store.banners.isNotEmpty && store.cinemas.isNotEmpty) ...[
+            _HeroBanner(store: store),
+            const SizedBox(height: 14),
+          ],
           _MovieFilterBar(
             search: _search,
             genres: store.genres,
@@ -118,33 +145,51 @@ class _MovieListScreenState extends State<MovieListScreen> {
             onGenreChanged: (genre) => setState(() => _genre = genre),
           ),
           const SectionTitle(title: 'Phim phù hợp với bạn'),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final width = constraints.maxWidth;
-              final columns = width >= 900
-                  ? 4
-                  : width >= 620
-                      ? 3
-                      : 2;
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: movies.length,
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: columns,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: .58,
-                ),
-                itemBuilder: (context, index) {
-                  return _MovieCard(
-                    movie: movies[index],
-                    onTap: () => _openMovie(store, movies[index]),
-                  );
-                },
-              );
-            },
-          ),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_error != null)
+            _MovieListMessage(
+              icon: Icons.cloud_off_rounded,
+              message: _error!,
+              actionLabel: 'Thử lại',
+              onAction: _loadMovies,
+            )
+          else if (movies.isEmpty)
+            const _MovieListMessage(
+              icon: Icons.local_movies_outlined,
+              message: 'Chưa có phim từ API.',
+            )
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                final columns = width >= 900
+                    ? 4
+                    : width >= 620
+                    ? 3
+                    : 2;
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: movies.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: .58,
+                  ),
+                  itemBuilder: (context, index) {
+                    return _MovieCard(
+                      movie: movies[index],
+                      onTap: () => _openMovie(store, movies[index]),
+                    );
+                  },
+                );
+              },
+            ),
         ],
       ),
     );
@@ -154,6 +199,49 @@ class _MovieListScreenState extends State<MovieListScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => MovieDetailScreen(store: store, movie: movie),
+      ),
+    );
+  }
+}
+
+class _MovieListMessage extends StatelessWidget {
+  const _MovieListMessage({
+    required this.icon,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final IconData icon;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Column(
+        children: [
+          Icon(icon, size: 44, color: AppColors.muted),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppColors.muted,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: onAction,
+              icon: const Icon(Icons.refresh_rounded),
+              label: Text(actionLabel!),
+            ),
+          ],
+        ],
       ),
     );
   }

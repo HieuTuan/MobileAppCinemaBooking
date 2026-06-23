@@ -1,33 +1,115 @@
 {
   "project_info": {
-    "project_number": "YOUR_PROJECT_NUMBER",
-    "project_id": "your-firebase-project-id",
-    "storage_bucket": "your-firebase-project-id.appspot.com"
+    "project_number": "455475441924",
+    "project_id": "tuan-27904",
+    "storage_bucket": "tuan-27904.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:YOUR_PROJECT_NUMBER:android:YOUR_ANDROID_APP_ID",
+        "mobilesdk_app_id": "1:455475441924:android:8b3450b5fb7b2aacc0a051",
         "android_client_info": {
-          "package_name": "com.sky_cinema.sky_cinema"
+          "package_name": "com.example.lab10_4_firebase_google_sign_in"
         }
       },
       "oauth_client": [
         {
-          "client_id": "YOUR_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+          "client_id": "455475441924-muatmbhktg90bojo3n2d7449gspcfr1a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.lab10_4_firebase_google_sign_in",
+            "certificate_hash": "aa310f783148f4e0f6357d0a9223496fe0615815"
+          }
+        },
+        {
+          "client_id": "455475441924-n2lkna08fkg8erdqf4fkfspmrtr6e2th.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "YOUR_ANDROID_API_KEY"
+          "current_key": "AIzaSyA7vyy19ll8t0hFOzWve5qXlflbL97ehpw"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
+              "client_id": "455475441924-n2lkna08fkg8erdqf4fkfspmrtr6e2th.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:455475441924:android:877a773d0e57b4c9c0a051",
+        "android_client_info": {
+          "package_name": "com.example.lap10"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "455475441924-vns3eu2mht53hn3794ug8uotd7iavi7e.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.lap10",
+            "certificate_hash": "aa310f783148f4e0f6357d0a9223496fe0615815"
+          }
+        },
+        {
+          "client_id": "455475441924-n2lkna08fkg8erdqf4fkfspmrtr6e2th.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA7vyy19ll8t0hFOzWve5qXlflbL97ehpw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "455475441924-n2lkna08fkg8erdqf4fkfspmrtr6e2th.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:455475441924:android:97ac0d1c114313e7c0a051",
+        "android_client_info": {
+          "package_name": "com.sky_cinema.sky_cinema"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "455475441924-96ql5mfn3gubv0asv35ns2ap4s8jh7kc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sky_cinema.sky_cinema",
+            "certificate_hash": "aa310f783148f4e0f6357d0a9223496fe0615815"
+          }
+        },
+        {
+          "client_id": "455475441924-n2lkna08fkg8erdqf4fkfspmrtr6e2th.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA7vyy19ll8t0hFOzWve5qXlflbL97ehpw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "455475441924-n2lkna08fkg8erdqf4fkfspmrtr6e2th.apps.googleusercontent.com",
               "client_type": 3
             }
           ]
