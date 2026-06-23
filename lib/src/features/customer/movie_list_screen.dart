@@ -41,6 +41,9 @@ class _MovieListScreenState extends State<MovieListScreen> {
   StreamSubscription? _changesSub;
   StreamSubscription? _connectivitySub;
 
+  // Debounce timer cho search text (tránh gọi API mỗi ký tự)
+  Timer? _searchDebounce;
+
   PageController get _carouselController {
     return _featuredController ??= PageController(viewportFraction: .66)
       ..addListener(() {
@@ -70,6 +73,7 @@ class _MovieListScreenState extends State<MovieListScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _changesSub?.cancel();
     _connectivitySub?.cancel();
     _search.dispose();
@@ -81,6 +85,34 @@ class _MovieListScreenState extends State<MovieListScreen> {
     await _loadMovies(forceRefresh: true);
   }
 
+  /// Được gọi khi search text thay đổi — debounce 400ms trước khi gọi API
+  void _onSearchChanged(String text) {
+    _searchDebounce?.cancel();
+    // Nếu xóa hết text → gọi API ngay (lấy lại tất cả phim)
+    if (text.isEmpty) {
+      setState(() {});
+      _loadMovies();
+      return;
+    }
+    // Bước 2: debounce 400ms để không gọi API mỗi ký tự gõ
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+      _loadMovies();
+    });
+    setState(() {}); // update UI ngay lập tức cho input field
+  }
+
+  /// Được gọi khi genre hoặc status filter thay đổi — gọi API ngay
+  void _onGenreChanged(String genre) {
+    setState(() => _genre = genre);
+    _loadMovies();
+  }
+
+  void _onStatusChanged(MovieStatus? status) {
+    setState(() => _status = status);
+    _loadMovies();
+  }
+
+  /// Gọi API GET /api/movies với search, genre, status params (Luồng bước 1–5)
   Future<void> _loadMovies({bool forceRefresh = false}) async {
     if (_loadInFlight) return;
     _loadInFlight = true;
@@ -89,7 +121,21 @@ class _MovieListScreenState extends State<MovieListScreen> {
       _error = null;
     });
     try {
-      final result = await _movieRepo.getMovies(forceRefresh: forceRefresh);
+      // Bước 2: truyền search text → backend JPQL không phân biệt hoa thường
+      final searchText = _search.text.trim().isEmpty ? null : _search.text.trim();
+
+      // Bước 3: truyền genre và status filter
+      final genreParam = (_genre.isEmpty || _genre == 'Tất cả') ? null : _genre;
+      final statusParam = _status == null
+          ? null
+          : (_status == MovieStatus.nowShowing ? 'nowShowing' : 'comingSoon');
+
+      final result = await _movieRepo.getMovies(
+        search: searchText,
+        genre: genreParam,
+        status: statusParam,
+        forceRefresh: forceRefresh,
+      );
       if (!mounted) return;
       widget.store.replaceMoviesFromApi(result.items);
       setState(() {
@@ -112,7 +158,9 @@ class _MovieListScreenState extends State<MovieListScreen> {
   Widget build(BuildContext context) {
     final store = widget.store;
     final selectedGenre = _genre.isEmpty ? store.genres.first : _genre;
-    final movies = store.searchMovies(_search.text, selectedGenre, _status);
+    // Bước 4: hiển thị kết quả từ store (đã được replace bởi API response)
+    // Store chứa đúng danh sách đã filter từ server — không cần filter lại client-side
+    final movies = store.movies;
     return RefreshIndicator(
       onRefresh: _pullRefresh,
       child: ListView(
@@ -140,9 +188,11 @@ class _MovieListScreenState extends State<MovieListScreen> {
             genres: store.genres,
             selectedGenre: selectedGenre,
             selectedStatus: _status,
-            onSearchChanged: (_) => setState(() {}),
-            onStatusChanged: (status) => setState(() => _status = status),
-            onGenreChanged: (genre) => setState(() => _genre = genre),
+            // Bước 2: debounce search → gọi API
+            onSearchChanged: _onSearchChanged,
+            // Bước 3: filter genre/status → gọi API ngay
+            onStatusChanged: _onStatusChanged,
+            onGenreChanged: _onGenreChanged,
           ),
           const SectionTitle(title: 'Phim phù hợp với bạn'),
           if (_loading)
@@ -157,10 +207,19 @@ class _MovieListScreenState extends State<MovieListScreen> {
               actionLabel: 'Thử lại',
               onAction: _loadMovies,
             )
+          // Bước 5 lỗi & ngoại lệ: Không có kết quả → mảng rỗng, 200 OK
           else if (movies.isEmpty)
-            const _MovieListMessage(
-              icon: Icons.local_movies_outlined,
-              message: 'Chưa có phim từ API.',
+            _MovieListMessage(
+              icon: Icons.search_off_rounded,
+              message: _search.text.isNotEmpty || _genre.isNotEmpty || _status != null
+                  ? 'Không tìm thấy phim phù hợp với bộ lọc.'
+                  : 'Chưa có phim nào.',
+              actionLabel: (_search.text.isNotEmpty || _genre.isNotEmpty || _status != null)
+                  ? 'Xóa bộ lọc'
+                  : null,
+              onAction: (_search.text.isNotEmpty || _genre.isNotEmpty || _status != null)
+                  ? _clearFilters
+                  : null,
             )
           else
             LayoutBuilder(
@@ -201,6 +260,17 @@ class _MovieListScreenState extends State<MovieListScreen> {
         builder: (_) => MovieDetailScreen(store: store, movie: movie),
       ),
     );
+  }
+
+  /// Xóa tất cả bộ lọc và reload API (Req R3.6 — không filter: tất cả phim)
+  void _clearFilters() {
+    _searchDebounce?.cancel();
+    _search.clear();
+    setState(() {
+      _genre = '';
+      _status = null;
+    });
+    _loadMovies();
   }
 }
 
