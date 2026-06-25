@@ -96,6 +96,7 @@ CreateBookingRequest _$CreateBookingRequestFromJson(
       .map((e) => ComboSelection.fromJson(e as Map<String, dynamic>))
       .toList(),
   userId: json['userId'] as String?,
+  movieAgeRating: json['movieAgeRating'] as String?,
 );
 
 Map<String, dynamic> _$CreateBookingRequestToJson(
@@ -104,6 +105,7 @@ Map<String, dynamic> _$CreateBookingRequestToJson(
   'holdId': instance.holdId,
   'combos': instance.combos.map((e) => e.toJson()).toList(),
   'userId': ?instance.userId,
+  'movieAgeRating': ?instance.movieAgeRating,
 };
 
 BookingResponse _$BookingResponseFromJson(Map<String, dynamic> json) =>
