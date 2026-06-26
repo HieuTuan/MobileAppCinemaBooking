@@ -87,12 +87,19 @@ class _BookingScreenState extends State<BookingScreen> {
   Future<void> _initializeRealtimeSeats() async {
     try {
       await _syncSeatState(widget.showtime.id);
+      if (mounted) setState(() => _loadError = null);
+
       final token = await SecureStorageService().getAccessToken();
       if (token == null) {
-        throw StateError('Missing access token for realtime seat updates');
+        return;
       }
-      await _webSocketClient.connect(widget.showtime.id, token);
-      if (mounted) setState(() => _loadError = null);
+
+      try {
+        await _webSocketClient.connect(widget.showtime.id, token);
+      } catch (_) {
+        // The REST seat map is enough to let customers select seats; realtime
+        // updates are a best-effort enhancement in local/web runs.
+      }
     } catch (_) {
       if (mounted) {
         setState(

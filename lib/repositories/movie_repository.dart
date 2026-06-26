@@ -69,12 +69,27 @@ class MovieRepository {
     bool forceRefresh = false,
   }) async {
     final online = _connectivity.isOnline;
-    final stale = await _cache.isMoviesStale();
-    final lastWritten = await _cache.moviesLastWrittenAt();
+    var stale = true;
+    DateTime? lastWritten;
+    try {
+      stale = await _cache.isMoviesStale();
+      lastWritten = await _cache.moviesLastWrittenAt();
+    } catch (_) {
+      // Cache backends are optional on web/local runs. A cache failure should
+      // not block fresh API data from rendering.
+    }
 
     if (!forceRefresh && (!online || !stale)) {
-      final cached = await _cache.readMovies(limit: pageSize);
-      return MovieResult(items: cached, fromCache: true, cachedAt: lastWritten);
+      try {
+        final cached = await _cache.readMovies(limit: pageSize);
+        return MovieResult(
+          items: cached,
+          fromCache: true,
+          cachedAt: lastWritten,
+        );
+      } catch (_) {
+        if (!online) rethrow;
+      }
     }
 
     try {
@@ -87,14 +102,30 @@ class MovieRepository {
       );
       return await _writeAndReturn(response);
     } on ApiNetworkException {
-      final cached = await _cache.readMovies(limit: pageSize);
-      return MovieResult(items: cached, fromCache: true, cachedAt: lastWritten);
+      try {
+        final cached = await _cache.readMovies(limit: pageSize);
+        return MovieResult(
+          items: cached,
+          fromCache: true,
+          cachedAt: lastWritten,
+        );
+      } catch (_) {
+        rethrow;
+      }
     }
   }
 
   Future<MovieResult> _writeAndReturn(PaginatedResponse<Movie> response) async {
     final now = DateTime.now();
-    await _cache.upsertMovies(response.data);
+    try {
+      await _cache.upsertMovies(response.data);
+    } catch (_) {
+      return MovieResult(
+        items: response.data,
+        fromCache: false,
+        cachedAt: null,
+      );
+    }
     return MovieResult(items: response.data, fromCache: false, cachedAt: now);
   }
 

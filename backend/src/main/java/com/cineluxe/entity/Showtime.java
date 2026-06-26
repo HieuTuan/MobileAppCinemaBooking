@@ -27,6 +27,8 @@ public class Showtime {
     private String roomId;
     private String cinemaName;
     private Instant startTime;
+    private Instant endTime;
+    private int basePrice;
 
     /** scheduled | cancelled | completed */
     private String status = STATUS_SCHEDULED;
@@ -38,11 +40,18 @@ public class Showtime {
 
     public Showtime(String id, String movieId, String roomId,
                     String cinemaName, Instant startTime) {
+        this(id, movieId, roomId, cinemaName, startTime, null, 120_000);
+    }
+
+    public Showtime(String id, String movieId, String roomId,
+                    String cinemaName, Instant startTime, Instant endTime, int basePrice) {
         this.id = id;
         this.movieId = movieId;
         this.roomId = roomId;
         this.cinemaName = cinemaName;
         this.startTime = startTime;
+        this.endTime = endTime;
+        this.basePrice = basePrice;
         this.status = STATUS_SCHEDULED;
         this.createdAt = Instant.now();
         this.updatedAt = Instant.now();
@@ -59,12 +68,18 @@ public class Showtime {
     public String getRoomId()      { return roomId; }
     public String getCinemaName()  { return cinemaName; }
     public Instant getStartTime()  { return startTime; }
+    public Instant getEndTime()    { return endTime; }
+    public int getBasePrice()      { return basePrice; }
     public String getStatus()      { return status; }
     public Instant getCreatedAt()  { return createdAt; }
     public Instant getUpdatedAt()  { return updatedAt; }
 
     // Setters
+    public void setMovieId(String movieId)       { this.movieId = movieId; }
+    public void setRoomId(String roomId)         { this.roomId = roomId; }
     public void setStatus(String status)         { this.status = status; }
     public void setStartTime(Instant startTime)  { this.startTime = startTime; }
+    public void setEndTime(Instant endTime)      { this.endTime = endTime; }
+    public void setBasePrice(int basePrice)      { this.basePrice = basePrice; }
     public void setCinemaName(String cinemaName) { this.cinemaName = cinemaName; }
 }

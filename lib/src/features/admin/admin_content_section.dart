@@ -99,16 +99,35 @@ class _AdminContentSectionState extends State<AdminContentSection> {
       rating: uiMovie.rating,
     );
     try {
-      if (isNew) {
-        await _api.adminCreateMovie(req);
-      } else {
-        await _api.adminUpdateMovie(uiMovie.id, req);
-      }
-      widget.store.saveMovie(uiMovie);
+      final saved = isNew
+          ? await _api.adminCreateMovie(req)
+          : await _api.adminUpdateMovie(uiMovie.id, req);
+      widget.store.saveMovie(_uiMovieFromApi(saved, fallback: uiMovie));
       _showSnack(isNew ? 'Đã thêm phim!' : 'Đã cập nhật phim!');
     } catch (e) {
       _showSnack('Lỗi: ${_errorMsg(e)}', isError: true);
     }
+  }
+
+  Movie _uiMovieFromApi(dynamic movie, {required Movie fallback}) {
+    return Movie(
+      id: movie.id as String,
+      title: movie.title as String,
+      description: movie.description as String,
+      genres: List<String>.from(movie.genres as List),
+      durationMinutes: movie.durationMinutes as int,
+      director: movie.director as String,
+      cast: List<String>.from(movie.cast as List),
+      posterUrl: movie.posterUrl as String,
+      trailerUrl: movie.trailerUrl as String,
+      rating: (movie.rating as num).toDouble(),
+      ageRating: movie.ageRating as String,
+      releaseDate: movie.releaseDate as DateTime,
+      status: movie.status == 'nowShowing'
+          ? MovieStatus.nowShowing
+          : MovieStatus.comingSoon,
+      heroColor: fallback.heroColor,
+    );
   }
 
   Future<void> _apiDeleteMovie(String movieId) async {
@@ -267,6 +286,36 @@ class _AdminContentSectionState extends State<AdminContentSection> {
       _showSnack(ready ? 'Phòng đã sẵn sàng' : 'Đã chuyển phòng sang bảo trì');
     } catch (e) {
       _showSnack('Lỗi cập nhật phòng: ${_errorMsg(e)}', isError: true);
+    }
+  }
+
+  Future<void> _apiCreateShowtime(ShowtimeScheduleRequest request) async {
+    try {
+      final saved = await _api.createAdminShowtime(request);
+      widget.store.saveShowtime(
+        Showtime(
+          id: saved.id,
+          movieId: saved.movieId,
+          roomId: saved.roomId,
+          startTime: saved.startTime,
+          endTime: saved.endTime,
+          basePrice: saved.basePrice,
+          status: saved.status,
+        ),
+      );
+      _showSnack('Đã tạo suất chiếu!');
+    } catch (e) {
+      _showSnack('Lỗi tạo suất chiếu: ${_errorMsg(e)}', isError: true);
+    }
+  }
+
+  Future<void> _apiDeleteShowtime(Showtime showtime) async {
+    try {
+      await _api.deleteAdminShowtime(showtime.id);
+      widget.store.deleteShowtime(showtime.id);
+      _showSnack('Đã huỷ suất chiếu!');
+    } catch (e) {
+      _showSnack('Lỗi huỷ suất chiếu: ${_errorMsg(e)}', isError: true);
     }
   }
 
@@ -554,7 +603,13 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                   Text(money(showtime.basePrice)),
                   IconButton(
                     tooltip: 'Xóa suất',
-                    onPressed: () => store.deleteShowtime(showtime.id),
+                    onPressed: () => _confirmDelete(
+                      context,
+                      title: 'Huỷ suất chiếu "${movie.title}"?',
+                      subtitle:
+                          'Suất chiếu sẽ được chuyển sang trạng thái cancelled trên backend.',
+                      onConfirm: () => _apiDeleteShowtime(showtime),
+                    ),
                     icon: const Icon(Icons.delete_outline_rounded),
                   ),
                 ],
@@ -2021,7 +2076,8 @@ class _AdminContentSectionState extends State<AdminContentSection> {
     var movieId = store.movies.first.id;
     var roomId = store.rooms.first.id;
     final price = TextEditingController(text: '120000');
-    final date = DateTime.now().add(const Duration(days: 1));
+    DateTime selectedDate = DateTime.now().add(const Duration(days: 1));
+    TimeOfDay selectedTime = const TimeOfDay(hour: 19, minute: 0);
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
@@ -2055,6 +2111,39 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(labelText: 'Giá vé cơ bản'),
               ),
+              const SizedBox(height: 10),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.event_rounded),
+                title: Text('Ngày: ${shortDate(selectedDate)}'),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: selectedDate,
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                  );
+                  if (picked != null) {
+                    setDialogState(() => selectedDate = picked);
+                  }
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.schedule_rounded),
+                title: Text(
+                  'Giờ: ${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}',
+                ),
+                onTap: () async {
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime: selectedTime,
+                  );
+                  if (picked != null) {
+                    setDialogState(() => selectedTime = picked);
+                  }
+                },
+              ),
             ],
           ),
         ),
@@ -2065,19 +2154,26 @@ class _AdminContentSectionState extends State<AdminContentSection> {
           ),
           FilledButton(
             onPressed: () {
-              final start = DateTime(date.year, date.month, date.day, 19);
-              store.saveShowtime(
-                Showtime(
-                  id: 'ST${compactId(DateTime.now())}',
+              final movie = store.movieById(movieId);
+              final start = DateTime(
+                selectedDate.year,
+                selectedDate.month,
+                selectedDate.day,
+                selectedTime.hour,
+                selectedTime.minute,
+              );
+              Navigator.pop(context);
+              _apiCreateShowtime(
+                ShowtimeScheduleRequest(
                   movieId: movieId,
                   roomId: roomId,
                   startTime: start,
-                  endTime: start.add(const Duration(minutes: 110)),
+                  endTime: start.add(
+                    Duration(minutes: movie.durationMinutes + 20),
+                  ),
                   basePrice: int.tryParse(price.text) ?? 120000,
-                  status: 'Đang mở',
                 ),
               );
-              Navigator.pop(context);
             },
             child: const Text('Tạo'),
           ),

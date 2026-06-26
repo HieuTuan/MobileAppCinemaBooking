@@ -614,8 +614,8 @@ class ShowtimeScheduleRequest {
   Map<String, dynamic> toJson() => {
     'movieId': movieId,
     'roomId': roomId,
-    'startTime': startTime.toIso8601String(),
-    'endTime': endTime.toIso8601String(),
+    'startTime': startTime.toUtc().toIso8601String(),
+    'endTime': endTime.toUtc().toIso8601String(),
     'basePrice': basePrice,
     'status': status,
   };

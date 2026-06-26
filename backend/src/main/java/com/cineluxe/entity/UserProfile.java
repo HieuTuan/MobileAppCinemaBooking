@@ -3,6 +3,8 @@ package com.cineluxe.entity;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "user_profiles",
@@ -24,6 +26,10 @@ public class UserProfile {
     private String memberRank;  // "silver", "gold", "platinum"
     private int points;
     private String role;        // "customer", "staff", "admin"
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_permissions", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "permission")
+    private List<String> permissions = new ArrayList<>();
     private boolean active;
     private Instant createdAt;
     private Instant updatedAt;
@@ -71,6 +77,7 @@ public class UserProfile {
     public String getMemberRank() { return memberRank; }
     public int getPoints() { return points; }
     public String getRole() { return role; }
+    public List<String> getPermissions() { return permissions; }
     public boolean isActive() { return active; }
     public Instant getCreatedAt() { return createdAt; }
 
@@ -83,5 +90,8 @@ public class UserProfile {
     public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
     public void setRole(String role) { this.role = role; }
+    public void setPermissions(List<String> permissions) {
+        this.permissions = permissions != null ? new ArrayList<>(permissions) : new ArrayList<>();
+    }
     public void setActive(boolean active) { this.active = active; }
 }

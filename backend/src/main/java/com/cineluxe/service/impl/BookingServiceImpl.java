@@ -46,6 +46,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -59,8 +60,6 @@ public class BookingServiceImpl implements BookingService {
 
     private static final Duration HOLD_DURATION = Duration.ofMinutes(10);
     private static final long DEFAULT_SEAT_PRICE = 120_000L;
-    private static final String VNPAY_SECRET = "cineluxe-demo-vnpay-secret-key-123456789";
-    private static final String API_BASE_URL = "http://10.0.2.2:8080";
 
     private final ShowtimeSeatRepository seatRepository;
     private final FoodComboRepository comboRepository;
@@ -69,6 +68,12 @@ public class BookingServiceImpl implements BookingService {
     private final NotificationService notificationService;
     private final UserProfileRepository userProfileRepository;
     private final AnalyticsService analyticsService;
+
+    @Value("${booking.vnpay-secret:cineluxe-demo-vnpay-secret-key-123456789}")
+    private String vnpaySecret;
+
+    @Value("${booking.api-base-url:http://10.0.2.2:8080}")
+    private String apiBaseUrl;
 
     private static long offlineSyncVersionCounter = 0L;
 
@@ -207,7 +212,7 @@ public class BookingServiceImpl implements BookingService {
                 booking.getStatus(),
                 booking.getPaymentStatus(),
                 total,
-                API_BASE_URL + "/api/payments/sandbox/" + bookingId
+                stripTrailingSlash(apiBaseUrl) + "/api/payments/sandbox/" + bookingId
                         + "?" + paymentParameters + "&signature=" + sign(paymentParameters),
                 booking.getPaymentExpiresAt());
     }
@@ -509,7 +514,7 @@ public class BookingServiceImpl implements BookingService {
 
     private String paymentReturnUrl(String bookingId, String responseCode, String transactionId) {
         var payload = callbackPayload(bookingId, responseCode, transactionId);
-        return API_BASE_URL + "/api/payments/vnpay/return?" + payload + "&signature=" + sign(payload);
+        return stripTrailingSlash(apiBaseUrl) + "/api/payments/vnpay/return?" + payload + "&signature=" + sign(payload);
     }
 
     private String callbackPayload(String bookingId, String responseCode, String transactionId) {
@@ -520,10 +525,16 @@ public class BookingServiceImpl implements BookingService {
     private String sign(String payload) {
         try {
             var mac = Mac.getInstance("HmacSHA512");
-            mac.init(new SecretKeySpec(VNPAY_SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA512"));
+            mac.init(new SecretKeySpec(vnpaySecret.getBytes(StandardCharsets.UTF_8), "HmacSHA512"));
             return HexFormat.of().formatHex(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception exception) {
             throw new IllegalStateException("Unable to sign VNPay parameters", exception);
         }
+    }
+
+    private String stripTrailingSlash(String value) {
+        return value != null && value.endsWith("/")
+                ? value.substring(0, value.length() - 1)
+                : value;
     }
 }
