@@ -68,6 +68,10 @@ class MovieRepository {
     int pageSize = 20,
     bool forceRefresh = false,
   }) async {
+    final hasFilter = (search != null && search.isNotEmpty) ||
+        (genre != null && genre.isNotEmpty) ||
+        (status != null && status.isNotEmpty);
+
     final online = _connectivity.isOnline;
     var stale = true;
     DateTime? lastWritten;
@@ -80,16 +84,8 @@ class MovieRepository {
     }
 
     if (!forceRefresh && (!online || !stale)) {
-      try {
-        final cached = await _cache.readMovies(limit: pageSize);
-        return MovieResult(
-          items: cached,
-          fromCache: true,
-          cachedAt: lastWritten,
-        );
-      } catch (_) {
-        if (!online) rethrow;
-      }
+      final cached = await _cache.readMovies(limit: pageSize);
+      return MovieResult(items: cached, fromCache: true, cachedAt: lastWritten);
     }
 
     try {
@@ -100,7 +96,15 @@ class MovieRepository {
         page: page,
         pageSize: pageSize,
       );
-      return await _writeAndReturn(response);
+      // Chỉ cache khi không có filter (cache = toàn bộ phim)
+      if (!hasFilter) {
+        return await _writeAndReturn(response);
+      }
+      return MovieResult(
+        items: response.data,
+        fromCache: false,
+        cachedAt: DateTime.now(),
+      );
     } on ApiNetworkException {
       try {
         final cached = await _cache.readMovies(limit: pageSize);

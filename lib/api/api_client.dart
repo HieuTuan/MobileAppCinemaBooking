@@ -421,20 +421,29 @@ class APIClient {
       cancelToken: cancelToken,
     );
 
-    // Unwrap our ApiResponse wrapper: {"status":200,"data":[...]}
+    // Backend trả ApiResponse { data: PagedMovieResponse }
+    // PagedMovieResponse: { data:[...], page, pageSize, totalItems, totalPages, hasNext, hasPrevious }
     final raw = response.data!;
-    final List<dynamic> items = _extractList(raw);
+    final pagedRaw = raw.containsKey('data') && raw['data'] is Map<String, dynamic>
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+
+    final List<dynamic> items = pagedRaw.containsKey('data') && pagedRaw['data'] is List
+        ? pagedRaw['data'] as List<dynamic>
+        : _extractList(raw);
+
     final movies = items
         .map((json) => Movie.fromJson(json as Map<String, dynamic>))
         .toList();
+
     return PaginatedResponse<Movie>(
       data: movies,
-      page: page,
-      pageSize: pageSize,
-      totalItems: movies.length,
-      totalPages: 1,
-      hasNext: false,
-      hasPrevious: false,
+      page: (pagedRaw['page'] as int?) ?? page,
+      pageSize: (pagedRaw['pageSize'] as int?) ?? pageSize,
+      totalItems: (pagedRaw['totalItems'] as int?) ?? movies.length,
+      totalPages: (pagedRaw['totalPages'] as int?) ?? 1,
+      hasNext: (pagedRaw['hasNext'] as bool?) ?? false,
+      hasPrevious: (pagedRaw['hasPrevious'] as bool?) ?? false,
     );
   }
 

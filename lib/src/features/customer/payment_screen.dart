@@ -149,6 +149,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
           holdId: widget.hold.holdId,
           combos: widget.comboSelections,
           userId: widget.store.currentUser?.id,
+          // Bước 4 — backend re-verify tuổi khi phim T18 (Req R7.5)
+          movieAgeRating: widget.movie.ageRating == 'T18' ? 'T18' : null,
         ),
       );
 
@@ -196,18 +198,36 @@ class _PaymentScreenState extends State<PaymentScreen> {
       if (!mounted) return;
       setState(() => _processing = false);
       if (error.error is ApiAuthorizationException) {
+        // Lỗi 2 — Profile thiếu ngày sinh hoặc dưới 18 tuổi → 403
+        // Hiển thị dialog rõ ràng với tùy chọn cập nhật hồ sơ
         await showDialog<void>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Xác minh độ tuổi yêu cầu'),
+            icon: const Icon(Icons.no_adult_content_rounded,
+                color: Colors.deepOrange, size: 40),
+            title: const Text(
+              'Xác minh độ tuổi thất bại',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
             content: const Text(
-              'Phim này yêu cầu xác minh độ tuổi 18+. '
-              'Vui lòng cập nhật ngày sinh trong hồ sơ.',
+              'Phim này yêu cầu người xem từ 18 tuổi trở lên.\n\n'
+              'Hồ sơ của bạn chưa có ngày sinh hoặc chưa đủ 18 tuổi. '
+              'Vui lòng cập nhật ngày sinh trong hồ sơ để tiếp tục.',
+              style: TextStyle(height: 1.5),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Đóng'),
+                child: const Text('Để sau'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  // Quay về trang hồ sơ để user cập nhật ngày sinh
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                },
+                style: FilledButton.styleFrom(backgroundColor: Colors.black),
+                child: const Text('Cập nhật hồ sơ'),
               ),
             ],
           ),

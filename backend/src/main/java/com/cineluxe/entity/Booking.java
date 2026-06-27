@@ -148,4 +148,10 @@ public class Booking {
   public void updateShowtimeDateTime(Instant showtimeDateTime) {
     this.showtimeDateTime = showtimeDateTime;
   }
+
+  /** Cập nhật tên rạp và tên phòng từ Showtime/Room thực tế (R5 — Req 9.1). */
+  public void updateCinemaInfo(String cinemaName, String roomName) {
+    this.cinemaName = cinemaName;
+    this.roomName = roomName;
+  }
 }
