@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -132,6 +133,12 @@ class _AuthScreenState extends State<AuthScreen>
   // Gọi API: POST /api/auth/google  (xem auth_service.dart)
   Future<void> _doGoogleSignIn() async {
     if (_submitting) return;
+    if (kIsWeb) {
+      _setError(
+        'Đăng nhập Google chưa được bật cho bản web local. Vui lòng dùng email/mật khẩu.',
+      );
+      return;
+    }
     setState(() {
       _submitting = true;
       _errorMsg = null;

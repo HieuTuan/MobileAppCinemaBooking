@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../api/api_client.dart';
+import '../../../models/admin_models.dart';
 import '../../core/formatters.dart';
 import '../../models/app_models.dart';
 import '../../shared/widgets/glass_card.dart';
@@ -177,44 +179,90 @@ class AdminSystemSection extends StatelessWidget {
   void _bannerDialog(BuildContext context) {
     final title = TextEditingController(text: 'Thông báo mới');
     final message = TextEditingController(text: 'Nội dung thông báo trên app.');
+    var sending = false;
     showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Thêm banner/thông báo'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: title,
-              decoration: const InputDecoration(labelText: 'Tiêu đề'),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Thêm banner/thông báo'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: title,
+                decoration: const InputDecoration(labelText: 'Tiêu đề'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: message,
+                decoration: const InputDecoration(labelText: 'Nội dung'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: sending ? null : () => Navigator.pop(context),
+              child: const Text('Hủy'),
             ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: message,
-              decoration: const InputDecoration(labelText: 'Nội dung'),
+            FilledButton(
+              onPressed: sending
+                  ? null
+                  : () async {
+                      final nextTitle = title.text.trim();
+                      final nextMessage = message.text.trim();
+                      if (nextTitle.isEmpty || nextMessage.isEmpty) {
+                        _showSnack(
+                          context,
+                          'Vui lòng nhập tiêu đề và nội dung',
+                          isError: true,
+                        );
+                        return;
+                      }
+                      setDialogState(() => sending = true);
+                      try {
+                        final delivered = await APIClient()
+                            .sendMarketingNotification(
+                              title: nextTitle,
+                              body: nextMessage,
+                            );
+                        store.saveBanner(
+                          AppBanner(
+                            id: 'BN${compactId(DateTime.now())}',
+                            title: nextTitle,
+                            message: nextMessage,
+                            active: true,
+                          ),
+                        );
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          _showSnack(
+                            context,
+                            'Đã gửi thông báo tới $delivered khách hàng',
+                          );
+                        }
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        _showSnack(
+                          context,
+                          'Gửi thông báo thất bại: $e',
+                          isError: true,
+                        );
+                      } finally {
+                        if (context.mounted) {
+                          setDialogState(() => sending = false);
+                        }
+                      }
+                    },
+              child: sending
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Gửi'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          FilledButton(
-            onPressed: () {
-              store.saveBanner(
-                AppBanner(
-                  id: 'BN${compactId(DateTime.now())}',
-                  title: title.text.trim(),
-                  message: message.text.trim(),
-                  active: true,
-                ),
-              );
-              Navigator.pop(context);
-            },
-            child: const Text('Lưu'),
-          ),
-        ],
       ),
     );
   }
@@ -223,50 +271,116 @@ class AdminSystemSection extends StatelessWidget {
     final terminal = TextEditingController(text: store.vnpayConfig.terminalId);
     final secret = TextEditingController(text: store.vnpayConfig.secretKey);
     final env = TextEditingController(text: store.vnpayConfig.environment);
+    final returnUrl = TextEditingController();
+    var enabled = true;
+    var saving = false;
     showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cấu hình VNPay'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: terminal,
-              decoration: const InputDecoration(labelText: 'Terminal ID'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: secret,
-              decoration: const InputDecoration(labelText: 'Secret Key'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: env,
-              decoration: const InputDecoration(
-                labelText: 'Môi trường sandbox/production',
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Cấu hình VNPay'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: terminal,
+                decoration: const InputDecoration(labelText: 'Terminal ID'),
               ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: secret,
+                decoration: const InputDecoration(labelText: 'Secret Key'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: env,
+                decoration: const InputDecoration(
+                  labelText: 'Môi trường sandbox/production',
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: returnUrl,
+                decoration: const InputDecoration(
+                  labelText: 'Return URL (tuỳ chọn)',
+                ),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: enabled,
+                title: const Text('Bật thanh toán VNPay'),
+                onChanged: (value) => setDialogState(() => enabled = value),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(context),
+              child: const Text('Hủy'),
+            ),
+            FilledButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      setDialogState(() => saving = true);
+                      try {
+                        final saved = await APIClient().updatePaymentSettings(
+                          UpdatePaymentSettingsRequest(
+                            terminalId: terminal.text.trim(),
+                            secretKey: secret.text.trim(),
+                            environment: env.text.trim(),
+                            returnUrl: returnUrl.text.trim(),
+                            enabled: enabled,
+                          ),
+                        );
+                        store.updateVnpayConfig(
+                          VnpayConfig(
+                            terminalId: saved.terminalId,
+                            secretKey: saved.secretKey,
+                            environment: saved.environment,
+                          ),
+                        );
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          _showSnack(context, 'Đã lưu cấu hình VNPay');
+                        }
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        _showSnack(
+                          context,
+                          'Lưu cấu hình thất bại: $e',
+                          isError: true,
+                        );
+                      } finally {
+                        if (context.mounted) {
+                          setDialogState(() => saving = false);
+                        }
+                      }
+                    },
+              child: saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Lưu'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          FilledButton(
-            onPressed: () {
-              store.updateVnpayConfig(
-                VnpayConfig(
-                  terminalId: terminal.text.trim(),
-                  secretKey: secret.text.trim(),
-                  environment: env.text.trim(),
-                ),
-              );
-              Navigator.pop(context);
-            },
-            child: const Text('Lưu'),
-          ),
-        ],
+      ),
+    );
+  }
+
+  void _showSnack(
+    BuildContext context,
+    String message, {
+    bool isError = false,
+  }) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.redAccent : null,
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }

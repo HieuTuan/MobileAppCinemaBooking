@@ -608,22 +608,22 @@ class APIClient {
       queryParameters['date'] = dateString;
     }
 
-    final response = await get<List<dynamic>>(
+    final response = await get<Map<String, dynamic>>(
       '/api/showtimes',
       queryParameters: queryParameters,
       cancelToken: cancelToken,
     );
 
-    return (response.data as List<dynamic>)
-        .map((json) => Showtime.fromJson(json as Map<String, dynamic>))
-        .toList();
+    return _extractList(
+      response.data!,
+    ).map((json) => Showtime.fromJson(json as Map<String, dynamic>)).toList();
   }
 
   Future<SeatMap> getSeats(String showtimeId) async {
     final response = await get<Map<String, dynamic>>(
       '/api/showtimes/$showtimeId/seats',
     );
-    return SeatMap.fromJson(response.data!);
+    return SeatMap.fromJson(_extractDataMap(response.data!));
   }
 
   Future<HoldResponse> holdSeats(
@@ -1225,7 +1225,7 @@ class APIClient {
       '/api/admin/dashboard/metrics',
       cancelToken: cancelToken,
     );
-    return DashboardMetrics.fromJson(response.data!);
+    return DashboardMetrics.fromJson(_extractDataMap(response.data!));
   }
 
   // ============================================================================
@@ -1273,7 +1273,7 @@ class APIClient {
       },
       cancelToken: cancelToken,
     );
-    return RevenueReport.fromJson(response.data!);
+    return RevenueReport.fromJson(_extractDataMap(response.data!));
   }
 
   // ============================================================================
@@ -1322,7 +1322,7 @@ class APIClient {
       },
       cancelToken: cancelToken,
     );
-    return BookingReport.fromJson(response.data!);
+    return BookingReport.fromJson(_extractDataMap(response.data!));
   }
 
   // ============================================================================
@@ -1456,7 +1456,7 @@ class APIClient {
       data: request.toJson(),
       cancelToken: cancelToken,
     );
-    return Showtime.fromJson(response.data!);
+    return Showtime.fromJson(_extractDataMap(response.data!));
   }
 
   Future<Showtime> updateAdminShowtime(
@@ -1469,7 +1469,7 @@ class APIClient {
       data: request.toJson(),
       cancelToken: cancelToken,
     );
-    return Showtime.fromJson(response.data!);
+    return Showtime.fromJson(_extractDataMap(response.data!));
   }
 
   Future<void> deleteAdminShowtime(
@@ -1495,7 +1495,7 @@ class APIClient {
       cancelToken: cancelToken,
     );
     return PaginatedResponse<AdminUser>.fromJson(
-      response.data!,
+      _extractDataMap(response.data!),
       (json) => AdminUser.fromJson(json as Map<String, dynamic>),
     );
   }
@@ -1509,7 +1509,7 @@ class APIClient {
       data: request.toJson(),
       cancelToken: cancelToken,
     );
-    return StaffAccountCreationResult.fromJson(response.data!);
+    return StaffAccountCreationResult.fromJson(_extractDataMap(response.data!));
   }
 
   Future<AdminUser> updateAdminUserStatus(
@@ -1522,7 +1522,7 @@ class APIClient {
       data: {'active': active},
       cancelToken: cancelToken,
     );
-    return AdminUser.fromJson(response.data!);
+    return AdminUser.fromJson(_extractDataMap(response.data!));
   }
 
   Future<AdminUser> updateAdminUserPermissions(
@@ -1535,7 +1535,7 @@ class APIClient {
       data: {'permissions': permissions},
       cancelToken: cancelToken,
     );
-    return AdminUser.fromJson(response.data!);
+    return AdminUser.fromJson(_extractDataMap(response.data!));
   }
 
   Future<void> deleteAdminUser(
@@ -1614,7 +1614,7 @@ class APIClient {
       '/api/admin/settings/payment',
       cancelToken: cancelToken,
     );
-    return PaymentSettings.fromJson(response.data!);
+    return PaymentSettings.fromJson(_extractDataMap(response.data!));
   }
 
   Future<PaymentSettings> updatePaymentSettings(
@@ -1626,6 +1626,21 @@ class APIClient {
       data: request.toJson(),
       cancelToken: cancelToken,
     );
-    return PaymentSettings.fromJson(response.data!);
+    return PaymentSettings.fromJson(_extractDataMap(response.data!));
+  }
+
+  Future<int> sendMarketingNotification({
+    required String title,
+    required String body,
+    String targetRole = 'customer',
+    CancelToken? cancelToken,
+  }) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/admin/notifications/promotions',
+      data: {'title': title, 'body': body, 'targetRole': targetRole},
+      cancelToken: cancelToken,
+    );
+    final data = _extractDataMap(response.data!);
+    return (data['deliveredCount'] as num?)?.toInt() ?? 0;
   }
 }

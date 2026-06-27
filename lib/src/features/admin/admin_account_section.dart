@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../api/api_client.dart';
+import '../../../models/admin_models.dart';
 import '../../core/labels.dart';
 import '../../models/app_models.dart';
 import '../../shared/widgets/glass_card.dart';
@@ -16,6 +18,9 @@ class AdminAccountSection extends StatefulWidget {
 
 class _AdminAccountSectionState extends State<AdminAccountSection> {
   final _search = TextEditingController();
+  final _api = APIClient();
+  bool _loading = false;
+  List<AppUser>? _remoteUsers;
 
   static const _staffPermissions = [
     'Soát vé',
@@ -26,9 +31,31 @@ class _AdminAccountSectionState extends State<AdminAccountSection> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadUsers();
+  }
+
+  @override
   void dispose() {
     _search.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadUsers() async {
+    setState(() => _loading = true);
+    try {
+      final page = await _api.getAdminUsers(pageSize: 100);
+      if (mounted) {
+        setState(() {
+          _remoteUsers = page.data.map(_appUserFromAdmin).toList();
+        });
+      }
+    } catch (_) {
+      // Keep local fallback data when backend is unavailable.
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -53,6 +80,11 @@ class _AdminAccountSectionState extends State<AdminAccountSection> {
             label: const Text('Tạo Staff'),
           ),
         ),
+        if (_loading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(child: CircularProgressIndicator()),
+          ),
         ...users.map(
           (user) => GlassCard(
             margin: const EdgeInsets.only(bottom: 10),
@@ -79,18 +111,12 @@ class _AdminAccountSectionState extends State<AdminAccountSection> {
                     value: user.isActive,
                     onChanged: user.role == UserRole.admin
                         ? null
-                        : (_) {
-                            widget.store.toggleUserStatus(user.id);
-                            setState(() {});
-                          },
+                        : (value) => _setUserActive(user, value),
                   ),
                   if (user.role != UserRole.admin)
                     IconButton(
                       tooltip: 'Xóa tài khoản',
-                      onPressed: () {
-                        widget.store.deleteUser(user.id);
-                        setState(() {});
-                      },
+                      onPressed: () => _deleteUser(user),
                       icon: const Icon(Icons.delete_outline_rounded),
                     ),
                 ],
@@ -104,12 +130,70 @@ class _AdminAccountSectionState extends State<AdminAccountSection> {
 
   List<AppUser> _filteredUsers() {
     final query = _search.text.trim().toLowerCase();
-    return widget.store.users.where((user) {
+    final source = _remoteUsers ?? widget.store.users;
+    return source.where((user) {
       return query.isEmpty ||
           user.fullName.toLowerCase().contains(query) ||
           user.email.toLowerCase().contains(query) ||
           user.phone.toLowerCase().contains(query);
     }).toList();
+  }
+
+  AppUser _appUserFromAdmin(AdminUser user) {
+    return AppUser(
+      id: user.userId,
+      fullName: user.fullName,
+      email: user.email,
+      password: '',
+      phone: '',
+      role: switch (user.role.toLowerCase()) {
+        'admin' => UserRole.admin,
+        'staff' => UserRole.staff,
+        _ => UserRole.customer,
+      },
+      isActive: user.active,
+      permissions: user.permissions,
+    );
+  }
+
+  void _replaceRemoteUser(AppUser next) {
+    setState(() {
+      final current = _remoteUsers ?? widget.store.users;
+      _remoteUsers = current
+          .map((user) => user.id == next.id ? next : user)
+          .toList();
+    });
+  }
+
+  Future<void> _setUserActive(AppUser user, bool active) async {
+    try {
+      final updated = await _api.updateAdminUserStatus(user.id, active);
+      _replaceRemoteUser(_appUserFromAdmin(updated));
+    } catch (e) {
+      _showSnack('Cập nhật trạng thái thất bại: $e', isError: true);
+    }
+  }
+
+  Future<void> _deleteUser(AppUser user) async {
+    try {
+      await _api.deleteAdminUser(user.id);
+      setState(() {
+        final current = _remoteUsers ?? widget.store.users;
+        _remoteUsers = current.where((item) => item.id != user.id).toList();
+      });
+    } catch (e) {
+      _showSnack('Xóa tài khoản thất bại: $e', isError: true);
+    }
+  }
+
+  void _showSnack(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.redAccent : null,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   IconData _roleIcon(UserRole role) {
@@ -147,10 +231,31 @@ class _AdminAccountSectionState extends State<AdminAccountSection> {
             child: const Text('Hủy'),
           ),
           FilledButton(
-            onPressed: () {
-              widget.store.addStaff(name.text.trim(), email.text.trim());
-              Navigator.pop(context);
-              setState(() {});
+            onPressed: () async {
+              try {
+                final created = await _api.createAdminUser(
+                  CreateStaffUserRequest(
+                    fullName: name.text.trim(),
+                    email: email.text.trim(),
+                    role: 'staff',
+                    permissions: _staffPermissions.take(3).toList(),
+                  ),
+                );
+                if (!context.mounted) return;
+                Navigator.pop(context);
+                setState(() {
+                  final next = _appUserFromAdmin(created.user);
+                  _remoteUsers = [
+                    next,
+                    ...(_remoteUsers ?? widget.store.users),
+                  ];
+                });
+                _showSnack(
+                  'Đã tạo Staff. Mật khẩu tạm: ${created.temporaryPassword}',
+                );
+              } catch (e) {
+                _showSnack('Tạo Staff thất bại: $e', isError: true);
+              }
             },
             child: const Text('Tạo'),
           ),
@@ -191,10 +296,19 @@ class _AdminAccountSectionState extends State<AdminAccountSection> {
               child: const Text('Hủy'),
             ),
             FilledButton(
-              onPressed: () {
-                widget.store.updateUserPermissions(user.id, selected.toList());
-                Navigator.pop(context);
-                setState(() {});
+              onPressed: () async {
+                try {
+                  final updated = await _api.updateAdminUserPermissions(
+                    user.id,
+                    selected.toList(),
+                  );
+                  if (!context.mounted) return;
+                  Navigator.pop(context);
+                  _replaceRemoteUser(_appUserFromAdmin(updated));
+                  _showSnack('Đã lưu quyền');
+                } catch (e) {
+                  _showSnack('Lưu quyền thất bại: $e', isError: true);
+                }
               },
               child: const Text('Lưu quyền'),
             ),
