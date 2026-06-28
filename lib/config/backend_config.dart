@@ -8,7 +8,7 @@ class BackendConfig {
   );
   static const String _devServerPort = String.fromEnvironment(
     'DEV_SERVER_PORT',
-    defaultValue: '8080',
+    defaultValue: '8081',
   );
 
   static String get restBaseUrl {
@@ -25,17 +25,17 @@ class BackendConfig {
     }
 
     // 3️⃣ Web dev server
-    if (kIsWeb) return 'http://localhost:8080';
+    if (kIsWeb) return 'http://localhost:8081';
 
     // 4️⃣ Android Emulator: 10.0.2.2 is the special alias that maps to the
     //    host machine's 127.0.0.1. Using 127.0.0.1 inside the emulator
     //    would point to the emulator VM itself, not the PC running the backend.
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080';
+      return 'http://10.0.2.2:8081';
     }
 
     // 5️⃣ iOS Simulator / macOS / desktop
-    return 'http://localhost:8080';
+    return 'http://localhost:8081';
   }
 
   static String get wsShowtimesBaseUrl {

@@ -25,7 +25,9 @@ import com.cineluxe.entity.ShowtimeSeat;
 import com.cineluxe.exception.ApiException;
 import com.cineluxe.repository.BookingRepository;
 import com.cineluxe.repository.FoodComboRepository;
+import com.cineluxe.repository.RoomRepository;
 import com.cineluxe.repository.ShowtimeSeatRepository;
+import com.cineluxe.repository.ShowtimeRepository;
 import com.cineluxe.repository.UserProfileRepository;
 import com.cineluxe.service.AnalyticsService;
 import com.cineluxe.service.BookingService;
@@ -64,6 +66,8 @@ public class BookingServiceImpl implements BookingService {
     private final ShowtimeSeatRepository seatRepository;
     private final FoodComboRepository comboRepository;
     private final BookingRepository bookingRepository;
+    private final ShowtimeRepository showtimeRepository;
+    private final RoomRepository roomRepository;
     private final SeatWebSocketHandler webSocketHandler;
     private final NotificationService notificationService;
     private final UserProfileRepository userProfileRepository;
@@ -156,12 +160,21 @@ public class BookingServiceImpl implements BookingService {
         if ("T18".equals(request.movieAgeRating())) {
             var profile = userProfileRepository.findById(userId).orElse(null);
             if (profile == null || profile.getBirthdate() == null) {
+                // Bước 5: Log mọi lần thử T18 (audit compliance)
+                log.info("T18_AGE_CHECK userId={} movieAgeRating=T18 birthdate=null result=DENIED reason=no_birthdate",
+                        anonymiseUserId(userId));
                 throw new ApiException(HttpStatus.FORBIDDEN, "Age verification required for this movie");
             }
             int age = Period.between(profile.getBirthdate(), LocalDate.now()).getYears();
             if (age < 18) {
+                // Bước 5: Log thử T18 thất bại — dưới 18 tuổi
+                log.info("T18_AGE_CHECK userId={} movieAgeRating=T18 age={} result=DENIED reason=underage",
+                        anonymiseUserId(userId), age);
                 throw new ApiException(HttpStatus.FORBIDDEN, "Age verification required for this movie");
             }
+            // Bước 5: Log thử T18 thành công
+            log.info("T18_AGE_CHECK userId={} movieAgeRating=T18 age={} result=APPROVED",
+                    anonymiseUserId(userId), age);
         }
         var seats = seatRepository.findByHoldId(request.holdId());
         if (seats.isEmpty() || seats.stream().anyMatch(
@@ -172,6 +185,11 @@ public class BookingServiceImpl implements BookingService {
         var selectedCombos = new ArrayList<FoodCombo>();
         long comboTotal = 0;
         for (var selection : comboSelections) {
+            // Validate quantity > 0 (Req R8 lỗi & ngoại lệ)
+            if (selection.quantity() <= 0) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid food combo selection");
+            }
+            // ComboId invalid hoặc inactive → 400 "Invalid food combo selection"
             FoodCombo combo = comboRepository.findById(selection.comboId())
                     .filter(FoodCombo::isActive)
                     .orElseThrow(() -> new ApiException(
@@ -189,15 +207,35 @@ public class BookingServiceImpl implements BookingService {
         }
         var bookingId = "BK-" + UUID.randomUUID();
         var total = seats.size() * DEFAULT_SEAT_PRICE + comboTotal;
-        var booking = bookingRepository.save(new Booking(
+
+        // R5: Lấy thông tin showtime và phòng thực tế (không hardcode) — Req 9.1
+        var showtimeId = seats.get(0).getShowtimeId();
+        var showtime = showtimeRepository.findById(showtimeId).orElse(null);
+        var room = (showtime != null)
+                ? roomRepository.findById(showtime.getRoomId()).orElse(null)
+                : null;
+        var showtimeDateTime = (showtime != null && showtime.getStartTime() != null)
+                ? showtime.getStartTime()
+                : Instant.now().plusSeconds(4 * 60 * 60); // fallback: +4 giờ
+        var cinemaName = (showtime != null && showtime.getCinemaName() != null)
+                ? showtime.getCinemaName()
+                : "CineLuxe Tràng Tiền";
+        var roomName = (room != null && room.getName() != null)
+                ? room.getName()
+                : "Phòng chiếu";
+
+        var booking = new Booking(
                 bookingId,
                 userId,
-                seats.get(0).getShowtimeId(),
+                showtimeId,
                 total,
                 seats.stream().map(ShowtimeSeat::getCode).toList(),
                 comboSelections.stream()
                         .map(selection -> selection.comboId() + ":" + selection.quantity())
-                        .toList()));
+                        .toList());
+        booking.updateShowtimeDateTime(showtimeDateTime);
+        booking.updateCinemaInfo(cinemaName, roomName);
+        bookingRepository.save(booking);
         seats.forEach(ShowtimeSeat::book);
         seatRepository.saveAll(seats);
         comboRepository.saveAll(selectedCombos);
@@ -530,11 +568,5 @@ public class BookingServiceImpl implements BookingService {
         } catch (Exception exception) {
             throw new IllegalStateException("Unable to sign VNPay parameters", exception);
         }
-    }
-
-    private String stripTrailingSlash(String value) {
-        return value != null && value.endsWith("/")
-                ? value.substring(0, value.length() - 1)
-                : value;
     }
 }

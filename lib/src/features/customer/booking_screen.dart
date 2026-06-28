@@ -172,6 +172,7 @@ class _BookingScreenState extends State<BookingScreen> {
         room: room,
         total: total,
         loading: _holdingSeats,
+        selectedSeats: _selectedSeats,
         onContinue: _holdAndContinue,
       ),
       body: ListView(
@@ -183,7 +184,11 @@ class _BookingScreenState extends State<BookingScreen> {
             error: _loadError,
             onRetry: _initializeRealtimeSeats,
           ),
-          const SizedBox(height: 18),
+          _SeatCounter(
+            selected: _selectedSeats.length,
+            maxSeats: 8,
+          ),
+          const SizedBox(height: 10),
           const _ScreenCurve(),
           const SizedBox(height: 10),
           if (_loadingSeats)
@@ -317,6 +322,75 @@ class _BookingScreenState extends State<BookingScreen> {
     return cinema.address.contains('Ã') || cinema.address.contains('Æ')
         ? '24 Hai Bà Trưng, Hoàn Kiếm, Hà Nội'
         : '${cinema.address}, ${cinema.city}';
+  }
+}
+
+/// Widget hiển thị counter số ghế đã chọn (R5 Bước 1 — tối đa 8 ghế).
+class _SeatCounter extends StatelessWidget {
+  const _SeatCounter({required this.selected, required this.maxSeats});
+
+  final int selected;
+  final int maxSeats;
+
+  @override
+  Widget build(BuildContext context) {
+    if (selected == 0) return const SizedBox.shrink();
+    final ratio = selected / maxSeats;
+    final color = ratio >= 1.0
+        ? const Color(0xFFE53935) // đỏ khi đạt max
+        : ratio >= 0.75
+            ? const Color(0xFFF57C00) // cam khi gần max
+            : const Color(0xFF388E3C); // xanh bình thường
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.event_seat_rounded, size: 15, color: color),
+              const SizedBox(width: 6),
+              Text(
+                'Đã chọn $selected / $maxSeats ghế',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+              if (selected >= maxSeats) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE53935),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Text(
+                    'Đã đủ 8 ghế',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: ratio.clamp(0.0, 1.0),
+              minHeight: 5,
+              backgroundColor: AppColors.pearl,
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -702,6 +776,7 @@ class _SeatCheckoutBar extends StatelessWidget {
     required this.room,
     required this.total,
     required this.loading,
+    required this.selectedSeats,
     required this.onContinue,
   });
 
@@ -710,6 +785,7 @@ class _SeatCheckoutBar extends StatelessWidget {
   final Room room;
   final int total;
   final bool loading;
+  final List<String> selectedSeats;
   final VoidCallback onContinue;
 
   @override
@@ -779,7 +855,40 @@ class _SeatCheckoutBar extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 10),
+            // Hiển thị ghế đã chọn (R5 bước 1)
+            if (selectedSeats.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.event_seat_rounded,
+                      size: 16,
+                      color: AppColors.muted,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Ghế: ${selectedSeats.join(', ')}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.muted,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${selectedSeats.length}/8',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             SizedBox(
               height: 58,
               width: double.infinity,
@@ -805,7 +914,11 @@ class _SeatCheckoutBar extends StatelessWidget {
                           color: Colors.white,
                         ),
                       )
-                    : const Text('Tiếp tục'),
+                    : Text(
+                        selectedSeats.isEmpty
+                            ? 'Chọn ghế để tiếp tục'
+                            : 'Tiếp tục  →  Chọn Combo',
+                      ),
               ),
             ),
           ],

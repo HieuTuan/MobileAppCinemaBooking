@@ -97,11 +97,16 @@ class CreateBookingRequest {
     required this.holdId,
     required this.combos,
     this.userId,
+    this.movieAgeRating,
   });
 
   final String holdId;
   final List<ComboSelection> combos;
   final String? userId;
+
+  /// Bước 4 — backend re-verify khi "T18": truyền ageRating để backend
+  /// biết cần kiểm tra ngày sinh trong profile (Req R7.5, R7.6).
+  final String? movieAgeRating;
 
   factory CreateBookingRequest.fromJson(Map<String, dynamic> json) =>
       _$CreateBookingRequestFromJson(json);
