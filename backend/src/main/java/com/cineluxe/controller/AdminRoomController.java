@@ -100,6 +100,50 @@ public class AdminRoomController {
         return ApiResponse.success(toResponse(room), "Cập nhật trạng thái phòng thành công");
     }
 
+    @PatchMapping("/{roomId}/seats/{seatCode}/type")
+    @Transactional
+    @Operation(summary = "Cập nhật loại ghế trong phòng")
+    public ResponseEntity<ApiResponse<RoomResponse>> updateSeatType(
+            @PathVariable String roomId,
+            @PathVariable String seatCode,
+            @RequestBody Map<String, String> body) {
+        return updateSeatTypeByCode(roomId, seatCode, body.get("seatType"));
+    }
+
+    @PatchMapping("/{roomId}/seats/type")
+    @Transactional
+    @Operation(summary = "Cập nhật loại ghế trong phòng bằng body")
+    public ResponseEntity<ApiResponse<RoomResponse>> updateSeatTypeFromBody(
+            @PathVariable String roomId,
+            @RequestBody Map<String, String> body) {
+        return updateSeatTypeByCode(roomId, body.get("seatCode"), body.get("seatType"));
+    }
+
+    private ResponseEntity<ApiResponse<RoomResponse>> updateSeatTypeByCode(
+            String roomId,
+            String seatCode,
+            String rawSeatType) {
+        var room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND,
+                        "Không tìm thấy phòng chiếu với id: " + roomId));
+        if (seatCode == null || seatCode.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "seatCode không được để trống");
+        }
+        var seatType = normalize(rawSeatType);
+        if (!ALLOWED_SEAT_TYPES.contains(seatType)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "seatType chỉ được là standard, vip hoặc couple");
+        }
+        var seat = roomSeatRepository.findByRoomIdAndSeatCode(
+                        roomId,
+                        seatCode.toUpperCase())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND,
+                        "Không tìm thấy ghế " + seatCode + " trong phòng"));
+        seat.setSeatType(seatType);
+        roomSeatRepository.save(seat);
+        return ApiResponse.success(toResponse(room), "Cập nhật loại ghế thành công");
+    }
+
     private void validateLayout(CreateRoomRequest request) {
         if (request.capacity() != request.seatLayout().size()) {
             throw new ApiException(HttpStatus.BAD_REQUEST,

@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../api/api_client.dart';
+import '../../../models/admin_models.dart' as admin_models;
 import '../../../models/admin_models.dart'
     hide Room; // app_models.dart Room is used instead
 import '../../core/app_theme.dart';
@@ -32,6 +33,7 @@ class _AdminContentSectionState extends State<AdminContentSection> {
   bool _combosLoading = false;
   List<AdminActor> _actors = [];
   bool _actorsLoading = false;
+  List<admin_models.Room> _adminRooms = [];
   bool _roomsLoading = false;
 
   @override
@@ -71,6 +73,7 @@ class _AdminContentSectionState extends State<AdminContentSection> {
     try {
       final list = await _api.adminGetRooms();
       if (mounted) {
+        setState(() => _adminRooms = list);
         widget.store.replaceRooms(list.map(_roomFromAdmin).toList());
       }
     } catch (_) {
@@ -255,14 +258,14 @@ class _AdminContentSectionState extends State<AdminContentSection> {
 
   String _errorMsg(Object e) => e.toString().replaceFirst('Exception: ', '');
 
-  Room _roomFromAdmin(dynamic room) {
+  Room _roomFromAdmin(admin_models.Room room) {
     return Room(
-      id: room.id as String,
-      cinemaId: room.theaterId as String,
-      name: room.name as String,
-      capacity: room.totalSeats as int,
-      screenType: room.screenType as String,
-      status: (room.status as String).toLowerCase() == 'maintenance'
+      id: room.id,
+      cinemaId: room.theaterId,
+      name: room.name,
+      capacity: room.totalSeats,
+      screenType: room.screenType,
+      status: room.status.toLowerCase() == 'maintenance'
           ? RoomStatus.maintenance
           : RoomStatus.ready,
     );
@@ -271,6 +274,12 @@ class _AdminContentSectionState extends State<AdminContentSection> {
   Future<void> _apiCreateRoom(RoomRequest request) async {
     try {
       final saved = await _api.createAdminRoom(request);
+      setState(() {
+        _adminRooms = [
+          saved,
+          ..._adminRooms.where((room) => room.id != saved.id),
+        ];
+      });
       widget.store.saveRoom(_roomFromAdmin(saved));
       _showSnack('Đã tạo phòng chiếu!');
     } catch (e) {
@@ -282,11 +291,39 @@ class _AdminContentSectionState extends State<AdminContentSection> {
     final nextStatus = ready ? 'ready' : 'maintenance';
     try {
       final saved = await _api.updateAdminRoomStatus(room.id, nextStatus);
+      setState(() {
+        _adminRooms = _adminRooms
+            .map((item) => item.id == saved.id ? saved : item)
+            .toList();
+      });
       widget.store.saveRoom(_roomFromAdmin(saved));
       _showSnack(ready ? 'Phòng đã sẵn sàng' : 'Đã chuyển phòng sang bảo trì');
     } catch (e) {
       _showSnack('Lỗi cập nhật phòng: ${_errorMsg(e)}', isError: true);
     }
+  }
+
+  admin_models.Room? _adminRoomFor(String roomId) {
+    for (final room in _adminRooms) {
+      if (room.id == roomId) return room;
+    }
+    return null;
+  }
+
+  String _seatTypeLabel(String type) {
+    return switch (type.toLowerCase()) {
+      'vip' => 'Ghế VIP',
+      'couple' => 'Ghế đôi',
+      _ => 'Ghế thường',
+    };
+  }
+
+  Color _seatTypeColor(String type) {
+    return switch (type.toLowerCase()) {
+      'vip' => AppColors.gold,
+      'couple' => const Color(0xFFE56B8C),
+      _ => AppColors.ink,
+    };
   }
 
   Future<void> _apiCreateShowtime(ShowtimeScheduleRequest request) async {
@@ -568,9 +605,29 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                 subtitle: Text(
                   'Sức chứa ${room.capacity} • ${room.status == RoomStatus.ready ? 'Sẵn sàng' : 'Bảo trì'}',
                 ),
-                trailing: Switch(
-                  value: room.status == RoomStatus.ready,
-                  onChanged: (value) => _apiUpdateRoomStatus(room, value),
+                trailing: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    IconButton(
+                      tooltip: 'Xem sơ đồ ghế',
+                      onPressed: () {
+                        final adminRoom = _adminRoomFor(room.id);
+                        if (adminRoom == null) {
+                          _showSnack(
+                            'Chưa tải được sơ đồ ghế của phòng này.',
+                            isError: true,
+                          );
+                          return;
+                        }
+                        _roomSeatLayoutDialog(context, adminRoom);
+                      },
+                      icon: const Icon(Icons.event_seat_outlined),
+                    ),
+                    Switch(
+                      value: room.status == RoomStatus.ready,
+                      onChanged: (value) => _apiUpdateRoomStatus(room, value),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -2219,6 +2276,174 @@ class _AdminContentSectionState extends State<AdminContentSection> {
 
   // ─── Room dialog ──────────────────────────────────────────────────────────
 
+  void _roomSeatLayoutDialog(BuildContext context, admin_models.Room room) {
+    final currentRoom = room;
+    final horizontalController = ScrollController();
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, _) {
+          final seats = [...currentRoom.seatLayout]
+            ..sort((a, b) {
+              final rowCompare = a.row.compareTo(b.row);
+              return rowCompare != 0
+                  ? rowCompare
+                  : a.column.compareTo(b.column);
+            });
+          final rows = seats.map((seat) => seat.row).toSet().toList()..sort();
+          final maxColumn = seats.fold<int>(
+            0,
+            (value, seat) => seat.column > value ? seat.column : value,
+          );
+          final byPosition = {
+            for (final seat in seats) '${seat.row}:${seat.column}': seat,
+          };
+
+          return AlertDialog(
+            title: Text('${currentRoom.name} • ${currentRoom.screenType}'),
+            content: SizedBox(
+              width: 520,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.ink,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'MÀN HÌNH',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Scrollbar(
+                      controller: horizontalController,
+                      thumbVisibility: true,
+                      trackVisibility: true,
+                      child: SingleChildScrollView(
+                        controller: horizontalController,
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            for (final row in rows)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 24,
+                                      child: Text(
+                                        row,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ),
+                                    for (
+                                      var column = 1;
+                                      column <= maxColumn;
+                                      column++
+                                    )
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          right: 6,
+                                        ),
+                                        child: Builder(
+                                          builder: (_) {
+                                            final seat =
+                                                byPosition['$row:$column'];
+                                            if (seat == null) {
+                                              return const SizedBox(
+                                                width: 42,
+                                                height: 38,
+                                              );
+                                            }
+                                            final color = _seatTypeColor(
+                                              seat.seatType,
+                                            );
+                                            return Tooltip(
+                                              message:
+                                                  '${seat.seatCode} • ${_seatTypeLabel(seat.seatType)}',
+                                              child: AnimatedContainer(
+                                                duration: const Duration(
+                                                  milliseconds: 150,
+                                                ),
+                                                width: 42,
+                                                height: 38,
+                                                decoration: BoxDecoration(
+                                                  color: color.withValues(
+                                                    alpha: .16,
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                  border: Border.all(
+                                                    color: color,
+                                                  ),
+                                                ),
+                                                child: Center(
+                                                  child: Text(
+                                                    seat.seatCode,
+                                                    style: TextStyle(
+                                                      color: color,
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.w900,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 8,
+                      children: [
+                        for (final type in const ['standard', 'vip', 'couple'])
+                          _SeatLegend(
+                            color: _seatTypeColor(type),
+                            label: _seatTypeLabel(type),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Đóng'),
+              ),
+            ],
+          );
+        },
+      ),
+    ).whenComplete(horizontalController.dispose);
+  }
+
   void _roomDialog(BuildContext context) {
     final store = widget.store;
     final name = TextEditingController(text: 'Phòng mới');
@@ -2226,6 +2451,7 @@ class _AdminContentSectionState extends State<AdminContentSection> {
     var screenType = '2D';
     final rows = TextEditingController(text: '6');
     final seatsPerRow = TextEditingController(text: '10');
+    final standardRows = TextEditingController(text: 'A, B, C, D');
     final vipRows = TextEditingController(text: 'E, F');
     final coupleRows = TextEditingController();
     String? validationError;
@@ -2292,6 +2518,7 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                     'Sức chứa',
                     keyboardType: TextInputType.number,
                   ),
+                  _field(standardRows, 'Hàng ghế thường (VD: A, B, C, D)'),
                   _field(vipRows, 'Hàng VIP (VD: E, F)'),
                   _field(coupleRows, 'Hàng ghế đôi (VD: G)'),
                   if (validationError != null)
@@ -2344,18 +2571,41 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                 final rowCount = int.tryParse(rows.text.trim()) ?? 0;
                 final seatCount = int.tryParse(seatsPerRow.text.trim()) ?? 0;
                 final roomCapacity = int.tryParse(capacity.text.trim()) ?? 0;
-                final totalSeats = rowCount * seatCount;
-                final error = name.text.trim().isEmpty
-                    ? 'Vui lòng nhập tên phòng.'
-                    : rowCount <= 0
-                    ? 'Số hàng phải lớn hơn 0.'
-                    : seatCount <= 0
-                    ? 'Số ghế mỗi hàng phải lớn hơn 0.'
-                    : roomCapacity <= 0
-                    ? 'Sức chứa phải lớn hơn 0.'
-                    : roomCapacity != totalSeats
-                    ? 'Sức chứa phải bằng số hàng x số ghế mỗi hàng.'
-                    : null;
+                final standardRowList = _parseRowList(standardRows.text);
+                final vipRowList = _parseRowList(vipRows.text);
+                final coupleRowList = _parseRowList(coupleRows.text);
+                final rowGroupError = _validateSeatRowGroups(
+                  declaredRowCount: rowCount,
+                  standardRows: standardRowList,
+                  vipRows: vipRowList,
+                  coupleRows: coupleRowList,
+                );
+                final seatLayout = _buildSeatLayout(
+                  seatsPerRow: seatCount,
+                  standardRows: standardRowList,
+                  vipRows: vipRowList,
+                  coupleRows: coupleRowList,
+                );
+                final totalSeats = seatLayout.length;
+                String? error;
+                if (name.text.trim().isEmpty) {
+                  error = 'Vui lòng nhập tên phòng.';
+                } else if (rowCount <= 0) {
+                  error = 'Số hàng phải lớn hơn 0.';
+                } else if (rowCount > 26) {
+                  error = 'Số hàng tối đa là 26, tương ứng A đến Z.';
+                } else if (seatCount <= 0) {
+                  error = 'Số ghế mỗi hàng phải lớn hơn 0.';
+                } else if (rowGroupError != null) {
+                  error = rowGroupError;
+                } else if (roomCapacity <= 0) {
+                  error = 'Sức chứa phải lớn hơn 0.';
+                } else if (roomCapacity != rowCount * seatCount) {
+                  error =
+                      'Sức chứa phải bằng số hàng x số ghế mỗi hàng: ${rowCount * seatCount}.';
+                } else if (roomCapacity != totalSeats) {
+                  error = 'Sức chứa không khớp layout ghế đã tạo: $totalSeats.';
+                }
                 if (error != null) {
                   setS(() {
                     validationError = error;
@@ -2371,12 +2621,7 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                   name: name.text.trim(),
                   capacity: roomCapacity,
                   screenType: screenType,
-                  seatLayout: _buildSeatLayout(
-                    rows: rowCount,
-                    seatsPerRow: seatCount,
-                    vipRows: _parseRows(vipRows.text),
-                    coupleRows: _parseRows(coupleRows.text),
-                  ),
+                  seatLayout: seatLayout,
                 );
                 Navigator.pop(context);
                 _apiCreateRoom(request);
@@ -2389,32 +2634,73 @@ class _AdminContentSectionState extends State<AdminContentSection> {
     );
   }
 
-  Set<String> _parseRows(String text) {
+  List<String> _parseRowList(String text) {
     return text
         .split(RegExp(r'[,;\s]+'))
         .map((item) => item.trim().toUpperCase())
         .where((item) => item.isNotEmpty)
-        .toSet();
+        .toList();
+  }
+
+  String? _validateSeatRowGroups({
+    required int declaredRowCount,
+    required List<String> standardRows,
+    required List<String> vipRows,
+    required List<String> coupleRows,
+  }) {
+    final rowOwners = <String, String>{};
+    final totalDeclaredRows =
+        standardRows.length + vipRows.length + coupleRows.length;
+    final groups = <String, List<String>>{
+      'hàng ghế thường': standardRows,
+      'hàng VIP': vipRows,
+      'hàng ghế đôi': coupleRows,
+    };
+
+    for (final entry in groups.entries) {
+      final groupSeen = <String>{};
+      for (final row in entry.value) {
+        if (!RegExp(r'^[A-Z]$').hasMatch(row)) {
+          return 'Mỗi hàng ghế chỉ dùng một chữ cái từ A đến Z.';
+        }
+        if (!groupSeen.add(row)) {
+          return '${entry.key} không được nhập trùng hàng $row.';
+        }
+        final owner = rowOwners[row];
+        if (owner != null) {
+          return 'Hàng $row đang được khai báo ở cả $owner và ${entry.key}.';
+        }
+        rowOwners[row] = entry.key;
+      }
+    }
+
+    if (totalDeclaredRows != declaredRowCount) {
+      return 'Bạn đang khai báo $totalDeclaredRows hàng ghế, nhưng Số hàng là $declaredRowCount.';
+    }
+
+    return null;
   }
 
   List<RoomSeatLayout> _buildSeatLayout({
-    required int rows,
     required int seatsPerRow,
-    required Set<String> vipRows,
-    required Set<String> coupleRows,
+    required List<String> standardRows,
+    required List<String> vipRows,
+    required List<String> coupleRows,
   }) {
+    final rows = <({String label, String type})>[
+      for (final row in standardRows) (label: row, type: 'standard'),
+      for (final row in vipRows) (label: row, type: 'vip'),
+      for (final row in coupleRows) (label: row, type: 'couple'),
+    ];
+
     return [
-      for (var rowIndex = 0; rowIndex < rows; rowIndex++)
+      for (final row in rows)
         for (var column = 1; column <= seatsPerRow; column++)
           RoomSeatLayout(
-            seatCode: '${String.fromCharCode(65 + rowIndex)}$column',
-            row: String.fromCharCode(65 + rowIndex),
+            seatCode: '${row.label}$column',
+            row: row.label,
             column: column,
-            seatType: coupleRows.contains(String.fromCharCode(65 + rowIndex))
-                ? 'couple'
-                : vipRows.contains(String.fromCharCode(65 + rowIndex))
-                ? 'vip'
-                : 'standard',
+            seatType: row.type,
           ),
     ];
   }
@@ -2509,6 +2795,40 @@ class _AdminContentSectionState extends State<AdminContentSection> {
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: AppColors.gold, width: 1.5),
       ),
+    );
+  }
+}
+
+class _SeatLegend extends StatelessWidget {
+  const _SeatLegend({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 14,
+          height: 14,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: .18),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: color),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.muted,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
     );
   }
 }

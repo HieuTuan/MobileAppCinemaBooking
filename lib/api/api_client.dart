@@ -1447,6 +1447,20 @@ class APIClient {
     return Room.fromJson(_extractDataMap(response.data!));
   }
 
+  Future<Room> updateAdminRoomSeatType(
+    String roomId,
+    String seatCode,
+    String seatType, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await patch<Map<String, dynamic>>(
+      '/api/admin/rooms/$roomId/seats/type',
+      data: {'seatCode': seatCode, 'seatType': seatType},
+      cancelToken: cancelToken,
+    );
+    return Room.fromJson(_extractDataMap(response.data!));
+  }
+
   Future<Showtime> createAdminShowtime(
     ShowtimeScheduleRequest request, {
     CancelToken? cancelToken,

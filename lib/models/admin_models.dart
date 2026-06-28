@@ -527,6 +527,7 @@ class Room {
     required this.name,
     required this.status,
     required this.totalSeats,
+    this.seatLayout = const <RoomSeatLayout>[],
     this.screenType = '',
   });
 
@@ -536,6 +537,7 @@ class Room {
   final String status;
   final int totalSeats;
   final String screenType;
+  final List<RoomSeatLayout> seatLayout;
 
   factory Room.fromJson(Map<String, dynamic> json) {
     return Room(
@@ -545,6 +547,9 @@ class Room {
       status: json['status'] as String,
       totalSeats: (json['totalSeats'] as num).toInt(),
       screenType: json['screenType'] as String? ?? '',
+      seatLayout: (json['seatLayout'] as List<dynamic>? ?? const [])
+          .map((item) => RoomSeatLayout.fromJson(item as Map<String, dynamic>))
+          .toList(),
     );
   }
 }
@@ -561,6 +566,15 @@ class RoomSeatLayout {
   final String row;
   final int column;
   final String seatType;
+
+  factory RoomSeatLayout.fromJson(Map<String, dynamic> json) {
+    return RoomSeatLayout(
+      seatCode: json['seatCode'] as String,
+      row: json['row'] as String,
+      column: (json['column'] as num).toInt(),
+      seatType: json['seatType'] as String,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'seatCode': seatCode,
