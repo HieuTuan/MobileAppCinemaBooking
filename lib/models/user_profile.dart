@@ -19,6 +19,7 @@ part 'user_profile.g.dart';
 @JsonSerializable()
 class UserProfile {
   /// Unique user identifier
+  @JsonKey(name: 'userId')
   final String id;
   
   /// User email address
@@ -49,6 +50,7 @@ class UserProfile {
   final List<String>? permissions;
   
   /// Account active status
+  @JsonKey(name: 'active')
   final bool isActive;
   
   /// Account creation timestamp

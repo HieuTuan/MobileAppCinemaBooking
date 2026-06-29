@@ -6,6 +6,7 @@ import com.cineluxe.dto.response.UserProfileResponse;
 import com.cineluxe.service.UserProfileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,7 +30,7 @@ public class UserProfileController {
     @Operation(summary = "Update user profile")
     public ResponseEntity<ApiResponse<UserProfileResponse>> updateProfile(
             @PathVariable String userId,
-            @RequestBody UpdateProfileRequest request) {
+            @Valid @RequestBody UpdateProfileRequest request) {
         return ApiResponse.success(userProfileService.updateProfile(userId, request));
     }
 }

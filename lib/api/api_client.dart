@@ -1168,7 +1168,7 @@ class APIClient {
       '/api/users/$userId/profile',
       cancelToken: cancelToken,
     );
-    return UserProfile.fromJson(response.data!);
+    return UserProfile.fromJson(_extractDataMap(response.data!));
   }
 
   /// Update profile data for a user.
@@ -1204,7 +1204,7 @@ class APIClient {
       data: request.toJson(),
       cancelToken: cancelToken,
     );
-    return UserProfile.fromJson(response.data!);
+    return UserProfile.fromJson(_extractDataMap(response.data!));
   }
 
   // ============================================================================

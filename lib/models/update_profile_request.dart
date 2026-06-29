@@ -42,6 +42,15 @@ class UpdateProfileRequest {
   /// Converts instance to JSON map
   Map<String, dynamic> toJson() => _$UpdateProfileRequestToJson(this);
 
+  /// Validates full name when provided.
+  String? validateFullName() {
+    if (fullName == null) return null;
+    if (fullName!.trim().isEmpty) {
+      return 'Full name cannot be empty';
+    }
+    return null;
+  }
+
   /// Validates phone number format.
   ///
   /// Accepts:

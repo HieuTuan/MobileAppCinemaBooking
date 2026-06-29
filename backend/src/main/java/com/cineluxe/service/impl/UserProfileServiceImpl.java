@@ -36,18 +36,10 @@ public class UserProfileServiceImpl implements UserProfileService {
         var profile = findOrCreate(userId);
 
         if (request.phone() != null) {
-            if (!PHONE_PATTERN.matcher(request.phone()).matches()) {
-                throw new ApiException(HttpStatus.BAD_REQUEST,
-                        "Invalid phone format: must be 0XXXXXXXXX or +84XXXXXXXXX");
-            }
             profile.setPhone(request.phone());
         }
 
         if (request.birthdate() != null) {
-            if (request.birthdate().isAfter(LocalDate.now())) {
-                throw new ApiException(HttpStatus.BAD_REQUEST,
-                        "Birthdate cannot be in the future");
-            }
             profile.setBirthdate(request.birthdate());
         }
 
@@ -59,7 +51,6 @@ public class UserProfileServiceImpl implements UserProfileService {
     }
 
     // ─── Private helpers ──────────────────────────────────────────────────
-
     private UserProfile findOrCreate(String userId) {
         return userProfileRepository.findById(userId)
                 .orElseGet(() -> userProfileRepository.save(new UserProfile(userId)));

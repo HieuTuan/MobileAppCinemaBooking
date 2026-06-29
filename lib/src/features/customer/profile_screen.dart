@@ -1,6 +1,8 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../api/api_client.dart';
+import '../../../api/exceptions/api_exceptions.dart';
 import '../../../models/update_profile_request.dart';
 import '../../../models/user_profile.dart';
 import '../../core/app_theme.dart';
@@ -33,6 +35,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   DateTime? _birthdate;
 
   // inline validation errors
+  String? _nameError;
   String? _phoneError;
   String? _birthdateError;
 
@@ -81,23 +84,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  /// Validates phone and birthdate fields.
+  /// Validates full name, phone, and birthdate fields.
   /// Returns true when all inline validations pass.
   bool _validate() {
     final request = UpdateProfileRequest(
+      fullName: _name.text.trim().isEmpty ? null : _name.text.trim(),
       phone: _phone.text.isEmpty ? null : _phone.text.trim(),
       birthdate: _birthdate,
     );
 
+    final nameErr = request.validateFullName();
     final phoneErr = request.validatePhone();
     final bdErr = request.validateBirthdate();
 
     setState(() {
+      _nameError = nameErr;
       _phoneError = phoneErr;
       _birthdateError = bdErr;
     });
 
-    return phoneErr == null && bdErr == null;
+    return nameErr == null && phoneErr == null && bdErr == null;
   }
 
   Future<void> _save() async {
@@ -132,12 +138,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cập nhật hồ sơ thành công')),
       );
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final error = e.error;
+      if (error is ApiValidationException) {
+        final fieldErrors = error.error.fieldErrors ?? {};
+        setState(() {
+          _nameError = fieldErrors['fullName']?.toString();
+          _phoneError = fieldErrors['phone']?.toString();
+          _birthdateError = fieldErrors['birthdate']?.toString();
+        });
+        if (fieldErrors.isNotEmpty) {
+          return;
+        }
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Cập nhật thất bại: ${e.toString()}'),
+          backgroundColor: AppColors.gold,
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Cập nhật thất bại: ${e.toString()}'),
-          backgroundColor: AppColors.danger,
+          backgroundColor: AppColors.success,
         ),
       );
     } finally {
@@ -260,7 +286,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // Full name
               TextField(
                 controller: _name,
-                decoration: const InputDecoration(labelText: 'Họ và tên'),
+                decoration: InputDecoration(
+                  labelText: 'Họ và tên',
+                  errorText: _nameError,
+                  errorStyle: const TextStyle(color: AppColors.danger),
+                ),
+                onChanged: (_) {
+                  if (_nameError != null) setState(() => _nameError = null);
+                },
               ),
               const SizedBox(height: 10),
 
