@@ -43,8 +43,8 @@ public class UserProfileServiceImpl implements UserProfileService {
             profile.setBirthdate(request.birthdate());
         }
 
-        if (request.fullName() != null) {
-            profile.setFullName(request.fullName());
+        if (request.fullName() != null && !request.fullName().isBlank()) {
+            profile.setFullName(request.fullName().trim());
         }
 
         return UserProfileResponse.from(userProfileRepository.save(profile));

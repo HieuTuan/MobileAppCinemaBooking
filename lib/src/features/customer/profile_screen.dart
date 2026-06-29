@@ -87,13 +87,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// Validates full name, phone, and birthdate fields.
   /// Returns true when all inline validations pass.
   bool _validate() {
+    final fullName = _name.text.trim();
     final request = UpdateProfileRequest(
-      fullName: _name.text.trim().isEmpty ? null : _name.text.trim(),
+      fullName: fullName,
       phone: _phone.text.isEmpty ? null : _phone.text.trim(),
       birthdate: _birthdate,
     );
 
-    final nameErr = request.validateFullName();
+    final nameErr = fullName.isEmpty
+        ? 'Họ và tên không được để trống'
+        : request.validateFullName();
     final phoneErr = request.validatePhone();
     final bdErr = request.validateBirthdate();
 
@@ -118,8 +121,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     setState(() => _saving = true);
     try {
+      final fullName = _name.text.trim();
       final request = UpdateProfileRequest(
-        fullName: _name.text.trim().isEmpty ? null : _name.text.trim(),
+        fullName: fullName,
         phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
         birthdate: _birthdate,
       );
@@ -127,7 +131,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final updatedProfile = await _api.updateProfile(userId, request);
 
       // Also update local store so the UI reflects the change immediately
-      widget.store.updateProfile(_name.text.trim(), _phone.text.trim());
+      widget.store.updateProfile(fullName, _phone.text.trim());
 
       if (!mounted) return;
       setState(() {

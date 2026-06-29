@@ -1,11 +1,12 @@
 package com.cineluxe.dto.response;
 
 import com.cineluxe.entity.UserProfile;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.time.LocalDate;
 
 public record UserProfileResponse(
-    String userId,
+    @JsonProperty("id") String userId,
     String fullName,
     String phone,
     LocalDate birthdate,
@@ -14,7 +15,7 @@ public record UserProfileResponse(
     String memberRank,
     int points,
     String role,
-    boolean active,
+    @JsonProperty("isActive") boolean active,
     Instant createdAt
 ) {
     public static UserProfileResponse from(UserProfile p) {
