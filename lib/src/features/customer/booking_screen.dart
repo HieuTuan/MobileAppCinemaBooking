@@ -178,16 +178,12 @@ class _BookingScreenState extends State<BookingScreen> {
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
-          _CinemaAddressBanner(address: _cinemaAddress(cinema)),
           _ConnectionBanner(
             state: _connectionState,
             error: _loadError,
             onRetry: _initializeRealtimeSeats,
           ),
-          _SeatCounter(
-            selected: _selectedSeats.length,
-            maxSeats: 8,
-          ),
+          _SeatCounter(selected: _selectedSeats.length, maxSeats: 8),
           const SizedBox(height: 10),
           const _ScreenCurve(),
           const SizedBox(height: 10),
@@ -231,6 +227,12 @@ class _BookingScreenState extends State<BookingScreen> {
       );
       return;
     }
+    if (!_hasValidCoupleSelection()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ghế đôi phải chọn đủ 2 ghế liền kề.')),
+      );
+      return;
+    }
 
     setState(() => _holdingSeats = true);
     try {
@@ -267,6 +269,27 @@ class _BookingScreenState extends State<BookingScreen> {
     } finally {
       if (mounted) setState(() => _holdingSeats = false);
     }
+  }
+
+  bool _hasValidCoupleSelection() {
+    final selected = _selectedSeats.toSet();
+    final seatsByCode = {
+      for (final seat in widget.store.seats) seat.code: seat,
+    };
+    for (final code in selected) {
+      final seat = seatsByCode[code];
+      if (seat == null || seat.type != SeatType.couple) continue;
+      final hasAdjacentPair = selected.any((otherCode) {
+        if (otherCode == code) return false;
+        final other = seatsByCode[otherCode];
+        return other != null &&
+            other.type == SeatType.couple &&
+            other.row == seat.row &&
+            (other.column - seat.column).abs() == 1;
+      });
+      if (!hasAdjacentPair) return false;
+    }
+    return true;
   }
 
   void _showAgeVerificationRequired() {
@@ -339,8 +362,8 @@ class _SeatCounter extends StatelessWidget {
     final color = ratio >= 1.0
         ? const Color(0xFFE53935) // đỏ khi đạt max
         : ratio >= 0.75
-            ? const Color(0xFFF57C00) // cam khi gần max
-            : const Color(0xFF388E3C); // xanh bình thường
+        ? const Color(0xFFF57C00) // cam khi gần max
+        : const Color(0xFF388E3C); // xanh bình thường
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
       child: Column(
@@ -361,7 +384,10 @@ class _SeatCounter extends StatelessWidget {
               if (selected >= maxSeats) ...[
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFE53935),
                     borderRadius: BorderRadius.circular(999),
@@ -460,16 +486,7 @@ class _CinemaAddressBanner extends StatelessWidget {
                 ),
               ),
             ),
-            TextButton(
-              onPressed: () {},
-              child: const Text(
-                'Chi tiết',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
+
           ],
         ),
       ),
@@ -562,16 +579,43 @@ class _SeatMap extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 10),
               child: Row(
                 children: [
-                  for (final seat in row.value)
+                  for (final cell in _seatCells(row.value))
                     Padding(
                       padding: const EdgeInsets.only(right: 10),
-                      child: _SeatTile(
-                        seat: seat,
-                        selected: selectedSeats.contains(seat.code),
-                        booked: booked.contains(seat.code),
-                        held: held.contains(seat.code),
-                        onTap: () => _toggleSeat(context, seat, booked, held),
-                      ),
+                      child: cell.pair == null
+                          ? _SeatTile(
+                              seat: cell.first,
+                              selected: selectedSeats.contains(cell.first.code),
+                              booked: booked.contains(cell.first.code),
+                              held: held.contains(cell.first.code),
+                              forceDisabled: cell.first.type == SeatType.couple,
+                              onTap: () => _toggleSeat(
+                                context,
+                                cell.first,
+                                booked,
+                                held,
+                              ),
+                            )
+                          : _CoupleSeatTile(
+                              first: cell.first,
+                              second: cell.pair!,
+                              selected:
+                                  selectedSeats.contains(cell.first.code) &&
+                                  selectedSeats.contains(cell.pair!.code),
+                              booked:
+                                  booked.contains(cell.first.code) ||
+                                  booked.contains(cell.pair!.code),
+                              held:
+                                  held.contains(cell.first.code) ||
+                                  held.contains(cell.pair!.code),
+                              onTap: () => _toggleCoupleSeat(
+                                context,
+                                cell.first,
+                                cell.pair!,
+                                booked,
+                                held,
+                              ),
+                            ),
                     ),
                 ],
               ),
@@ -594,12 +638,41 @@ class _SeatMap extends StatelessWidget {
     );
   }
 
+  List<_SeatCell> _seatCells(List<SeatSpot> seats) {
+    final cells = <_SeatCell>[];
+    var index = 0;
+    while (index < seats.length) {
+      final seat = seats[index];
+      if (seat.type == SeatType.couple && index + 1 < seats.length) {
+        final next = seats[index + 1];
+        final adjacent =
+            seat.row == next.row &&
+            next.type == SeatType.couple &&
+            (seat.column - next.column).abs() == 1;
+        if (adjacent) {
+          cells.add(_SeatCell(seat, next));
+          index += 2;
+          continue;
+        }
+      }
+      cells.add(_SeatCell(seat, null));
+      index++;
+    }
+    return cells;
+  }
+
   void _toggleSeat(
     BuildContext context,
     SeatSpot seat,
     Set<String> booked,
     Set<String> held,
   ) {
+    if (seat.type == SeatType.couple) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ghế đôi phải chọn theo cặp liền kề.')),
+      );
+      return;
+    }
     if (booked.contains(seat.code) || held.contains(seat.code)) return;
     if (selectedSeats.contains(seat.code)) {
       selectedSeats.remove(seat.code);
@@ -613,6 +686,36 @@ class _SeatMap extends StatelessWidget {
     }
     onChanged();
   }
+
+  void _toggleCoupleSeat(
+    BuildContext context,
+    SeatSpot first,
+    SeatSpot second,
+    Set<String> booked,
+    Set<String> held,
+  ) {
+    final codes = [first.code, second.code];
+    if (codes.any(booked.contains) || codes.any(held.contains)) return;
+    final selectedAny = codes.any(selectedSeats.contains);
+    if (selectedAny) {
+      selectedSeats.removeWhere(codes.contains);
+    } else if (selectedSeats.length + codes.length > 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mỗi lần đặt tối đa 8 ghế.')),
+      );
+      return;
+    } else {
+      selectedSeats.addAll(codes);
+    }
+    onChanged();
+  }
+}
+
+class _SeatCell {
+  const _SeatCell(this.first, this.pair);
+
+  final SeatSpot first;
+  final SeatSpot? pair;
 }
 
 class _SeatTile extends StatelessWidget {
@@ -622,6 +725,7 @@ class _SeatTile extends StatelessWidget {
     required this.booked,
     required this.held,
     required this.onTap,
+    this.forceDisabled = false,
   });
 
   final SeatSpot seat;
@@ -629,10 +733,11 @@ class _SeatTile extends StatelessWidget {
   final bool booked;
   final bool held;
   final VoidCallback onTap;
+  final bool forceDisabled;
 
   @override
   Widget build(BuildContext context) {
-    final disabled = booked || held;
+    final disabled = booked || held || forceDisabled;
     final colors = _seatColors(seat.type, selected, disabled);
     return InkWell(
       onTap: disabled ? null : onTap,
@@ -666,7 +771,7 @@ class _SeatTile extends StatelessWidget {
   _SeatColors _seatColors(SeatType type, bool selected, bool disabled) {
     if (disabled) {
       return const _SeatColors(
-        background: Colors.white,
+        background: Color(0xFFF7F7F7),
         text: AppColors.muted,
         border: AppColors.line,
       );
@@ -680,21 +785,119 @@ class _SeatTile extends StatelessWidget {
     }
     return switch (type) {
       SeatType.standard => const _SeatColors(
-        background: Color(0xFFE8E8E8),
-        text: Colors.black,
-        border: Color(0xFFE8E8E8),
+        background: Color(0xFFE9EAEC),
+        text: Color(0xFF181A20),
+        border: Color(0xFFDADDE2),
       ),
       SeatType.vip => const _SeatColors(
-        background: Color(0xFFD4D4D4),
-        text: Colors.black,
-        border: Color(0xFFD4D4D4),
+        background: Color(0xFFFFF1C7),
+        text: Color(0xFF7A5600),
+        border: Color(0xFFD7A93A),
       ),
       SeatType.couple => const _SeatColors(
-        background: Color(0xFFF4F4F4),
-        text: Colors.black,
-        border: Color(0xFFF4F4F4),
+        background: Color(0xFFFFDCE8),
+        text: Color(0xFFB4164E),
+        border: Color(0xFFE85A8C),
       ),
     };
+  }
+}
+
+class _CoupleSeatTile extends StatelessWidget {
+  const _CoupleSeatTile({
+    required this.first,
+    required this.second,
+    required this.selected,
+    required this.booked,
+    required this.held,
+    required this.onTap,
+  });
+
+  final SeatSpot first;
+  final SeatSpot second;
+  final bool selected;
+  final bool booked;
+  final bool held;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = booked || held;
+    final colors = _seatColors(selected, disabled);
+    return InkWell(
+      onTap: disabled ? null : onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 118,
+        height: 44,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: colors.background,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? Colors.black : colors.border,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: _CoupleHalf(code: first.code, colors: colors),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: _CoupleHalf(code: second.code, colors: colors),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  _SeatColors _seatColors(bool selected, bool disabled) {
+    if (disabled) {
+      return const _SeatColors(
+        background: Color(0xFFF7F7F7),
+        text: AppColors.muted,
+        border: AppColors.line,
+      );
+    }
+    if (selected) {
+      return const _SeatColors(
+        background: Colors.black,
+        text: Colors.white,
+        border: Colors.black,
+      );
+    }
+    return const _SeatColors(
+      background: Color(0xFFFFDCE8),
+      text: Color(0xFFB4164E),
+      border: Color(0xFFE85A8C),
+    );
+  }
+}
+
+class _CoupleHalf extends StatelessWidget {
+  const _CoupleHalf({required this.code, required this.colors});
+
+  final String code;
+  final _SeatColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .28),
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Center(
+        child: Text(
+          code,
+          style: TextStyle(color: colors.text, fontWeight: FontWeight.w900),
+        ),
+      ),
+    );
   }
 }
 
@@ -715,21 +918,36 @@ class _SeatLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: EdgeInsets.symmetric(horizontal: 18),
-      child: Row(
-        children: [
-          _LegendItem(
-            color: Colors.white,
-            border: AppColors.line,
-            label: 'Đã đặt',
-          ),
-          _LegendItem(color: Colors.black, label: 'Ghế bạn chọn'),
-          _LegendItem(color: Color(0xFFE8E8E8), label: 'Ghế thường'),
-          _LegendItem(color: Color(0xFFD4D4D4), label: 'Ghế VIP'),
-          _LegendItem(color: Color(0xFFF4F4F4), label: 'Ghế đôi'),
-        ],
+    return Scrollbar(
+      thumbVisibility: true,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+        child: const Row(
+          children: [
+            _LegendItem(
+              color: Colors.white,
+              border: AppColors.line,
+              label: 'Đã đặt',
+            ),
+            _LegendItem(color: Colors.black, label: 'Ghế bạn chọn'),
+            _LegendItem(
+              color: Color(0xFFE9EAEC),
+              border: Color(0xFFDADDE2),
+              label: 'Ghế thường',
+            ),
+            _LegendItem(
+              color: Color(0xFFFFF1C7),
+              border: Color(0xFFD7A93A),
+              label: 'Ghế VIP',
+            ),
+            _LegendItem(
+              color: Color(0xFFFFDCE8),
+              border: Color(0xFFE85A8C),
+              label: 'Ghế đôi',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -745,23 +963,23 @@ class _LegendItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(right: 16),
+      padding: const EdgeInsets.only(right: 20),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 18,
-            height: 18,
+            width: 16,
+            height: 16,
             decoration: BoxDecoration(
               color: color,
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(3),
               border: Border.all(color: border ?? color, width: 2),
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 5),
           Text(
             label,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
           ),
         ],
       ),

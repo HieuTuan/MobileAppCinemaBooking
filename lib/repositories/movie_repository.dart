@@ -68,7 +68,8 @@ class MovieRepository {
     int pageSize = 20,
     bool forceRefresh = false,
   }) async {
-    final hasFilter = (search != null && search.isNotEmpty) ||
+    final hasFilter =
+        (search != null && search.isNotEmpty) ||
         (genre != null && genre.isNotEmpty) ||
         (status != null && status.isNotEmpty);
 
@@ -83,7 +84,22 @@ class MovieRepository {
       // not block fresh API data from rendering.
     }
 
-    if (!forceRefresh && (!online || !stale)) {
+    if (!forceRefresh && !online) {
+      final cached = await _cache.readMovies();
+      return MovieResult(
+        items: _filterMovies(
+          cached,
+          search: search,
+          genre: genre,
+          status: status,
+          limit: pageSize,
+        ),
+        fromCache: true,
+        cachedAt: lastWritten,
+      );
+    }
+
+    if (!forceRefresh && !hasFilter && !stale) {
       final cached = await _cache.readMovies(limit: pageSize);
       return MovieResult(items: cached, fromCache: true, cachedAt: lastWritten);
     }
@@ -107,9 +123,15 @@ class MovieRepository {
       );
     } on ApiNetworkException {
       try {
-        final cached = await _cache.readMovies(limit: pageSize);
+        final cached = await _cache.readMovies();
         return MovieResult(
-          items: cached,
+          items: _filterMovies(
+            cached,
+            search: search,
+            genre: genre,
+            status: status,
+            limit: pageSize,
+          ),
           fromCache: true,
           cachedAt: lastWritten,
         );
@@ -117,6 +139,36 @@ class MovieRepository {
         rethrow;
       }
     }
+  }
+
+  List<Movie> _filterMovies(
+    List<Movie> movies, {
+    String? search,
+    String? genre,
+    String? status,
+    int? limit,
+  }) {
+    final text = search?.trim().toLowerCase() ?? '';
+    final genreText = genre?.trim().toLowerCase() ?? '';
+    final statusText = status?.trim() ?? '';
+    final filtered = movies.where((movie) {
+      final matchesText =
+          text.isEmpty ||
+          movie.title.toLowerCase().contains(text) ||
+          movie.description.toLowerCase().contains(text) ||
+          movie.director.toLowerCase().contains(text) ||
+          movie.cast.any((actor) => actor.toLowerCase().contains(text)) ||
+          movie.genres.any((item) => item.toLowerCase().contains(text));
+      final matchesGenre =
+          genreText.isEmpty ||
+          movie.genres.any((item) => item.toLowerCase() == genreText);
+      final matchesStatus = statusText.isEmpty || movie.status == statusText;
+      return matchesText && matchesGenre && matchesStatus;
+    }).toList();
+    if (limit == null || filtered.length <= limit) {
+      return filtered;
+    }
+    return filtered.take(limit).toList();
   }
 
   Future<MovieResult> _writeAndReturn(PaginatedResponse<Movie> response) async {

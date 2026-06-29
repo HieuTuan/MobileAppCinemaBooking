@@ -81,6 +81,17 @@ ThemeData buildAppTheme() {
         side: const BorderSide(color: AppColors.line),
       ),
     ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      // Đẩy snackbar lên cao hơn để không bị che bởi NavigationBar (~80px)
+      insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+      contentTextStyle: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: Colors.white,
+      ),
+    ),
   );
 }
 

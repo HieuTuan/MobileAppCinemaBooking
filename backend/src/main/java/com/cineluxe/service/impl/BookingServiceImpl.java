@@ -511,6 +511,24 @@ public class BookingServiceImpl implements BookingService {
 
     // ─── Private helpers ──────────────────────────────────────────────────
 
+    private String anonymiseUserId(String userId) {
+        if (userId == null || userId.length() <= 8) {
+            return userId;
+        }
+        return userId.substring(0, 8) + "****";
+    }
+
+    private String stripTrailingSlash(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        var trimmed = value.trim();
+        while (trimmed.endsWith("/")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        return trimmed;
+    }
+
     private Booking requireBooking(String bookingId) {
         return bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Booking not found: " + bookingId));

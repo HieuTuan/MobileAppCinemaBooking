@@ -256,7 +256,7 @@ class CinemaStore extends ChangeNotifier {
     return switch (seat.type) {
       SeatType.standard => showtime.basePrice + standardSeatSurcharge,
       SeatType.vip => showtime.basePrice + vipSeatSurcharge,
-      SeatType.couple => (showtime.basePrice * 2) + coupleSeatSurcharge,
+      SeatType.couple => showtime.basePrice + (coupleSeatSurcharge ~/ 2),
     };
   }
 

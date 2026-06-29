@@ -35,6 +35,14 @@ class _AdminContentSectionState extends State<AdminContentSection> {
   bool _actorsLoading = false;
   List<admin_models.Room> _adminRooms = [];
   bool _roomsLoading = false;
+  OverlayEntry? _adminToastEntry;
+
+  @override
+  void dispose() {
+    _adminToastEntry?.remove();
+    _adminToastEntry = null;
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -151,7 +159,11 @@ class _AdminContentSectionState extends State<AdminContentSection> {
 
   // ─── Actor CRUD ───────────────────────────────────────────────────────────
 
-  Future<void> _apiSaveActor(AdminActor actor, {bool isNew = false}) async {
+  Future<bool> _apiSaveActor(
+    AdminActor actor, {
+    bool isNew = false,
+    bool showSnack = false,
+  }) async {
     final req = ActorManagementRequest(
       name: actor.name,
       avatarUrl: actor.avatarUrl,
@@ -169,9 +181,12 @@ class _AdminContentSectionState extends State<AdminContentSection> {
             ..sort(_sortActors);
         });
       }
-      _showSnack(isNew ? 'Đã thêm diễn viên!' : 'Đã cập nhật diễn viên!');
+      return true;
     } catch (e) {
-      _showSnack('Lỗi: ${_errorMsg(e)}', isError: true);
+      if (showSnack) {
+        _showSnack('Lỗi: ${_errorMsg(e)}', isError: true);
+      }
+      return false;
     }
   }
 
@@ -238,7 +253,8 @@ class _AdminContentSectionState extends State<AdminContentSection> {
       builder: (_) => _buildActorDialogWidget(
         context: context,
         actor: actor,
-        onSave: (next) => _apiSaveActor(next, isNew: actor == null),
+        onSave: (next) =>
+            _apiSaveActor(next, isNew: actor == null, showSnack: false),
       ),
     );
   }
@@ -247,13 +263,68 @@ class _AdminContentSectionState extends State<AdminContentSection> {
 
   void _showSnack(String msg, {bool isError = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: isError ? Colors.redAccent : AppColors.success,
-        behavior: SnackBarBehavior.floating,
-      ),
+    final overlay = Overlay.maybeOf(context, rootOverlay: true);
+    if (overlay == null) return;
+
+    _adminToastEntry?.remove();
+    _adminToastEntry = OverlayEntry(
+      builder: (context) {
+        final top = MediaQuery.paddingOf(context).top + 78;
+        final color = isError ? Colors.redAccent : AppColors.success;
+        return Positioned(
+          top: top,
+          left: 16,
+          right: 16,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: .18),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    isError
+                        ? Icons.error_outline_rounded
+                        : Icons.check_circle_outline_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      msg,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
+    overlay.insert(_adminToastEntry!);
+    Future<void>.delayed(const Duration(seconds: 3), () {
+      if (_adminToastEntry?.mounted ?? false) {
+        _adminToastEntry?.remove();
+      }
+      _adminToastEntry = null;
+    });
   }
 
   String _errorMsg(Object e) => e.toString().replaceFirst('Exception: ', '');
@@ -858,7 +929,7 @@ class _AdminContentSectionState extends State<AdminContentSection> {
         );
         posterCtrl.text = url;
         setS(() {});
-        _showSnack('Da tai poster len Cloudinary');
+        _showSnack('Poster đã được tải lên.');
       } catch (e) {
         _showSnack('Upload anh that bai: ${_errorMsg(e)}', isError: true);
       } finally {
@@ -1378,11 +1449,17 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                             context: ctx,
                             actor: null,
                             onSave: (newActor) async {
-                              await _apiSaveActor(newActor, isNew: true);
+                              final ok = await _apiSaveActor(
+                                newActor,
+                                isNew: true,
+                                showSnack: false,
+                              );
+                              if (!ok) return false;
                               setS(() {
                                 localActors.clear();
                                 localActors.addAll(_actors);
                               });
+                              return true;
                             },
                           ),
                         );
@@ -1536,14 +1613,17 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                                       context: ctx,
                                       actor: actor,
                                       onSave: (updated) async {
-                                        await _apiSaveActor(
+                                        final ok = await _apiSaveActor(
                                           updated,
                                           isNew: false,
+                                          showSnack: false,
                                         );
+                                        if (!ok) return false;
                                         setS(() {
                                           localActors.clear();
                                           localActors.addAll(_actors);
                                         });
+                                        return true;
                                       },
                                     ),
                                   );
@@ -1830,13 +1910,16 @@ class _AdminContentSectionState extends State<AdminContentSection> {
   Widget _buildActorDialogWidget({
     required BuildContext context,
     required AdminActor? actor,
-    required Future<void> Function(AdminActor) onSave,
+    required Future<bool> Function(AdminActor) onSave,
   }) {
     final nameCtrl = TextEditingController(text: actor?.name ?? '');
     final descCtrl = TextEditingController(text: actor?.description ?? '');
     final avatarCtrl = TextEditingController(text: actor?.avatarUrl ?? '');
     final picker = ImagePicker();
     bool uploadingAvatar = false;
+    bool savingActor = false;
+    String? actorFormMessage;
+    bool actorFormMessageIsError = false;
 
     return StatefulBuilder(
       builder: (ctx, setS) {
@@ -1847,7 +1930,11 @@ class _AdminContentSectionState extends State<AdminContentSection> {
             imageQuality: 88,
           );
           if (picked == null) return;
-          setS(() => uploadingAvatar = true);
+          setS(() {
+            uploadingAvatar = true;
+            actorFormMessage = null;
+            actorFormMessageIsError = false;
+          });
           try {
             final url = await _api.adminUploadImage(
               bytes: await picked.readAsBytes(),
@@ -1855,15 +1942,17 @@ class _AdminContentSectionState extends State<AdminContentSection> {
               contentType: _imageContentType(picked.name),
             );
             avatarCtrl.text = url;
-            setS(() {});
-            _showSnack(
-              '\u0110\u00e3 t\u1ea3i avatar l\u00ean Cloudinary \u2713',
-            );
+            setS(() {
+              actorFormMessage =
+                  '\u0110\u00e3 t\u1ea3i avatar l\u00ean Cloudinary \u2713';
+              actorFormMessageIsError = false;
+            });
           } catch (e) {
-            _showSnack(
-              'Upload avatar th\u1ea5t b\u1ea1i: ${_errorMsg(e)}',
-              isError: true,
-            );
+            setS(() {
+              actorFormMessage =
+                  'Upload avatar th\u1ea5t b\u1ea1i: ${_errorMsg(e)}';
+              actorFormMessageIsError = true;
+            });
           } finally {
             setS(() => uploadingAvatar = false);
           }
@@ -1966,7 +2055,7 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                               ),
                               SizedBox(height: 4),
                               Text(
-                                'Nh\u1ea5n v\u00e0o avatar \u0111\u1ec3 t\u1ea3i \u1ea3nh l\u00ean,\nho\u1eb7c d\u00e1n URL b\u00ean d\u01b0\u1edbi.',
+                                'T\u1ea3i \u1ea3nh t\u1eeb thi\u1ebft b\u1ecb l\u00ean Cloudinary,\nho\u1eb7c d\u00e1n URL b\u00ean d\u01b0\u1edbi.',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: AppColors.muted,
@@ -1977,6 +2066,73 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: uploadingAvatar ? null : pickAndUploadAvatar,
+                      icon: uploadingAvatar
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.cloud_upload_rounded, size: 18),
+                      label: Text(
+                        uploadingAvatar
+                            ? '\u0110ang upload \u1ea3nh...'
+                            : 'T\u1ea3i \u1ea3nh t\u1eeb thi\u1ebft b\u1ecb',
+                      ),
+                    ),
+                    if (actorFormMessage != null) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              (actorFormMessageIsError
+                                      ? Colors.redAccent
+                                      : AppColors.success)
+                                  .withValues(alpha: .12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color:
+                                (actorFormMessageIsError
+                                        ? Colors.redAccent
+                                        : AppColors.success)
+                                    .withValues(alpha: .35),
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              actorFormMessageIsError
+                                  ? Icons.error_outline_rounded
+                                  : Icons.check_circle_outline_rounded,
+                              color: actorFormMessageIsError
+                                  ? Colors.redAccent
+                                  : AppColors.success,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                actorFormMessage!,
+                                style: TextStyle(
+                                  color: actorFormMessageIsError
+                                      ? Colors.redAccent
+                                      : AppColors.success,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     _field(nameCtrl, 'T\u00ean di\u1ec5n vi\u00ean *'),
                     _field(
@@ -1984,40 +2140,77 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                       'Ti\u1ec3u s\u1eed / M\u00f4 t\u1ea3',
                       maxLines: 3,
                     ),
-                    _field(avatarCtrl, 'Avatar URL Cloudinary'),
+                    _field(avatarCtrl, 'Avatar diễn viên'),
                     const SizedBox(height: 4),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         TextButton(
-                          onPressed: uploadingAvatar
+                          onPressed: uploadingAvatar || savingActor
                               ? null
                               : () => Navigator.pop(ctx),
                           child: const Text('H\u1ee7y'),
                         ),
                         const SizedBox(width: 10),
                         FilledButton.icon(
-                          onPressed: uploadingAvatar
+                          onPressed: uploadingAvatar || savingActor
                               ? null
                               : () async {
                                   if (nameCtrl.text.trim().isEmpty) {
-                                    _showSnack(
-                                      'Vui l\u00f2ng nh\u1eadp t\u00ean di\u1ec5n vi\u00ean',
-                                      isError: true,
-                                    );
+                                    setS(() {
+                                      actorFormMessage =
+                                          'Vui l\u00f2ng nh\u1eadp t\u00ean di\u1ec5n vi\u00ean';
+                                      actorFormMessageIsError = true;
+                                    });
                                     return;
                                   }
+                                  setS(() {
+                                    savingActor = true;
+                                    actorFormMessage = null;
+                                    actorFormMessageIsError = false;
+                                  });
                                   final next = AdminActor(
                                     id: actor?.id ?? '',
                                     name: nameCtrl.text.trim(),
                                     avatarUrl: avatarCtrl.text.trim(),
                                     description: descCtrl.text.trim(),
                                   );
-                                  Navigator.pop(ctx);
-                                  await onSave(next);
+                                  final ok = await onSave(next);
+                                  if (!ctx.mounted) return;
+                                  if (!ok) {
+                                    setS(() {
+                                      savingActor = false;
+                                      actorFormMessage =
+                                          'Kh\u00f4ng th\u1ec3 l\u01b0u di\u1ec5n vi\u00ean. Vui l\u00f2ng th\u1eed l\u1ea1i.';
+                                      actorFormMessageIsError = true;
+                                    });
+                                    return;
+                                  }
+                                  setS(() {
+                                    savingActor = false;
+                                    actorFormMessage = actor == null
+                                        ? '\u0110\u00e3 th\u00eam di\u1ec5n vi\u00ean!'
+                                        : '\u0110\u00e3 c\u1eadp nh\u1eadt di\u1ec5n vi\u00ean!';
+                                    actorFormMessageIsError = false;
+                                  });
+                                  await Future<void>.delayed(
+                                    const Duration(milliseconds: 650),
+                                  );
+                                  if (ctx.mounted) Navigator.pop(ctx);
                                 },
-                          icon: const Icon(Icons.save_rounded),
-                          label: const Text('L\u01b0u'),
+                          icon: savingActor
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.save_rounded),
+                          label: Text(
+                            savingActor ? '\u0110ang l\u01b0u...' : 'L\u01b0u',
+                          ),
                         ),
                       ],
                     ),

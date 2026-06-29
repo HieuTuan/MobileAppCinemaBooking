@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../api/api_client.dart';
+import '../../../models/booking_models.dart';
 import '../../core/app_theme.dart';
 import '../../core/formatters.dart';
 import '../../models/app_models.dart';
@@ -24,8 +26,12 @@ class ShowtimeSelectionScreen extends StatefulWidget {
 }
 
 class _ShowtimeSelectionScreenState extends State<ShowtimeSelectionScreen> {
+  final _api = APIClient();
   int _dateIndex = 0;
   int _timeIndex = 0;
+  bool _loadingShowtimes = true;
+  String? _loadError;
+  final Map<String, String> _availabilityLabels = {};
 
   static const _timeSlots = [
     _TimeSlot('Tất cả', null, null),
@@ -34,6 +40,56 @@ class _ShowtimeSelectionScreenState extends State<ShowtimeSelectionScreen> {
     _TimeSlot('15:00 - 18:00', 15, 18),
     _TimeSlot('18:00 - 23:00', 18, 23),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadShowtimeData();
+  }
+
+  Future<void> _loadShowtimeData() async {
+    setState(() {
+      _loadingShowtimes = true;
+      _loadError = null;
+    });
+    try {
+      final showtimes = await _api.getShowtimes(widget.movie.id);
+      widget.store.replaceShowtimesFromApi(showtimes);
+      await _loadAvailabilityLabels(showtimes.map((item) => item.id).toList());
+      if (!mounted) return;
+      setState(() {
+        _dateIndex = 0;
+        _loadingShowtimes = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingShowtimes = false;
+        _loadError = 'Không thể tải suất chiếu từ API.';
+      });
+    }
+  }
+
+  Future<void> _loadAvailabilityLabels(List<String> showtimeIds) async {
+    final entries = await Future.wait(
+      showtimeIds.map((id) async {
+        try {
+          final seatMap = await _api.getSeats(id);
+          final total = seatMap.seats.length;
+          final available = seatMap.seats
+              .where((seat) => seat.status == ApiSeatStatus.available)
+              .length;
+          return MapEntry(id, 'Còn $available/$total');
+        } catch (_) {
+          return MapEntry(id, 'Đang cập nhật');
+        }
+      }),
+    );
+    if (!mounted) return;
+    _availabilityLabels
+      ..clear()
+      ..addEntries(entries);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -142,6 +198,27 @@ class _ShowtimeSelectionScreenState extends State<ShowtimeSelectionScreen> {
             ),
           ),
           const _SectionDivider(),
+          if (_loadingShowtimes)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 18),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_loadError != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
+              child: Material(
+                color: AppColors.pearl,
+                borderRadius: BorderRadius.circular(8),
+                child: ListTile(
+                  leading: const Icon(Icons.cloud_off_rounded),
+                  title: Text(_loadError!),
+                  trailing: TextButton(
+                    onPressed: _loadShowtimeData,
+                    child: const Text('Thử lại'),
+                  ),
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
             child: Row(
@@ -169,6 +246,7 @@ class _ShowtimeSelectionScreenState extends State<ShowtimeSelectionScreen> {
             movie: widget.movie,
             showtimes: visibleShowtimes,
             store: store,
+            availabilityLabels: _availabilityLabels,
           ),
         ],
       ),
@@ -214,6 +292,7 @@ class _CinemaShowtimeCard extends StatelessWidget {
     required this.movie,
     required this.showtimes,
     required this.store,
+    required this.availabilityLabels,
   });
 
   final String cinemaName;
@@ -221,6 +300,7 @@ class _CinemaShowtimeCard extends StatelessWidget {
   final Movie movie;
   final List<Showtime> showtimes;
   final CinemaStore store;
+  final Map<String, String> availabilityLabels;
 
   @override
   Widget build(BuildContext context) {
@@ -330,6 +410,8 @@ class _CinemaShowtimeCard extends StatelessWidget {
                     return _ShowtimeCard(
                       showtime: showtime,
                       movie: movie,
+                      availabilityLabel:
+                          availabilityLabels[showtime.id] ?? 'Đang cập nhật',
                       onTap: () => _navigateToBooking(
                         context,
                         store: store,
@@ -351,11 +433,13 @@ class _ShowtimeCard extends StatelessWidget {
   const _ShowtimeCard({
     required this.showtime,
     required this.movie,
+    required this.availabilityLabel,
     required this.onTap,
   });
 
   final Showtime showtime;
   final Movie movie;
+  final String availabilityLabel;
   final VoidCallback onTap;
 
   @override
@@ -406,10 +490,10 @@ class _ShowtimeCard extends StatelessWidget {
                 color: Color(0xFFFAFAFA),
                 borderRadius: BorderRadius.vertical(bottom: Radius.circular(8)),
               ),
-              child: const Text(
-                'Còn 58/60',
+              child: Text(
+                availabilityLabel,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   color: AppColors.muted,
                   fontWeight: FontWeight.w700,
                 ),
