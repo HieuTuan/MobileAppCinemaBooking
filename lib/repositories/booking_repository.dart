@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:dio/dio.dart';
 
 import '../api/api_client.dart';
 import '../api/exceptions/api_exceptions.dart';
@@ -113,7 +114,24 @@ class BookingRepository {
   Future<BookingQr?> getBookingQr(String bookingId) async {
     try {
       final qr = await _api.getBookingQr(bookingId);
-      final bytes = await _renderQrPng(qr.qrCode);
+      Uint8List? bytes;
+      if (qr.qrCodeUrl != null && qr.qrCodeUrl!.isNotEmpty) {
+        try {
+          final dio = Dio();
+          final response = await dio.get<List<int>>(
+            qr.qrCodeUrl!,
+            options: Options(responseType: ResponseType.bytes),
+          );
+          if (response.statusCode == 200 && response.data != null) {
+            bytes = Uint8List.fromList(response.data!);
+          }
+        } catch (e) {
+          // fallback to local rendering if download fails
+        }
+      }
+      if (bytes == null) {
+        bytes = await _renderQrPng(qr.qrCode);
+      }
       if (bytes != null) {
         await _cache.upsertQRCode(bookingId, bytes);
       }

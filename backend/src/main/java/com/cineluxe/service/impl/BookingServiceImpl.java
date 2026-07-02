@@ -33,6 +33,13 @@ import com.cineluxe.service.AnalyticsService;
 import com.cineluxe.service.BookingService;
 import com.cineluxe.service.NotificationService;
 import com.cineluxe.websocket.SeatWebSocketHandler;
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.client.j2se.MatrixToImageWriter;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
@@ -72,6 +79,7 @@ public class BookingServiceImpl implements BookingService {
     private final NotificationService notificationService;
     private final UserProfileRepository userProfileRepository;
     private final AnalyticsService analyticsService;
+    private final Cloudinary cloudinary;
 
     @Value("${booking.vnpay-secret:cineluxe-demo-vnpay-secret-key-123456789}")
     private String vnpaySecret;
@@ -284,7 +292,8 @@ public class BookingServiceImpl implements BookingService {
                 booking.getShowtimeDateTime(),
                 booking.getRoomName(),
                 booking.getCinemaName(),
-                List.copyOf(booking.getSeatCodes()));
+                List.copyOf(booking.getSeatCodes()),
+                booking.getQrCodeUrl());
     }
 
     @Override
@@ -307,11 +316,26 @@ public class BookingServiceImpl implements BookingService {
         var refund = booking.getShowtimeDateTime().isAfter(now.plus(Duration.ofHours(2)))
                 ? booking.getTotalAmount()
                 : booking.getTotalAmount() / 2;
+        
+        if (refund > 0) {
+            log.info("Sending VNPay refund request to gateway for booking: {}, amount: {}", booking.getId(), refund);
+            booking.setRefundedAt(now);
+        }
+        
         booking.cancel(refund);
         bookingRepository.save(booking);
+        
+        var userProfile = userProfileRepository.findById(userId).orElse(null);
+        if (userProfile != null) {
+            int pointsToDeduct = (int) (booking.getTotalAmount() / 10000);
+            userProfile.setPoints(Math.max(0, userProfile.getPoints() - pointsToDeduct));
+            userProfileRepository.save(userProfile);
+            log.info("Deducted {} member points from user {}. New points balance: {}", pointsToDeduct, userId, userProfile.getPoints());
+        }
+        
         releaseBookingSeats(booking);
         notificationService.sendBookingCancellation(userId, booking);
-        return new CancelBookingResponse(booking.getId(), booking.getStatus(), refund, "refunded");
+        return new CancelBookingResponse(booking.getId(), booking.getStatus(), refund, refund > 0 ? "refunded" : "cancelled");
     }
 
     @Override
@@ -451,6 +475,34 @@ public class BookingServiceImpl implements BookingService {
         if ("pendingPayment".equals(booking.getStatus())) {
             if ("00".equals(responseCode)) {
                 booking.completePayment(transactionId, responseCode);
+
+                // --- Generate and upload QR code (R10) ---
+                try {
+                    List<String> sortedSeats = new java.util.ArrayList<>(booking.getSeatCodes());
+                    java.util.Collections.sort(sortedSeats);
+                    String rawQrContent = "CINELUXE|" + booking.getId() + "|" + booking.getUserId() + "|" 
+                            + booking.getShowtimeId() + "|" + String.join("-", sortedSeats);
+
+                    byte[] qrPngBytes = generateQrCodePng(rawQrContent, 300, 300);
+
+                    String publicId = "cineluxe/qr/" + booking.getId();
+                    Map<?, ?> uploadResult = cloudinary.uploader().upload(
+                            qrPngBytes,
+                            ObjectUtils.asMap(
+                                    "public_id", publicId,
+                                    "overwrite", true,
+                                    "resource_type", "image",
+                                    "access_mode", "public"
+                            )
+                    );
+
+                    String qrUrl = (String) uploadResult.get("secure_url");
+                    booking.setQrCodeUrl(qrUrl);
+                    log.info("Successfully generated and uploaded QR code image to Cloudinary for booking {}: {}", booking.getId(), qrUrl);
+                } catch (Exception e) {
+                    log.error("Failed to generate and upload QR code image for booking {}", booking.getId(), e);
+                }
+
                 notificationService.sendPaymentConfirmation(booking.getUserId(), booking);
                 // Req 41.6 — funnel: payment_complete
                 analyticsService.logPaymentComplete(
@@ -549,7 +601,16 @@ public class BookingServiceImpl implements BookingService {
                 booking.getStatus(),
                 booking.getPaymentStatus(),
                 booking.getCreatedAt(),
-                booking.getQrCode());
+                booking.getQrCode(),
+                booking.getQrCodeUrl());
+    }
+
+    private byte[] generateQrCodePng(String text, int width, int height) throws Exception {
+        QRCodeWriter qrCodeWriter = new QRCodeWriter();
+        BitMatrix bitMatrix = qrCodeWriter.encode(text, BarcodeFormat.QR_CODE, width, height);
+        ByteArrayOutputStream pngOutputStream = new ByteArrayOutputStream();
+        MatrixToImageWriter.writeToStream(bitMatrix, "PNG", pngOutputStream);
+        return pngOutputStream.toByteArray();
     }
 
     private PaymentStatusResponse paymentStatus(Booking booking) {

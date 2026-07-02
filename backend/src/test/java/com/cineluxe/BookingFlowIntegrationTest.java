@@ -25,12 +25,12 @@ class BookingFlowIntegrationTest {
   void returnsSeatMapAndActiveCombos() throws Exception {
     mockMvc.perform(get("/api/showtimes/ST001/seats"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.showtimeId").value("ST001"))
-        .andExpect(jsonPath("$.seats", hasSize(60)));
+        .andExpect(jsonPath("$.data.showtimeId").value("ST001"))
+        .andExpect(jsonPath("$.data.seats", hasSize(60)));
 
     mockMvc.perform(get("/api/food-combos"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$", hasSize(2)));
+        .andExpect(jsonPath("$.data", hasSize(2)));
   }
 
   @Test
@@ -46,7 +46,7 @@ class BookingFlowIntegrationTest {
     var holdResult = hold("B1", "booking-user").andExpect(status().isOk())
         .andReturn().getResponse().getContentAsString();
     var holdId = new com.fasterxml.jackson.databind.ObjectMapper()
-        .readTree(holdResult).get("holdId").asText();
+        .readTree(holdResult).get("data").get("holdId").asText();
 
     mockMvc.perform(post("/api/bookings")
             .header("X-User-Id", "booking-user")
@@ -55,8 +55,8 @@ class BookingFlowIntegrationTest {
                 {"holdId":"%s","combos":[{"comboId":"CB01","quantity":1}]}
                 """.formatted(holdId)))
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.status").value("pendingPayment"))
-        .andExpect(jsonPath("$.totalAmount").value(269000));
+        .andExpect(jsonPath("$.data.status").value("pendingPayment"))
+        .andExpect(jsonPath("$.data.totalAmount").value(269000));
   }
 
   @Test
@@ -64,12 +64,12 @@ class BookingFlowIntegrationTest {
     var first = hold("C1", "extend-user").andExpect(status().isOk())
         .andReturn().getResponse().getContentAsString();
     var second = hold("C2", "extend-user").andExpect(status().isOk())
-        .andExpect(jsonPath("$.seatCodes", hasSize(2)))
+        .andExpect(jsonPath("$.data.seatCodes", hasSize(2)))
         .andReturn().getResponse().getContentAsString();
     var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
     org.junit.jupiter.api.Assertions.assertEquals(
-        mapper.readTree(first).get("holdId").asText(),
-        mapper.readTree(second).get("holdId").asText());
+        mapper.readTree(first).get("data").get("holdId").asText(),
+        mapper.readTree(second).get("data").get("holdId").asText());
   }
 
   @Test
@@ -88,24 +88,24 @@ class BookingFlowIntegrationTest {
 
     mockMvc.perform(get("/api/bookings/{bookingId}", bookingId))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value("active"))
-        .andExpect(jsonPath("$.paymentStatus").value("success"));
+        .andExpect(jsonPath("$.data.status").value("active"))
+        .andExpect(jsonPath("$.data.paymentStatus").value("success"));
     mockMvc.perform(get("/api/bookings/{bookingId}/qr", bookingId))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.qrCode", containsString("CINELUXE|" + bookingId)));
+        .andExpect(jsonPath("$.data.qrCode", containsString("CINELUXE|" + bookingId)));
     mockMvc.perform(get("/api/users/payment-user/bookings"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].bookingId").value(bookingId));
+        .andExpect(jsonPath("$.data[0].bookingId").value(bookingId));
 
     mockMvc.perform(post("/api/bookings/{bookingId}/cancel", bookingId)
             .header("X-User-Id", "payment-user")
             .contentType(MediaType.APPLICATION_JSON)
             .content("{}"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value("cancelled"))
-        .andExpect(jsonPath("$.refundAmount").value(120000));
+        .andExpect(jsonPath("$.data.status").value("cancelled"))
+        .andExpect(jsonPath("$.data.refundAmount").value(120000));
     mockMvc.perform(get("/api/showtimes/ST001/seats"))
-        .andExpect(jsonPath("$.seats[?(@.code == 'D1')].status").value("available"));
+        .andExpect(jsonPath("$.data.seats[?(@.code == 'D1')].status").value("available"));
   }
 
   @Test
@@ -128,10 +128,10 @@ class BookingFlowIntegrationTest {
 
     validate(bookingId, "ST001")
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.status").value("used"))
-        .andExpect(jsonPath("$.movieTitle").value("CineLuxe Premiere"))
-        .andExpect(jsonPath("$.seatCodes[0]").value("E1"));
+        .andExpect(jsonPath("$.data.success").value(true))
+        .andExpect(jsonPath("$.data.status").value("used"))
+        .andExpect(jsonPath("$.data.movieTitle").value("CineLuxe Premiere"))
+        .andExpect(jsonPath("$.data.seatCodes[0]").value("E1"));
 
     validate(bookingId, "ST001")
         .andExpect(status().isConflict())
@@ -159,14 +159,14 @@ class BookingFlowIntegrationTest {
     var holdResult = hold(seat, user).andExpect(status().isOk())
         .andReturn().getResponse().getContentAsString();
     var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-    var holdId = mapper.readTree(holdResult).get("holdId").asText();
+    var holdId = mapper.readTree(holdResult).get("data").get("holdId").asText();
     var bookingResult = mockMvc.perform(post("/api/bookings")
             .header("X-User-Id", user)
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"holdId\":\"" + holdId + "\",\"combos\":[]}"))
-        .andExpect(status().isCreated())
+          .andExpect(status().isCreated())
         .andReturn().getResponse().getContentAsString();
-    return mapper.readTree(bookingResult);
+    return mapper.readTree(bookingResult).get("data");
   }
 
   private String createPaidBooking(String seat, String user) throws Exception {

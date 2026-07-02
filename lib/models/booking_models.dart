@@ -185,6 +185,7 @@ class BookingQr {
     required this.roomName,
     required this.cinemaName,
     required this.seatCodes,
+    this.qrCodeUrl,
   });
 
   final String bookingId;
@@ -194,6 +195,7 @@ class BookingQr {
   final String roomName;
   final String cinemaName;
   final List<String> seatCodes;
+  final String? qrCodeUrl;
 
   factory BookingQr.fromJson(Map<String, dynamic> json) =>
       _$BookingQrFromJson(json);

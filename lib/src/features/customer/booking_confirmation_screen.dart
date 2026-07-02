@@ -109,11 +109,25 @@ class _TicketContent extends StatelessWidget {
             ),
             child: Hero(
               tag: ticket.bookingId,
-              child: QrImageView(
-                data: ticket.qrCode,
-                size: 300,
-                backgroundColor: Colors.white,
-              ),
+              child: ticket.qrCodeUrl != null && ticket.qrCodeUrl!.isNotEmpty
+                  ? Image.network(
+                      ticket.qrCodeUrl!,
+                      width: 300,
+                      height: 300,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        return QrImageView(
+                          data: ticket.qrCode,
+                          size: 300,
+                          backgroundColor: Colors.white,
+                        );
+                      },
+                    )
+                  : QrImageView(
+                      data: ticket.qrCode,
+                      size: 300,
+                      backgroundColor: Colors.white,
+                    ),
             ),
           ),
         ),
@@ -232,11 +246,25 @@ class _FullScreenQr extends StatelessWidget {
             children: [
               Hero(
                 tag: ticket.bookingId,
-                child: QrImageView(
-                  data: ticket.qrCode,
-                  size: 340,
-                  backgroundColor: Colors.white,
-                ),
+                child: ticket.qrCodeUrl != null && ticket.qrCodeUrl!.isNotEmpty
+                    ? Image.network(
+                        ticket.qrCodeUrl!,
+                        width: 340,
+                        height: 340,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return QrImageView(
+                            data: ticket.qrCode,
+                            size: 340,
+                            backgroundColor: Colors.white,
+                          );
+                        },
+                      )
+                    : QrImageView(
+                        data: ticket.qrCode,
+                        size: 340,
+                        backgroundColor: Colors.white,
+                      ),
               ),
               const SizedBox(height: 20),
               Text('${ticket.cinemaName} - ${ticket.roomName}'),

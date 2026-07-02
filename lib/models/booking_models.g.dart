@@ -178,6 +178,7 @@ BookingQr _$BookingQrFromJson(Map<String, dynamic> json) => BookingQr(
   seatCodes: (json['seatCodes'] as List<dynamic>)
       .map((e) => e as String)
       .toList(),
+  qrCodeUrl: json['qrCodeUrl'] as String?,
 );
 
 Map<String, dynamic> _$BookingQrToJson(BookingQr instance) => <String, dynamic>{
@@ -188,6 +189,7 @@ Map<String, dynamic> _$BookingQrToJson(BookingQr instance) => <String, dynamic>{
   'roomName': instance.roomName,
   'cinemaName': instance.cinemaName,
   'seatCodes': instance.seatCodes,
+  'qrCodeUrl': instance.qrCodeUrl,
 };
 
 PaymentStatusResult _$PaymentStatusResultFromJson(Map<String, dynamic> json) =>

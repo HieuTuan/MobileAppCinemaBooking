@@ -350,13 +350,18 @@ public class AuthController {
     }
 
     private boolean passwordMatches(String password, String storedHash) {
-        var parts = storedHash.split(":", 2);
-        if (parts.length != 2) return false;
+        try {
+            var parts = storedHash.split(":", 2);
+            if (parts.length != 2) return false;
 
-        var salt = Base64.getUrlDecoder().decode(parts[0]);
-        var expectedHash = Base64.getUrlDecoder().decode(parts[1]);
-        var actualHash = digest(salt, password);
-        return MessageDigest.isEqual(expectedHash, actualHash);
+            var salt = Base64.getUrlDecoder().decode(parts[0]);
+            var expectedHash = Base64.getUrlDecoder().decode(parts[1]);
+            var actualHash = digest(salt, password);
+            return MessageDigest.isEqual(expectedHash, actualHash);
+        } catch (IllegalArgumentException e) {
+            log.error("Failed to decode stored password hash (invalid base64): {}", e.getMessage());
+            return false;
+        }
     }
 
     private byte[] digest(byte[] salt, String password) {

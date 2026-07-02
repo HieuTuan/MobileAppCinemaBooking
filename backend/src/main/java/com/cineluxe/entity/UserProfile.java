@@ -93,5 +93,6 @@ public class UserProfile {
     public void setPermissions(List<String> permissions) {
         this.permissions = permissions != null ? new ArrayList<>(permissions) : new ArrayList<>();
     }
+    public void setPoints(int points) { this.points = points; }
     public void setActive(boolean active) { this.active = active; }
 }

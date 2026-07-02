@@ -151,8 +151,16 @@ public class SeedDataConfig {
                           String email,
                           String password,
                           String role) {
-        if (repo.findByEmailIgnoreCase(email).isPresent()) {
-            log.debug("Seed user already exists: {}", email);
+        var existingOpt = repo.findByEmailIgnoreCase(email);
+        if (existingOpt.isPresent()) {
+            var profile = existingOpt.get();
+            if (!isValidSha256HashFormat(profile.getPasswordHash())) {
+                profile.setPasswordHash(hashPassword(password));
+                repo.save(profile);
+                log.info("🔄 Updated password hash format for seed user: {}", email);
+            } else {
+                log.debug("Seed user already exists and has valid hash format: {}", email);
+            }
             return;
         }
 
@@ -165,6 +173,19 @@ public class SeedDataConfig {
         repo.save(profile);
 
         log.info("✅ Seeded {} account: {} (password: {})", role, email, password);
+    }
+
+    private boolean isValidSha256HashFormat(String storedHash) {
+        if (storedHash == null) return false;
+        var parts = storedHash.split(":", 2);
+        if (parts.length != 2) return false;
+        try {
+            Base64.getUrlDecoder().decode(parts[0]);
+            Base64.getUrlDecoder().decode(parts[1]);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     // ── Password hash (SHA-256 + random salt) ──────────────────────────

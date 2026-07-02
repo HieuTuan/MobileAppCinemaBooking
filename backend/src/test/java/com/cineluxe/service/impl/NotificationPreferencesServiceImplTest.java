@@ -56,7 +56,7 @@ class NotificationPreferencesServiceImplTest {
         testPreferences.setPromotions(false);
         testPreferences.setNewMovies(false);
         testPreferences.setBookingUpdates(false);
-        when(preferencesRepository.findByUserId(testUserId)).thenReturn(Optional.of(testPreferences));
+        
         
         // Act: Check if payment confirmation should be sent
         boolean shouldSend = service.shouldSendNotification(testUserId, "paymentConfirmation");
@@ -75,7 +75,7 @@ class NotificationPreferencesServiceImplTest {
         testPreferences.setPromotions(false);
         testPreferences.setNewMovies(false);
         testPreferences.setBookingUpdates(false);
-        when(preferencesRepository.findByUserId(testUserId)).thenReturn(Optional.of(testPreferences));
+        
         
         // Act: Check if booking cancellation should be sent
         boolean shouldSend = service.shouldSendNotification(testUserId, "bookingCancellation");

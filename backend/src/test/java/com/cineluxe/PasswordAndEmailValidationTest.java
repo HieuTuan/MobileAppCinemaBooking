@@ -121,10 +121,9 @@ class PasswordValidationTest {
 
     // ── Phone number tests (Vietnamese format) ────────────────────────────────
 
-    /** Validates phone: +84 or 0 followed by 9-10 digits. Requirement 17.2 */
     private boolean isValidVietnamesePhone(String phone) {
         if (phone == null) return false;
-        return phone.matches("^(\\+84|0)[0-9]{9,10}$");
+        return phone.matches("^(0[0-9]{9}|\\+84[0-9]{9})$");
     }
 
     @ParameterizedTest

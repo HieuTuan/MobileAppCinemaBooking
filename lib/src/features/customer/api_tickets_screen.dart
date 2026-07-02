@@ -151,7 +151,7 @@ class _ApiTicketsScreenState extends State<ApiTicketsScreen> {
                               itemCount: bookings.length,
                               itemBuilder: (_, index) => _BookingCard(
                                 booking: bookings[index],
-                                userId: widget.store.currentUser!.id,
+                                store: widget.store,
                                 fromCache: result.fromCache,
                                 onChanged: _refresh,
                               ),
@@ -177,13 +177,13 @@ class _StatusOption {
 class _BookingCard extends StatelessWidget {
   const _BookingCard({
     required this.booking,
-    required this.userId,
+    required this.store,
     required this.fromCache,
     required this.onChanged,
   });
 
   final BookingDetails booking;
-  final String userId;
+  final CinemaStore store;
   final bool fromCache;
   final VoidCallback onChanged;
 
@@ -274,10 +274,15 @@ class _BookingCard extends StatelessWidget {
     );
     if (confirmed != true || !context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
+    final userId = store.currentUser!.id;
     final result = await APIClient().cancelBooking(
       booking.bookingId,
       userId: userId,
     );
+    try {
+      final updatedProfile = await APIClient().getProfile(userId);
+      store.setCurrentUserFromProfile(updatedProfile);
+    } catch (_) {}
     if (!context.mounted) return;
     messenger.showSnackBar(
       SnackBar(
