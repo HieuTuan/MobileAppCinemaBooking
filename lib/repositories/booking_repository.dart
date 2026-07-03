@@ -18,11 +18,19 @@ class BookingResult {
     required this.items,
     required this.fromCache,
     this.cachedAt,
+    this.page = 1,
+    this.totalPages = 1,
+    this.hasNext = false,
+    this.hasPrevious = false,
   });
 
   final List<BookingDetails> items;
   final bool fromCache;
   final DateTime? cachedAt;
+  final int page;
+  final int totalPages;
+  final bool hasNext;
+  final bool hasPrevious;
 }
 
 /// Repository for bookings + QR codes. Single concrete class.
@@ -62,6 +70,10 @@ class BookingRepository {
   Future<BookingResult> getUserBookings(
     String userId, {
     String? status,
+    String? startDate,
+    String? endDate,
+    int page = 1,
+    int pageSize = 10,
     bool forceRefresh = false,
   }) async {
     _trackedUserIds.add(userId);
@@ -76,13 +88,24 @@ class BookingRepository {
     }
 
     try {
-      final bookings = await _api.getUserBookings(userId, status: status);
-      await _cache.upsertBookings(bookings);
+      final response = await _api.getUserBookings(
+        userId,
+        status: status,
+        startDate: startDate,
+        endDate: endDate,
+        page: page,
+        pageSize: pageSize,
+      );
+      await _cache.upsertBookings(response.data);
       if (!_changes.isClosed) _changes.add(null);
       return BookingResult(
-        items: bookings,
+        items: response.data,
         fromCache: false,
         cachedAt: DateTime.now(),
+        page: response.page,
+        totalPages: response.totalPages,
+        hasNext: response.hasNext,
+        hasPrevious: response.hasPrevious,
       );
     } on ApiNetworkException {
       final cached = await _cache.readBookings(status: status);
@@ -149,8 +172,8 @@ class BookingRepository {
   /// Public sync entry point — fetches all tracked users' bookings.
   Future<bool> syncUserBookings(String userId) async {
     try {
-      final bookings = await _api.getUserBookings(userId);
-      await _cache.upsertBookings(bookings);
+      final response = await _api.getUserBookings(userId, pageSize: 100);
+      await _cache.upsertBookings(response.data);
       if (!_changes.isClosed) _changes.add(null);
       return true;
     } catch (_) {

@@ -27,7 +27,7 @@ class CacheBanner extends StatelessWidget {
     final color = isOffline ? AppColors.danger : AppColors.warning;
     final icon = isOffline ? Icons.cloud_off_rounded : Icons.cached_rounded;
     final defaultMsg = isOffline
-        ? 'Mất kết nối mạng. Đang hiển thị kết quả đã lưu cục bộ.'
+        ? 'Đang offline. Đang hiển thị vé đã lưu cục bộ.'
         : 'Đang hiển thị kết quả được lưu cục bộ.';
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),

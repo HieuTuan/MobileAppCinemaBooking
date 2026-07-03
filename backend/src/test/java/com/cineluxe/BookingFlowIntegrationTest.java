@@ -20,6 +20,17 @@ import com.cineluxe.repository.BookingRepository;
 class BookingFlowIntegrationTest {
   @Autowired MockMvc mockMvc;
   @Autowired BookingRepository bookingRepository;
+  @Autowired com.cineluxe.repository.ShowtimeSeatRepository seatRepository;
+
+  @org.junit.jupiter.api.BeforeEach
+  void setUp() {
+    bookingRepository.deleteAll();
+    var seats = seatRepository.findAll();
+    for (var seat : seats) {
+      seat.release();
+    }
+    seatRepository.saveAll(seats);
+  }
 
   @Test
   void returnsSeatMapAndActiveCombos() throws Exception {
@@ -95,7 +106,7 @@ class BookingFlowIntegrationTest {
         .andExpect(jsonPath("$.data.qrCode", containsString("CINELUXE|" + bookingId)));
     mockMvc.perform(get("/api/users/payment-user/bookings"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data[0].bookingId").value(bookingId));
+        .andExpect(jsonPath("$.data.data[0].bookingId").value(bookingId));
 
     mockMvc.perform(post("/api/bookings/{bookingId}/cancel", bookingId)
             .header("X-User-Id", "payment-user")

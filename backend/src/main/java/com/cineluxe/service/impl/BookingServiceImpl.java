@@ -20,11 +20,13 @@ import com.cineluxe.dto.response.StaffOfflineSyncDto;
 import com.cineluxe.dto.response.ValidationResult;
 import com.cineluxe.entity.Booking;
 import com.cineluxe.entity.FoodCombo;
+import com.cineluxe.entity.Movie;
 import com.cineluxe.entity.SeatStatus;
 import com.cineluxe.entity.ShowtimeSeat;
 import com.cineluxe.exception.ApiException;
 import com.cineluxe.repository.BookingRepository;
 import com.cineluxe.repository.FoodComboRepository;
+import com.cineluxe.repository.MovieRepository;
 import com.cineluxe.repository.RoomRepository;
 import com.cineluxe.repository.ShowtimeSeatRepository;
 import com.cineluxe.repository.ShowtimeRepository;
@@ -60,6 +62,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @Service
 @RequiredArgsConstructor
@@ -78,6 +83,7 @@ public class BookingServiceImpl implements BookingService {
     private final SeatWebSocketHandler webSocketHandler;
     private final NotificationService notificationService;
     private final UserProfileRepository userProfileRepository;
+    private final MovieRepository movieRepository;
     private final AnalyticsService analyticsService;
     private final Cloudinary cloudinary;
 
@@ -243,6 +249,12 @@ public class BookingServiceImpl implements BookingService {
                         .toList());
         booking.updateShowtimeDateTime(showtimeDateTime);
         booking.updateCinemaInfo(cinemaName, roomName);
+
+        var movie = (showtime != null) ? movieRepository.findById(showtime.getMovieId()).orElse(null) : null;
+        var movieTitle = (movie != null) ? movie.getTitle() : "CineLuxe Premiere";
+        var posterUrl = (movie != null) ? movie.getPosterUrl() : "";
+        booking.updateMovieInfo(movieTitle, posterUrl);
+
         bookingRepository.save(booking);
         seats.forEach(ShowtimeSeat::book);
         seatRepository.saveAll(seats);
@@ -276,6 +288,21 @@ public class BookingServiceImpl implements BookingService {
                 ? bookingRepository.findByUserIdOrderByCreatedAtDesc(userId)
                 : bookingRepository.findByUserIdAndStatusOrderByCreatedAtDesc(userId, status);
         return bookings.stream().map(this::details).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<BookingDetailsResponse> getUserBookings(
+            String userId, String status, Instant startDate, Instant endDate, int page, int pageSize) {
+        int zeroBasedPage = Math.max(page - 1, 0);
+        int size = Math.min(Math.max(pageSize, 1), 100);
+        var pageable = PageRequest.of(zeroBasedPage, size);
+
+        String queryStatus = (status == null || status.isBlank() || "all".equalsIgnoreCase(status)) ? null : status;
+
+        return bookingRepository
+                .findUserBookingsWithFilters(userId, queryStatus, startDate, endDate, pageable)
+                .map(this::details);
     }
 
     @Override
@@ -602,7 +629,8 @@ public class BookingServiceImpl implements BookingService {
                 booking.getPaymentStatus(),
                 booking.getCreatedAt(),
                 booking.getQrCode(),
-                booking.getQrCodeUrl());
+                booking.getQrCodeUrl(),
+                booking.getPosterUrl());
     }
 
     private byte[] generateQrCodePng(String text, int width, int height) throws Exception {

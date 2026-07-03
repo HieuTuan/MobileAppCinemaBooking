@@ -52,7 +52,8 @@ class OfflineService {
     if (isOnline) {
       try {
         // Fetch fresh data from API
-        final bookings = await _apiClient.getUserBookings(userId, status: status);
+        final response = await _apiClient.getUserBookings(userId, status: status);
+        final bookings = response.data;
 
         // Cache each booking for offline access
         for (final booking in bookings) {

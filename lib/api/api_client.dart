@@ -893,17 +893,28 @@ class APIClient {
     return BookingDetails.fromJson(response.data!);
   }
 
-  Future<List<BookingDetails>> getUserBookings(
+  Future<PaginatedResponse<BookingDetails>> getUserBookings(
     String userId, {
     String? status,
+    String? startDate,
+    String? endDate,
+    int page = 1,
+    int pageSize = 10,
   }) async {
-    final response = await get<List<dynamic>>(
+    final response = await get<Map<String, dynamic>>(
       '/api/users/$userId/bookings',
-      queryParameters: {if (status != null) 'status': status},
+      queryParameters: {
+        if (status != null) 'status': status,
+        if (startDate != null) 'startDate': startDate,
+        if (endDate != null) 'endDate': endDate,
+        'page': page,
+        'pageSize': pageSize,
+      },
     );
-    return response.data!
-        .map((item) => BookingDetails.fromJson(item as Map<String, dynamic>))
-        .toList();
+    return PaginatedResponse<BookingDetails>.fromJson(
+      response.data!,
+      (json) => BookingDetails.fromJson(json as Map<String, dynamic>),
+    );
   }
 
   Future<BookingQr> getBookingQr(String bookingId) async {

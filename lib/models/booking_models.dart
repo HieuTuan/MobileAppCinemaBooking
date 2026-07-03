@@ -153,6 +153,7 @@ class BookingDetails {
     required this.paymentStatus,
     required this.createdAt,
     this.qrCode,
+    this.posterUrl,
   });
 
   final String bookingId;
@@ -169,6 +170,7 @@ class BookingDetails {
   final String paymentStatus;
   final DateTime createdAt;
   final String? qrCode;
+  final String? posterUrl;
 
   factory BookingDetails.fromJson(Map<String, dynamic> json) =>
       _$BookingDetailsFromJson(json);

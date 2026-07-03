@@ -33,6 +33,11 @@ class _ApiTicketsScreenState extends State<ApiTicketsScreen> {
   final ConnectivityService _connectivity = ConnectivityService();
 
   String _status = _statusAll;
+  DateTime? _startDate;
+  DateTime? _endDate;
+  int _currentPage = 1;
+  static const int _pageSize = 10;
+
   late Future<BookingResult> _bookings = _load();
 
   StreamSubscription? _changesSub;
@@ -65,6 +70,10 @@ class _ApiTicketsScreenState extends State<ApiTicketsScreen> {
     final result = await _repo.getUserBookings(
       userId,
       status: _status == _statusAll ? null : _status,
+      startDate: _startDate != null ? _startDate!.toIso8601String() : null,
+      endDate: _endDate != null ? _endDate!.toIso8601String() : null,
+      page: _currentPage,
+      pageSize: _pageSize,
     );
     return result;
   }
@@ -80,6 +89,10 @@ class _ApiTicketsScreenState extends State<ApiTicketsScreen> {
     final result = await _repo.getUserBookings(
       userId,
       status: _status == _statusAll ? null : _status,
+      startDate: _startDate != null ? _startDate!.toIso8601String() : null,
+      endDate: _endDate != null ? _endDate!.toIso8601String() : null,
+      page: _currentPage,
+      pageSize: _pageSize,
       forceRefresh: true,
     );
     if (!mounted) return;
@@ -105,10 +118,75 @@ class _ApiTicketsScreenState extends State<ApiTicketsScreen> {
                   .toList(),
               onChanged: (value) {
                 if (value == null) return;
-                setState(() => _status = value);
+                setState(() {
+                  _status = value;
+                  _currentPage = 1;
+                });
                 _refresh();
               },
             ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: _startDate ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2100),
+                    );
+                    if (date != null) {
+                      setState(() {
+                        _startDate = date;
+                        _currentPage = 1;
+                      });
+                      _refresh();
+                    }
+                  },
+                  icon: const Icon(Icons.date_range_rounded),
+                  label: Text(_startDate == null ? 'Từ ngày' : shortDate(_startDate!)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: _endDate ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2100),
+                    );
+                    if (date != null) {
+                      setState(() {
+                        _endDate = DateTime(date.year, date.month, date.day, 23, 59, 59);
+                        _currentPage = 1;
+                      });
+                      _refresh();
+                    }
+                  },
+                  icon: const Icon(Icons.date_range_rounded),
+                  label: Text(_endDate == null ? 'Đến ngày' : shortDate(_endDate!)),
+                ),
+              ),
+              if (_startDate != null || _endDate != null)
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _startDate = null;
+                      _endDate = null;
+                      _currentPage = 1;
+                    });
+                    _refresh();
+                  },
+                  icon: const Icon(Icons.clear_rounded),
+                ),
+            ],
+          ),
         ),
         FutureBuilder<BookingResult>(
           future: _bookings,
@@ -147,7 +225,7 @@ class _ApiTicketsScreenState extends State<ApiTicketsScreen> {
                             onRefresh: _pullRefresh,
                             child: ListView.builder(
                               padding:
-                                  const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                                  const EdgeInsets.fromLTRB(16, 4, 16, 16),
                               itemCount: bookings.length,
                               itemBuilder: (_, index) => _BookingCard(
                                 booking: bookings[index],
@@ -158,6 +236,41 @@ class _ApiTicketsScreenState extends State<ApiTicketsScreen> {
                             ),
                           ),
                   ),
+                  if (!result.fromCache && result.totalPages > 1)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            onPressed: result.hasPrevious
+                                ? () {
+                                    setState(() {
+                                      _currentPage--;
+                                    });
+                                    _refresh();
+                                  }
+                                : null,
+                            icon: const Icon(Icons.chevron_left_rounded),
+                          ),
+                          Text(
+                            'Trang ${result.page} / ${result.totalPages}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          IconButton(
+                            onPressed: result.hasNext
+                                ? () {
+                                    setState(() {
+                                      _currentPage++;
+                                    });
+                                    _refresh();
+                                  }
+                                : null,
+                            icon: const Icon(Icons.chevron_right_rounded),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             );
@@ -193,56 +306,110 @@ class _BookingCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    booking.movieTitle,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
+            if (booking.posterUrl != null && booking.posterUrl!.isNotEmpty)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  booking.posterUrl!,
+                  width: 70,
+                  height: 105,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: 70,
+                    height: 105,
+                    color: Colors.grey.shade800,
+                    child: const Icon(Icons.movie_rounded, color: Colors.white54),
                   ),
                 ),
-                if (fromCache) const _CachedChip(),
-              ],
-            ),
-            Text(
-              '${shortDate(booking.showtimeDateTime)} ${shortTime(booking.showtimeDateTime)}',
-            ),
-            Text('${booking.cinemaName} - ${booking.roomName}'),
-            Text('Ghế: ${booking.seatCodes.join(', ')}'),
-            Text('Tổng tiền: ${money(booking.totalAmount)}'),
-            Text('Trạng thái: ${booking.status} / ${booking.paymentStatus}'),
-            const SizedBox(height: 10),
-            if (booking.status == 'active')
-              Row(
+              )
+            else
+              Container(
+                width: 70,
+                height: 105,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade900,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.movie_rounded, color: Colors.white54),
+              ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => BookingConfirmationScreen(
-                            bookingId: booking.bookingId,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          booking.movieTitle,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ),
-                      icon: const Icon(Icons.qr_code),
-                      label: const Text('Xem QR'),
-                    ),
+                      if (fromCache) const _CachedChip(),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: FilledButton.tonal(
-                      onPressed: () => _cancel(context),
-                      child: const Text('Hủy vé'),
-                    ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${shortDate(booking.showtimeDateTime)} ${shortTime(booking.showtimeDateTime)}',
+                    style: const TextStyle(fontSize: 13),
                   ),
+                  Text(
+                    '${booking.cinemaName} - ${booking.roomName}',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  Text(
+                    'Ghế: ${booking.seatCodes.join(', ')}',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  Text(
+                    'Tổng tiền: ${money(booking.totalAmount)}',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    'Trạng thái: ${booking.status} / ${booking.paymentStatus}',
+                    style: const TextStyle(fontSize: 12, color: Colors.white60),
+                  ),
+                  const SizedBox(height: 10),
+                  if (booking.status == 'active')
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => BookingConfirmationScreen(
+                                  bookingId: booking.bookingId,
+                                ),
+                              ),
+                            ),
+                            icon: const Icon(Icons.qr_code, size: 16),
+                            label: const Text('Xem QR', style: TextStyle(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FilledButton.tonal(
+                            onPressed: () => _cancel(context),
+                            child: const Text('Hủy vé', style: TextStyle(fontSize: 12)),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
+            ),
           ],
         ),
       ),

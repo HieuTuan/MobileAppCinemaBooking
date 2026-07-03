@@ -18,5 +18,6 @@ public record BookingDetailsResponse(
     String paymentStatus,
     Instant createdAt,
     String qrCode,
-    String qrCodeUrl
+    String qrCodeUrl,
+    String posterUrl
 ) {}
