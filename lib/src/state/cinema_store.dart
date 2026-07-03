@@ -155,6 +155,15 @@ class CinemaStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  void updateEmail(String email) {
+    final user = currentUser;
+    if (user == null) return;
+    final updated = user.copyWith(email: email);
+    users = users.map((item) => item.id == user.id ? updated : item).toList();
+    currentUser = updated;
+    notifyListeners();
+  }
+
   Movie _movieFromApi(api_movie.Movie movie) {
     return Movie(
       id: movie.id,

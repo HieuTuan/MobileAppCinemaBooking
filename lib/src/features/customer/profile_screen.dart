@@ -24,10 +24,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late final TextEditingController _name;
   late final TextEditingController _phone;
   late final TextEditingController _email;
+  late final TextEditingController _codeController;
 
   // ── state ─────────────────────────────────────────────────────────────────
   bool _loadingProfile = false;
   bool _saving = false;
+  bool _verifyingEmail = false;
   UserProfile? _remoteProfile;
 
   DateTime? _birthdate;
@@ -49,6 +51,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _name = TextEditingController(text: user.fullName);
     _phone = TextEditingController(text: user.phone);
     _email = TextEditingController(text: user.email);
+    _codeController = TextEditingController();
     _fetchProfile();
   }
 
@@ -57,6 +60,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _name.dispose();
     _phone.dispose();
     _email.dispose();
+    _codeController.dispose();
     super.dispose();
   }
 
@@ -78,6 +82,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // Silently fall back to local data on network error
     } finally {
       if (mounted) setState(() => _loadingProfile = false);
+    }
+  }
+
+  Future<void> _verifyEmailCode() async {
+    final userId = widget.store.currentUser?.id;
+    if (userId == null) return;
+    final code = _codeController.text.trim();
+    if (code.length != 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mã xác thực phải gồm 6 chữ số'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _verifyingEmail = true);
+    try {
+      final updatedProfile = await _api.confirmEmail(userId, code);
+      widget.store.updateEmail(updatedProfile.email);
+      if (!mounted) return;
+      setState(() {
+        _remoteProfile = updatedProfile;
+        _pendingEmailChange = false;
+        _email.text = updatedProfile.email;
+        _codeController.clear();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Xác minh email thành công')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Xác minh thất bại: ${e.toString()}'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _verifyingEmail = false);
     }
   }
 
@@ -116,6 +161,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         fullName: _name.text.trim().isEmpty ? null : _name.text.trim(),
         phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
         birthdate: _birthdate,
+        email: _email.text.trim().isEmpty ? null : _email.text.trim(),
       );
 
       final updatedProfile = await _api.updateProfile(userId, request);
@@ -226,24 +272,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (_pendingEmailChange) ...[
           const SizedBox(height: 10),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
               color: AppColors.warning.withValues(alpha: .12),
               border: Border.all(color: AppColors.warning),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.mail_outline, color: AppColors.warning),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Yêu cầu thay đổi email đang chờ xác minh. '
-                    'Email xác nhận đã được gửi đến địa chỉ mới.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.warning,
+                Row(
+                  children: [
+                    const Icon(Icons.mail_outline, color: AppColors.warning),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Yêu cầu thay đổi email đang chờ xác minh. '
+                        'Email xác nhận đã được gửi đến địa chỉ mới.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.warning,
+                        ),
+                      ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _codeController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: const InputDecoration(
+                    labelText: 'Mã xác thực (6 chữ số)',
+                    counterText: '',
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _verifyingEmail ? null : _verifyEmailCode,
+                    child: Text(_verifyingEmail ? 'Đang xác minh...' : 'Xác minh mã'),
                   ),
                 ),
               ],

@@ -28,6 +28,11 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
 
   boolean existsByUserIdAndStatus(String userId, String status);
 
+  @Query("SELECT COUNT(b) > 0 FROM Booking b, Showtime s " +
+      "WHERE b.showtimeId = s.id AND b.userId = :userId " +
+      "AND s.movieId = :movieId AND b.status = 'used'")
+  boolean hasUserWatchedMovie(@Param("userId") String userId, @Param("movieId") String movieId);
+
   /**
    * Search bookings by booking ID and/or customer name, limited to showtimes within 24 hours.
    * Used by staff for manual ticket validation lookup.

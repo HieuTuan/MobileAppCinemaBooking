@@ -1218,6 +1218,22 @@ class APIClient {
     return UserProfile.fromJson(response.data!);
   }
 
+  /// Confirm email change with 6-digit verification code.
+  /// 
+  /// Throws [ApiException] on failure.
+  Future<UserProfile> confirmEmail(
+    String userId,
+    String code, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/users/$userId/profile/confirm-email',
+      data: {'code': code},
+      cancelToken: cancelToken,
+    );
+    return UserProfile.fromJson(response.data!);
+  }
+
   // ============================================================================
   // Admin Dashboard Endpoints - Requirements 25.1, 25.2, 25.3, 25.4, 25.5
   // ============================================================================
