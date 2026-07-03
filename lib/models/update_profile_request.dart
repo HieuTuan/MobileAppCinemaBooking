@@ -29,10 +29,14 @@ class UpdateProfileRequest {
   /// Updated date of birth (must not be in the future)
   final DateTime? birthdate;
 
+  /// Updated email of the user
+  final String? email;
+
   const UpdateProfileRequest({
     this.fullName,
     this.phone,
     this.birthdate,
+    this.email,
   });
 
   /// Creates an instance from JSON map
@@ -49,9 +53,9 @@ class UpdateProfileRequest {
   /// - +84 followed by exactly 9 digits (e.g., +84901234567)
   String? validatePhone() {
     if (phone == null) return null;
-    final phoneRegex = RegExp(r'^(0[0-9]{9}|\+84[0-9]{9})$');
+    final phoneRegex = RegExp(r'^(0[0-9]{9,10}|\+84[0-9]{9,10})$');
     if (!phoneRegex.hasMatch(phone!)) {
-      return 'Phone number must start with 0 or +84 followed by 9 digits';
+      return 'Số điện thoại phải bắt đầu bằng 0 hoặc +84 tiếp theo là 9–10 chữ số';
     }
     return null;
   }
@@ -60,7 +64,17 @@ class UpdateProfileRequest {
   String? validateBirthdate() {
     if (birthdate == null) return null;
     if (birthdate!.isAfter(DateTime.now())) {
-      return 'Birthdate cannot be in the future';
+      return 'Ngày sinh không được ở tương lai';
+    }
+    return null;
+  }
+
+  /// Validates that email is format compliant.
+  String? validateEmail() {
+    if (email == null) return null;
+    final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+    if (!emailRegex.hasMatch(email!)) {
+      return 'Email không đúng định dạng';
     }
     return null;
   }
@@ -70,7 +84,7 @@ class UpdateProfileRequest {
     final errors = <String>[];
 
     if (fullName != null && fullName!.trim().isEmpty) {
-      errors.add('Full name cannot be empty');
+      errors.add('Họ và tên không được để trống');
     }
 
     final phoneError = validatePhone();
@@ -78,6 +92,9 @@ class UpdateProfileRequest {
 
     final birthdateError = validateBirthdate();
     if (birthdateError != null) errors.add(birthdateError);
+
+    final emailError = validateEmail();
+    if (emailError != null) errors.add(emailError);
 
     return errors;
   }

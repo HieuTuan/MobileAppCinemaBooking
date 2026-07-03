@@ -8,4 +8,6 @@ public interface UserProfileService {
     UserProfileResponse getProfile(String userId);
 
     UserProfileResponse updateProfile(String userId, UpdateProfileRequest request);
+
+    UserProfileResponse confirmEmail(String userId, String code);
 }

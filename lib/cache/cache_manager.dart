@@ -84,6 +84,7 @@ class CacheManager {
         payment_status TEXT NOT NULL,
         created_at INTEGER NOT NULL,
         qr_code TEXT,
+        poster_url TEXT,
         cached_at INTEGER NOT NULL
       )
     ''');
@@ -155,6 +156,7 @@ class CacheManager {
         'payment_status': booking.paymentStatus,
         'created_at': booking.createdAt.millisecondsSinceEpoch,
         'qr_code': booking.qrCode,
+        'poster_url': booking.posterUrl,
         'cached_at': DateTime.now().millisecondsSinceEpoch,
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
@@ -192,6 +194,7 @@ class CacheManager {
         createdAt:
             DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
         qrCode: map['qr_code'] as String?,
+        posterUrl: map['poster_url'] as String?,
       );
     });
   }
@@ -241,6 +244,7 @@ class CacheManager {
       paymentStatus: map['payment_status'] as String,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
       qrCode: map['qr_code'] as String?,
+      posterUrl: map['poster_url'] as String?,
     );
   }
 

@@ -1,9 +1,11 @@
 package com.cineluxe.controller;
 
 import com.cineluxe.dto.request.UpdateProfileRequest;
+import com.cineluxe.dto.request.ConfirmEmailRequest;
 import com.cineluxe.dto.response.ApiResponse;
 import com.cineluxe.dto.response.UserProfileResponse;
 import com.cineluxe.service.UserProfileService;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -31,5 +33,13 @@ public class UserProfileController {
             @PathVariable String userId,
             @RequestBody UpdateProfileRequest request) {
         return ApiResponse.success(userProfileService.updateProfile(userId, request));
+    }
+
+    @PostMapping("/profile/confirm-email")
+    @Operation(summary = "Confirm email change")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> confirmEmail(
+            @PathVariable String userId,
+            @Valid @RequestBody ConfirmEmailRequest request) {
+        return ApiResponse.success(userProfileService.confirmEmail(userId, request.code()));
     }
 }

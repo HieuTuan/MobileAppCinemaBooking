@@ -16,6 +16,9 @@ import com.cineluxe.dto.response.BookingSearchResult;
 import com.cineluxe.dto.response.CancelBookingResponse;
 import com.cineluxe.dto.response.HoldResponse;
 import com.cineluxe.dto.response.PaymentStatusResponse;
+import com.cineluxe.dto.response.PagedBookingResponse;
+import com.cineluxe.exception.ApiException;
+import org.springframework.http.HttpStatus;
 import com.cineluxe.dto.response.SeatMapResponse;
 import com.cineluxe.dto.response.StaffOfflineSyncDto;
 import com.cineluxe.dto.response.ValidationResult;
@@ -108,13 +111,48 @@ public class BookingController {
     }
 
     @Operation(summary = "Get user's bookings",
-            description = "Retrieve all bookings for a specific user with optional status filter")
+            description = "Retrieve bookings for a specific user with optional status, date range filters, and pagination")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Successfully retrieved user bookings")
     @GetMapping("/users/{userId}/bookings")
-    public ResponseEntity<ApiResponse<List<BookingDetailsResponse>>> getUserBookings(
+    public ResponseEntity<ApiResponse<PagedBookingResponse>> getUserBookings(
             @Parameter(description = "User ID") @PathVariable String userId,
-            @Parameter(description = "Filter by booking status (optional)") @RequestParam(required = false) String status) {
-        return success(bookingService.getUserBookings(userId, status));
+            @Parameter(description = "Filter by booking status (optional)") @RequestParam(required = false) String status,
+            @Parameter(description = "Filter by start date (optional, ISO format)") @RequestParam(required = false) String startDate,
+            @Parameter(description = "Filter by end date (optional, ISO format)") @RequestParam(required = false) String endDate,
+            @Parameter(description = "Page number (optional, default 1)") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Page size (optional, default 10)") @RequestParam(defaultValue = "10") int pageSize) {
+        
+        java.time.Instant startInstant = null;
+        if (startDate != null && !startDate.isBlank()) {
+            try {
+                startInstant = java.time.Instant.parse(startDate);
+            } catch (Exception e) {
+                try {
+                    java.time.LocalDate localDate = java.time.LocalDate.parse(startDate);
+                    startInstant = localDate.atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+                } catch (Exception ex) {
+                    throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid startDate format: " + startDate);
+                }
+            }
+        }
+
+        java.time.Instant endInstant = null;
+        if (endDate != null && !endDate.isBlank()) {
+            try {
+                endInstant = java.time.Instant.parse(endDate);
+            } catch (Exception e) {
+                try {
+                    java.time.LocalDate localDate = java.time.LocalDate.parse(endDate);
+                    endInstant = localDate.atTime(23, 59, 59).atZone(java.time.ZoneOffset.UTC).toInstant();
+                } catch (Exception ex) {
+                    throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid endDate format: " + endDate);
+                }
+            }
+        }
+
+        var springPage = bookingService.getUserBookings(userId, status, startInstant, endInstant, page, pageSize);
+        var result = PagedBookingResponse.from(springPage, page);
+        return success(result);
     }
 
     @Operation(summary = "Get booking QR code",

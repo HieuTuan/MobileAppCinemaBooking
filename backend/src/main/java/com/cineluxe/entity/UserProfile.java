@@ -37,6 +37,10 @@ public class UserProfile {
     /** Soft delete timestamp — null means active (Req 32.8). */
     private Instant deletedAt;
 
+    private String pendingEmail;
+    private String emailVerificationCode;
+    private Instant emailVerificationExpiresAt;
+
     protected UserProfile() {}
 
     /**
@@ -74,12 +78,21 @@ public class UserProfile {
     public String getEmail() { return email; }
     public String getAvatarUrl() { return avatarUrl; }
     public String getPasswordHash() { return passwordHash; }
-    public String getMemberRank() { return memberRank; }
+    
+    public String getMemberRank() {
+        if (points >= 5000) return "platinum";
+        if (points >= 1000) return "gold";
+        return "silver";
+    }
+
     public int getPoints() { return points; }
     public String getRole() { return role; }
     public List<String> getPermissions() { return permissions; }
     public boolean isActive() { return active; }
     public Instant getCreatedAt() { return createdAt; }
+    public String getPendingEmail() { return pendingEmail; }
+    public String getEmailVerificationCode() { return emailVerificationCode; }
+    public Instant getEmailVerificationExpiresAt() { return emailVerificationExpiresAt; }
 
     // Setters for mutable fields
 
@@ -93,5 +106,9 @@ public class UserProfile {
     public void setPermissions(List<String> permissions) {
         this.permissions = permissions != null ? new ArrayList<>(permissions) : new ArrayList<>();
     }
+    public void setPoints(int points) { this.points = points; }
     public void setActive(boolean active) { this.active = active; }
+    public void setPendingEmail(String pendingEmail) { this.pendingEmail = pendingEmail; }
+    public void setEmailVerificationCode(String code) { this.emailVerificationCode = code; }
+    public void setEmailVerificationExpiresAt(Instant expiresAt) { this.emailVerificationExpiresAt = expiresAt; }
 }

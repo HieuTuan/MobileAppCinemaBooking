@@ -18,7 +18,8 @@ import java.util.List;
     indexes = {
         @Index(name = "idx_booking_user_id",     columnList = "userId"),
         @Index(name = "idx_booking_showtime_id", columnList = "showtimeId"),
-        @Index(name = "idx_booking_status",      columnList = "status")
+        @Index(name = "idx_booking_status",      columnList = "status"),
+        @Index(name = "idx_booking_user_created_at", columnList = "userId, createdAt DESC")
     })
 public class Booking {
   @Id
@@ -34,6 +35,7 @@ public class Booking {
   private Instant paidAt;
   private Instant cancelledAt;
   private Instant validatedAt;
+  private Instant refundedAt;
   private String validatedByStaffId;
   private long refundAmount;
   private String transactionId;
@@ -42,6 +44,8 @@ public class Booking {
   private String roomName;
   private String cinemaName;
   private String qrCode;
+  private String qrCodeUrl;
+  private String posterUrl = "";
   @ElementCollection
   private List<String> seatCodes = new ArrayList<>();
   @ElementCollection
@@ -103,6 +107,8 @@ public class Booking {
   public Instant getPaidAt() { return paidAt; }
   public Instant getCancelledAt() { return cancelledAt; }
   public Instant getValidatedAt() { return validatedAt; }
+  public Instant getRefundedAt() { return refundedAt; }
+  public void setRefundedAt(Instant refundedAt) { this.refundedAt = refundedAt; }
   public String getValidatedByStaffId() { return validatedByStaffId; }
   public long getRefundAmount() { return refundAmount; }
   public String getTransactionId() { return transactionId; }
@@ -111,6 +117,10 @@ public class Booking {
   public String getRoomName() { return roomName; }
   public String getCinemaName() { return cinemaName; }
   public String getQrCode() { return qrCode; }
+  public String getQrCodeUrl() { return qrCodeUrl; }
+  public void setQrCodeUrl(String qrCodeUrl) { this.qrCodeUrl = qrCodeUrl; }
+  public String getPosterUrl() { return posterUrl; }
+  public void setPosterUrl(String posterUrl) { this.posterUrl = posterUrl; }
   public List<String> getSeatCodes() { return seatCodes; }
   public List<String> getComboSelections() { return comboSelections; }
 
@@ -153,5 +163,10 @@ public class Booking {
   public void updateCinemaInfo(String cinemaName, String roomName) {
     this.cinemaName = cinemaName;
     this.roomName = roomName;
+  }
+
+  public void updateMovieInfo(String movieTitle, String posterUrl) {
+    this.movieTitle = movieTitle;
+    this.posterUrl = posterUrl;
   }
 }

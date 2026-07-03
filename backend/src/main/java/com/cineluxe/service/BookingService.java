@@ -16,6 +16,8 @@ import com.cineluxe.dto.response.PaymentStatusResponse;
 import com.cineluxe.dto.response.SeatMapResponse;
 import com.cineluxe.dto.response.StaffOfflineSyncDto;
 import com.cineluxe.dto.response.ValidationResult;
+import org.springframework.data.domain.Page;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -48,6 +50,10 @@ public interface BookingService {
 
     /** Get all bookings for a user, optionally filtered by status. */
     List<BookingDetailsResponse> getUserBookings(String userId, String status);
+
+    /** Get paginated bookings for a user with status and date range filters. */
+    Page<BookingDetailsResponse> getUserBookings(
+            String userId, String status, Instant startDate, Instant endDate, int page, int pageSize);
 
     /** Get QR code for an active booking. */
     BookingQrResponse getBookingQr(String bookingId);

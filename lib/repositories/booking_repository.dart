@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/rendering.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:dio/dio.dart';
 
 import '../api/api_client.dart';
 import '../api/exceptions/api_exceptions.dart';
@@ -17,11 +18,19 @@ class BookingResult {
     required this.items,
     required this.fromCache,
     this.cachedAt,
+    this.page = 1,
+    this.totalPages = 1,
+    this.hasNext = false,
+    this.hasPrevious = false,
   });
 
   final List<BookingDetails> items;
   final bool fromCache;
   final DateTime? cachedAt;
+  final int page;
+  final int totalPages;
+  final bool hasNext;
+  final bool hasPrevious;
 }
 
 /// Repository for bookings + QR codes. Single concrete class.
@@ -61,6 +70,10 @@ class BookingRepository {
   Future<BookingResult> getUserBookings(
     String userId, {
     String? status,
+    String? startDate,
+    String? endDate,
+    int page = 1,
+    int pageSize = 10,
     bool forceRefresh = false,
   }) async {
     _trackedUserIds.add(userId);
@@ -75,13 +88,24 @@ class BookingRepository {
     }
 
     try {
-      final bookings = await _api.getUserBookings(userId, status: status);
-      await _cache.upsertBookings(bookings);
+      final response = await _api.getUserBookings(
+        userId,
+        status: status,
+        startDate: startDate,
+        endDate: endDate,
+        page: page,
+        pageSize: pageSize,
+      );
+      await _cache.upsertBookings(response.data);
       if (!_changes.isClosed) _changes.add(null);
       return BookingResult(
-        items: bookings,
+        items: response.data,
         fromCache: false,
         cachedAt: DateTime.now(),
+        page: response.page,
+        totalPages: response.totalPages,
+        hasNext: response.hasNext,
+        hasPrevious: response.hasPrevious,
       );
     } on ApiNetworkException {
       final cached = await _cache.readBookings(status: status);
@@ -113,7 +137,24 @@ class BookingRepository {
   Future<BookingQr?> getBookingQr(String bookingId) async {
     try {
       final qr = await _api.getBookingQr(bookingId);
-      final bytes = await _renderQrPng(qr.qrCode);
+      Uint8List? bytes;
+      if (qr.qrCodeUrl != null && qr.qrCodeUrl!.isNotEmpty) {
+        try {
+          final dio = Dio();
+          final response = await dio.get<List<int>>(
+            qr.qrCodeUrl!,
+            options: Options(responseType: ResponseType.bytes),
+          );
+          if (response.statusCode == 200 && response.data != null) {
+            bytes = Uint8List.fromList(response.data!);
+          }
+        } catch (e) {
+          // fallback to local rendering if download fails
+        }
+      }
+      if (bytes == null) {
+        bytes = await _renderQrPng(qr.qrCode);
+      }
       if (bytes != null) {
         await _cache.upsertQRCode(bookingId, bytes);
       }
@@ -131,8 +172,8 @@ class BookingRepository {
   /// Public sync entry point — fetches all tracked users' bookings.
   Future<bool> syncUserBookings(String userId) async {
     try {
-      final bookings = await _api.getUserBookings(userId);
-      await _cache.upsertBookings(bookings);
+      final response = await _api.getUserBookings(userId, pageSize: 100);
+      await _cache.upsertBookings(response.data);
       if (!_changes.isClosed) _changes.add(null);
       return true;
     } catch (_) {

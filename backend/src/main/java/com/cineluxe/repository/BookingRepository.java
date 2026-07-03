@@ -7,12 +7,31 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 public interface BookingRepository extends JpaRepository<Booking, String> {
   List<Booking> findByUserIdOrderByCreatedAtDesc(String userId);
   List<Booking> findByUserIdAndStatusOrderByCreatedAtDesc(String userId, String status);
   List<Booking> findByStatusAndPaymentExpiresAtBefore(String status, Instant now);
 
+  @Query("SELECT b FROM Booking b WHERE b.userId = :userId " +
+      "AND (:status IS NULL OR b.status = :status) " +
+      "AND (cast(:startDate as timestamp) IS NULL OR b.createdAt >= :startDate) " +
+      "AND (cast(:endDate as timestamp) IS NULL OR b.createdAt <= :endDate)")
+  Page<Booking> findUserBookingsWithFilters(
+      @Param("userId") String userId,
+      @Param("status") String status,
+      @Param("startDate") Instant startDate,
+      @Param("endDate") Instant endDate,
+      Pageable pageable);
+
   boolean existsByUserIdAndStatus(String userId, String status);
+
+  @Query("SELECT COUNT(b) > 0 FROM Booking b, Showtime s " +
+      "WHERE b.showtimeId = s.id AND b.userId = :userId " +
+      "AND s.movieId = :movieId AND b.status = 'used'")
+  boolean hasUserWatchedMovie(@Param("userId") String userId, @Param("movieId") String movieId);
 
   /**
    * Search bookings by booking ID and/or customer name, limited to showtimes within 24 hours.

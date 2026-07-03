@@ -10,5 +10,6 @@ public record BookingQrResponse(
     Instant showtimeDateTime,
     String roomName,
     String cinemaName,
-    List<String> seatCodes
+    List<String> seatCodes,
+    String qrCodeUrl
 ) {}
