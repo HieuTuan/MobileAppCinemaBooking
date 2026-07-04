@@ -17,7 +17,9 @@ import '../../core/formatters.dart';
 /// - R13 (Staff): Xem chính sách hoàn tiền và xác nhận hủy/hoàn vé cho khách
 /// - Mới: Duyệt yêu cầu hoàn tiền từ khách hàng
 class StaffRefundSection extends StatefulWidget {
-  const StaffRefundSection({super.key});
+  const StaffRefundSection({super.key, this.showTitle = true});
+
+  final bool showTitle;
 
   @override
   State<StaffRefundSection> createState() => _StaffRefundSectionState();
@@ -125,9 +127,10 @@ class _StaffRefundSectionState extends State<StaffRefundSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── Header ────────────────────────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
-          child: Row(
+        if (widget.showTitle)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
+            child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),

@@ -171,7 +171,7 @@ public class BookingController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid search parameters",
                     content = @Content)
     })
-    @GetMapping("/staff/bookings/search")
+    @GetMapping({"/staff/bookings/search", "/bookings/search"})
     public ResponseEntity<ApiResponse<List<BookingSearchResult>>> searchBookings(
             @Parameter(description = "Booking ID to search (optional, partial match supported)")
             @RequestParam(required = false) String bookingId,

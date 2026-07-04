@@ -8,9 +8,14 @@ import '../../shared/widgets/glass_card.dart';
 import '../../state/cinema_store.dart';
 
 class StaffShowtimeBookingsSection extends StatefulWidget {
-  const StaffShowtimeBookingsSection({super.key, required this.store});
+  const StaffShowtimeBookingsSection({
+    super.key,
+    required this.store,
+    this.showTitle = true,
+  });
 
   final CinemaStore store;
+  final bool showTitle;
 
   @override
   State<StaffShowtimeBookingsSection> createState() =>
@@ -48,7 +53,8 @@ class _StaffShowtimeBookingsSectionState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionTitle(title: 'Danh sách đặt vé theo suất'),
+        if (widget.showTitle)
+          const SectionTitle(title: 'Danh sách đặt vé theo suất'),
         GlassCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

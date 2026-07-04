@@ -8,9 +8,14 @@ import '../../shared/widgets/glass_card.dart';
 import '../../state/cinema_store.dart';
 
 class StaffCustomerSupportSection extends StatefulWidget {
-  const StaffCustomerSupportSection({super.key, required this.store});
+  const StaffCustomerSupportSection({
+    super.key,
+    required this.store,
+    this.showTitle = true,
+  });
 
   final CinemaStore store;
+  final bool showTitle;
 
   @override
   State<StaffCustomerSupportSection> createState() =>
@@ -33,7 +38,8 @@ class _StaffCustomerSupportSectionState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionTitle(title: 'Hỗ trợ khách hàng tại quầy'),
+        if (widget.showTitle)
+          const SectionTitle(title: 'Hỗ trợ khách hàng tại quầy'),
         TextField(
           controller: _search,
           onChanged: (_) => setState(() {}),

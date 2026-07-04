@@ -202,7 +202,7 @@ class _ShimmerButtonState extends State<ShimmerButton>
             borderRadius: BorderRadius.circular(8),
             gradient: LinearGradient(
               transform: GradientRotation(_controller.value * math.pi * 2),
-              colors: const [AppColors.ink, Color(0xFF3A3428), AppColors.gold],
+              colors: const [AppColors.ink, Color(0xFF334155), AppColors.gold],
             ),
           ),
           child: ElevatedButton.icon(

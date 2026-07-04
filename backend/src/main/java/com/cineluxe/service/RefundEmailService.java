@@ -162,20 +162,20 @@ public class RefundEmailService {
         if (!canSend(user)) return;
 
         var safeNote = note == null || note.isBlank()
-                ? "Thong tin rut tien chua hop le. Vui long kiem tra lai ngan hang, so tai khoan va ten chu tai khoan roi gui yeu cau moi."
+                ? "Thông tin rút tiền chưa hợp lệ. Vui lòng kiểm tra lại ngân hàng, số tài khoản và tên chủ tài khoản rồi gửi yêu cầu mới."
                 : note.trim();
-        var subject = "CineLuxe - Yeu cau rut tien chua duoc duyet";
+        var subject = "CineLuxe - Yêu cầu rút tiền chưa được duyệt";
         var html = layout(
-                "Yeu cau rut tien chua duoc duyet",
-                "Yeu cau rut tien cua ban chua duoc chap nhan. So tien da duoc hoan lai vao vi CineLuxe. Vui long thao tac lai theo ly do ben duoi.",
+                "Yêu cầu rút tiền chưa được duyệt",
+                "Yêu cầu rút tiền của bạn chưa được chấp nhận. Số tiền đã được hoàn lại vào ví CineLuxe. Vui lòng thao tác lại theo lý do bên dưới.",
                 "rejected",
                 """
-                <tr><td>Ma yeu cau</td><td>%s</td></tr>
-                <tr><td>Ngan hang</td><td>%s</td></tr>
-                <tr><td>So tai khoan</td><td>%s</td></tr>
-                <tr><td>Chu tai khoan</td><td>%s</td></tr>
-                <tr><td>So tien da hoan vao vi</td><td class="amount">%s</td></tr>
-                <tr><td>Trang thai</td><td><span class="badge rejected">Da tu choi</span></td></tr>
+                <tr><td>Mã yêu cầu</td><td>%s</td></tr>
+                <tr><td>Ngân hàng</td><td>%s</td></tr>
+                <tr><td>Số tài khoản</td><td>%s</td></tr>
+                <tr><td>Chủ tài khoản</td><td>%s</td></tr>
+                <tr><td>Số tiền đã hoàn vào ví</td><td class="amount">%s</td></tr>
+                <tr><td>Trạng thái</td><td><span class="badge rejected">Đã từ chối</span></td></tr>
                 """.formatted(
                         escape(withdrawal.getId()),
                         escape(withdrawal.getBankName()),
@@ -184,11 +184,11 @@ public class RefundEmailService {
                         escape(formatMoney(withdrawal.getAmount()))),
                 """
                 <div class="reason">
-                  <div class="reason-title">Ly do tu choi</div>
+                  <div class="reason-title">Lý do từ chối</div>
                   <div>%s</div>
                 </div>
                 <p class="note warning">
-                  Vui long gui lai yeu cau rut tien voi thong tin chinh xac theo ly do tren.
+                  Vui lòng gửi lại yêu cầu rút tiền với thông tin chính xác theo lý do trên.
                 </p>
                 """.formatted(escape(safeNote)));
 
@@ -211,7 +211,7 @@ public class RefundEmailService {
         try {
             log.info("Sending email '{}' to {}", subject, to);
             var message = mailSender.get().createMimeMessage();
-            var helper = new MimeMessageHelper(message, "UTF-8");
+            var helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(mailFrom == null || mailFrom.isBlank()
                     ? "no-reply@cineluxe.local"
                     : mailFrom);

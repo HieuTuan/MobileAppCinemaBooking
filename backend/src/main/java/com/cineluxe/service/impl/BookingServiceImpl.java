@@ -345,7 +345,8 @@ public class BookingServiceImpl implements BookingService {
         if (!"active".equals(booking.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "Ticket is not active");
         }
-        if (!booking.getShowtimeId().equals(request.expectedShowtimeId())) {
+        if (request.expectedShowtimeId() != null && !request.expectedShowtimeId().isBlank()
+                && !booking.getShowtimeId().equals(request.expectedShowtimeId())) {
             throw new ApiException(
                     HttpStatus.BAD_REQUEST,
                     "Wrong showtime. Ticket belongs to " + booking.getShowtimeId());
@@ -378,12 +379,13 @@ public class BookingServiceImpl implements BookingService {
     @Transactional(readOnly = true)
     public List<BookingSearchResult> searchBookings(SearchBookingsRequest request) {
         var now = Instant.now();
+        var minus24Hours = now.minus(Duration.ofHours(24));
         var plus24Hours = now.plus(Duration.ofHours(24));
         var bookingId = request.bookingId() == null ? "" : request.bookingId();
         var customerName = request.customerName() == null ? "" : request.customerName();
 
         var bookings = bookingRepository.searchBookingsForValidation(
-                bookingId, customerName, now, plus24Hours);
+                bookingId, customerName, minus24Hours, plus24Hours);
         return bookings.stream().map(BookingSearchResult::from).toList();
     }
 

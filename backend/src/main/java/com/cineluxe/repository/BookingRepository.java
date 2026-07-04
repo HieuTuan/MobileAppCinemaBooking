@@ -21,13 +21,13 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
   @Query("SELECT b FROM Booking b WHERE " +
       "(:bookingId IS NULL OR :bookingId = '' OR LOWER(b.id) LIKE LOWER(CONCAT('%', :bookingId, '%'))) AND " +
       "(:customerName IS NULL OR :customerName = '' OR LOWER(b.userId) LIKE LOWER(CONCAT('%', :customerName, '%'))) AND " +
-      "b.showtimeDateTime BETWEEN :now AND :plus24Hours AND " +
+      "b.showtimeDateTime BETWEEN :minus24Hours AND :plus24Hours AND " +
       "b.status = 'active' " +
       "ORDER BY b.showtimeDateTime ASC")
   List<Booking> searchBookingsForValidation(
       @Param("bookingId") String bookingId,
       @Param("customerName") String customerName,
-      @Param("now") Instant now,
+      @Param("minus24Hours") Instant minus24Hours,
       @Param("plus24Hours") Instant plus24Hours);
 
   /**

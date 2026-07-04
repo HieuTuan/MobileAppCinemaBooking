@@ -46,15 +46,87 @@ class _StaffDashboardState extends State<StaffDashboard> {
           _StaffHeader(user: staff),
           const SizedBox(height: 12),
           _StaffMetrics(store: widget.store),
-          StaffTicketVerificationSection(store: widget.store),
-          const SizedBox(height: 8),
-          const StaffRefundSection(),
-          const StaffWithdrawalSection(),
-          const StaffFoodComboSection(),
-          StaffCustomerSupportSection(store: widget.store),
-          StaffRoomManagementSection(store: widget.store),
-          StaffShowtimeBookingsSection(store: widget.store),
+          const SizedBox(height: 12),
+          CollapsibleSection(
+            title: 'Xác thực vé tại cổng',
+            icon: Icons.qr_code_scanner_rounded,
+            child: StaffTicketVerificationSection(store: widget.store, showTitle: false),
+          ),
+          CollapsibleSection(
+            title: 'Xử lý hoàn tiền',
+            icon: Icons.currency_exchange_rounded,
+            child: const StaffRefundSection(showTitle: false),
+          ),
+          CollapsibleSection(
+            title: 'Xử lý rút tiền',
+            icon: Icons.account_balance_rounded,
+            child: const StaffWithdrawalSection(showTitle: false),
+          ),
+          CollapsibleSection(
+            title: 'Trạng thái bắp nước',
+            icon: Icons.fastfood_rounded,
+            child: const StaffFoodComboSection(showTitle: false),
+          ),
+          CollapsibleSection(
+            title: 'Hỗ trợ khách hàng tại quầy',
+            icon: Icons.support_agent_rounded,
+            child: StaffCustomerSupportSection(store: widget.store, showTitle: false),
+          ),
+          CollapsibleSection(
+            title: 'Phòng chiếu và sự cố kỹ thuật',
+            icon: Icons.meeting_room_rounded,
+            child: StaffRoomManagementSection(store: widget.store, showTitle: false),
+          ),
+          CollapsibleSection(
+            title: 'Danh sách đặt vé theo suất',
+            icon: Icons.event_available_rounded,
+            child: StaffShowtimeBookingsSection(store: widget.store, showTitle: false),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class CollapsibleSection extends StatelessWidget {
+  const CollapsibleSection({
+    super.key,
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
+
+  final String title;
+  final IconData icon;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          dividerColor: Colors.transparent,
+        ),
+        child: ExpansionTile(
+          title: Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+            ),
+          ),
+          leading: Icon(icon, color: AppColors.ink),
+          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          children: [
+            child,
+          ],
+        ),
       ),
     );
   }

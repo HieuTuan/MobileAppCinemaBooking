@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const ink = Color(0xFF141822);
-  static const muted = Color(0xFF71788A);
-  static const line = Color(0xFFE7EAF1);
-  static const ivory = Color(0xFFFBFBF8);
-  static const pearl = Color(0xFFF3F5F9);
-  static const gold = Color(0xFFC9A44C);
-  static const goldSoft = Color(0xFFFFF2C5);
-  static const platinum = Color(0xFFEAF0FF);
-  static const success = Color(0xFF1B9E66);
-  static const danger = Color(0xFFD04747);
-  static const warning = Color(0xFFE09622);
+  static const ink = Color(0xFF0F172A);      // Deep slate black
+  static const muted = Color(0xFF64748B);    // Slate gray
+  static const line = Color(0xFFE2E8F0);     // Light gray borders
+  static const ivory = Color(0xFFF8FAFC);    // Clean off-white background
+  static const pearl = Color(0xFFF1F5F9);    // Pearl gray
+  static const gold = Color(0xFF000000);     // Luxury solid black for main items
+  static const goldSoft = Color(0xFFE2E8F0); // Sleek gray for selections/indicators
+  static const platinum = Color(0xFFF1F5F9);
+  static const success = Color(0xFF10B981);  // Emerald green
+  static const danger = Color(0xFFEF4444);   // Crimson red
+  static const warning = Color(0xFFF59E0B);  // Amber orange
 
   static const primary = gold;
   static const background = ivory;

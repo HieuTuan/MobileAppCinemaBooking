@@ -8,7 +8,9 @@ import '../../core/app_theme.dart';
 import '../../core/formatters.dart';
 
 class StaffWithdrawalSection extends StatefulWidget {
-  const StaffWithdrawalSection({super.key});
+  const StaffWithdrawalSection({super.key, this.showTitle = true});
+
+  final bool showTitle;
 
   @override
   State<StaffWithdrawalSection> createState() => _StaffWithdrawalSectionState();
@@ -62,9 +64,10 @@ class _StaffWithdrawalSectionState extends State<StaffWithdrawalSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
-          child: Row(
+        if (widget.showTitle)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
+            child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),

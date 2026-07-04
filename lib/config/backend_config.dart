@@ -27,14 +27,13 @@ class BackendConfig {
     // 3️⃣ Web dev server
     if (kIsWeb) return 'http://localhost:8080';
 
-    // 4️⃣ Android Emulator: 10.0.2.2 is the special alias that maps to the
-    //    host machine's 127.0.0.1. Using 127.0.0.1 inside the emulator
-    //    would point to the emulator VM itself, not the PC running the backend.
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080';
+    // 4️⃣ Android Emulator & Physical Devices / iOS Simulator & Physical Devices
+    if (defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS) {
+      return 'http://192.168.1.18:8080';
     }
 
-    // 5️⃣ iOS Simulator / macOS / desktop
+    // 5️⃣ Web / desktop localhost
     return 'http://localhost:8080';
   }
 

@@ -110,6 +110,31 @@ class _ManualBookingLookupScreenState
 
       if (result.success) {
         if (!mounted) return;
+        setState(() {
+          if (_searchResults != null) {
+            final index = _searchResults!.indexWhere((b) => b.bookingId == booking.bookingId);
+            if (index != -1) {
+              final b = _searchResults![index];
+              _searchResults![index] = BookingDetails(
+                bookingId: b.bookingId,
+                userId: b.userId,
+                showtimeId: b.showtimeId,
+                movieTitle: b.movieTitle,
+                roomName: b.roomName,
+                cinemaName: b.cinemaName,
+                showtimeDateTime: b.showtimeDateTime,
+                seatCodes: b.seatCodes,
+                combos: b.combos,
+                totalAmount: b.totalAmount,
+                status: 'used',
+                paymentStatus: b.paymentStatus,
+                createdAt: b.createdAt,
+                qrCode: b.qrCode,
+              );
+            }
+          }
+          _isValidating = false;
+        });
         _showValidationSuccessDialog(result);
       } else {
         setState(() {
@@ -157,13 +182,6 @@ class _ManualBookingLookupScreenState
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
-              // Clear search and allow new search
-              setState(() {
-                _searchResults = null;
-                _bookingIdController.clear();
-                _customerNameController.clear();
-                _isValidating = false;
-              });
             },
             child: const Text('OK'),
           ),

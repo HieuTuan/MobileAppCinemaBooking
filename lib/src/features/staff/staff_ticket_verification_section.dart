@@ -17,9 +17,14 @@ import '../../shared/widgets/glass_card.dart';
 import '../../state/cinema_store.dart';
 
 class StaffTicketVerificationSection extends StatefulWidget {
-  const StaffTicketVerificationSection({super.key, required this.store});
+  const StaffTicketVerificationSection({
+    super.key,
+    required this.store,
+    this.showTitle = true,
+  });
 
   final CinemaStore store;
+  final bool showTitle;
 
   @override
   State<StaffTicketVerificationSection> createState() =>
@@ -30,19 +35,10 @@ class _StaffTicketVerificationSectionState
     extends State<StaffTicketVerificationSection> {
   final _code = TextEditingController();
   final _apiClient = APIClient();
-  String? _showtimeId;
   ValidationResult? _validation;
   String _message = 'Sẵn sàng quét QR hoặc nhập mã vé.';
   bool _success = false;
   bool _loading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.store.showtimes.isNotEmpty) {
-      _showtimeId = widget.store.showtimes.first.id;
-    }
-  }
 
   @override
   void dispose() {
@@ -52,31 +48,14 @@ class _StaffTicketVerificationSectionState
 
   @override
   Widget build(BuildContext context) {
-    final showtimes = widget.store.showtimes;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionTitle(title: 'Xác thực vé tại cổng'),
+        if (widget.showTitle) const SectionTitle(title: 'Xác thực vé tại cổng'),
         GlassCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              DropdownButtonFormField<String>(
-                initialValue: _showtimeId,
-                decoration: const InputDecoration(
-                  labelText: 'Suất chiếu đang soát',
-                  prefixIcon: Icon(Icons.event_seat_rounded),
-                ),
-                items: [
-                  for (final showtime in showtimes)
-                    DropdownMenuItem(
-                      value: showtime.id,
-                      child: Text(_showtimeLabel(showtime)),
-                    ),
-                ],
-                onChanged: (value) => setState(() => _showtimeId = value),
-              ),
-              const SizedBox(height: 12),
               TextField(
                 controller: _code,
                 decoration: const InputDecoration(
@@ -105,7 +84,7 @@ class _StaffTicketVerificationSectionState
                   ),
                   const SizedBox(width: 10),
                   OutlinedButton.icon(
-                    onPressed: _showtimeId == null ? null : _openScanner,
+                    onPressed: _openScanner,
                     icon: const Icon(Icons.qr_code_scanner_rounded),
                     label: const Text('Quét liên tục'),
                   ),
@@ -126,7 +105,7 @@ class _StaffTicketVerificationSectionState
 
   Future<void> _verifyManual() async {
     final raw = _code.text.trim();
-    if (raw.isEmpty || _showtimeId == null) return;
+    if (raw.isEmpty) return;
     var bookingId = raw;
     if (raw.startsWith('CINELUXE|')) {
       try {
@@ -140,7 +119,7 @@ class _StaffTicketVerificationSectionState
     try {
       final result = await _apiClient.validateTicket(
         bookingId,
-        _showtimeId!,
+        '', // Empty string for global showtime check-in
         staffId: widget.store.currentUser?.id,
       );
       if (!mounted) return;
@@ -164,7 +143,7 @@ class _StaffTicketVerificationSectionState
       MaterialPageRoute(
         builder: (_) => _ContinuousScannerScreen(
           apiClient: _apiClient,
-          expectedShowtimeId: _showtimeId!,
+          expectedShowtimeId: '', // Empty string for global showtime check-in
           staffId: widget.store.currentUser?.id,
         ),
       ),

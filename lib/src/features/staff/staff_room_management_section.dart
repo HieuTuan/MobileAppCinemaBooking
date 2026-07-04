@@ -7,9 +7,14 @@ import '../../shared/widgets/glass_card.dart';
 import '../../state/cinema_store.dart';
 
 class StaffRoomManagementSection extends StatefulWidget {
-  const StaffRoomManagementSection({super.key, required this.store});
+  const StaffRoomManagementSection({
+    super.key,
+    required this.store,
+    this.showTitle = true,
+  });
 
   final CinemaStore store;
+  final bool showTitle;
 
   @override
   State<StaffRoomManagementSection> createState() =>
@@ -33,7 +38,8 @@ class _StaffRoomManagementSectionState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionTitle(title: 'Phòng chiếu và sự cố kỹ thuật'),
+        if (widget.showTitle)
+          const SectionTitle(title: 'Phòng chiếu và sự cố kỹ thuật'),
         ...widget.store.rooms.map(
           (room) => _RoomCard(
             room: room,

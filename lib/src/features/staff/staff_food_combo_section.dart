@@ -7,7 +7,9 @@ import '../../core/app_theme.dart';
 import '../../shared/widgets/glass_card.dart';
 
 class StaffFoodComboSection extends StatefulWidget {
-  const StaffFoodComboSection({super.key});
+  const StaffFoodComboSection({super.key, this.showTitle = true});
+
+  final bool showTitle;
 
   @override
   State<StaffFoodComboSection> createState() => _StaffFoodComboSectionState();
@@ -77,14 +79,15 @@ class _StaffFoodComboSectionState extends State<StaffFoodComboSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionTitle(
-          title: 'Trạng thái bắp nước',
-          action: IconButton(
-            tooltip: 'Tải lại',
-            onPressed: _loading ? null : _loadCombos,
-            icon: const Icon(Icons.refresh_rounded),
+        if (widget.showTitle)
+          SectionTitle(
+            title: 'Trạng thái bắp nước',
+            action: IconButton(
+              tooltip: 'Tải lại',
+              onPressed: _loading ? null : _loadCombos,
+              icon: const Icon(Icons.refresh_rounded),
+            ),
           ),
-        ),
         if (_loading)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 24),

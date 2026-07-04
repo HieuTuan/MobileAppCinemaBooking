@@ -1,6 +1,5 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../models/booking_models.dart';
@@ -127,7 +126,47 @@ class _TicketContent extends StatelessWidget {
         ),
         Text('${ticket.cinemaName} - ${ticket.roomName}'),
         Text('Ghế: ${ticket.seatCodes.join(', ')}'),
-        Text('Mã booking: ${ticket.bookingId}'),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: () => _copyToClipboard(context, ticket.bookingId),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.muted.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.muted.withValues(alpha: 0.15)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Mã booking (chạm để sao chép):',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        ticket.bookingId,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.copy_rounded, size: 20, color: Colors.grey),
+              ],
+            ),
+          ),
+        ),
         const SizedBox(height: 24),
         FilledButton(
           onPressed: () =>
@@ -166,9 +205,28 @@ class _CachedTicketContent extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Center(
-          child: Text(
-            'Mã booking: $bookingId',
-            style: const TextStyle(fontWeight: FontWeight.w800),
+          child: InkWell(
+            onTap: () => _copyToClipboard(context, bookingId),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.muted.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.muted.withValues(alpha: 0.15)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Mã booking: $bookingId',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.copy_rounded, size: 18, color: Colors.grey),
+                ],
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 24),
@@ -247,4 +305,21 @@ class _FullScreenQr extends StatelessWidget {
       ),
     );
   }
+}
+
+void _copyToClipboard(BuildContext context, String text) {
+  Clipboard.setData(ClipboardData(text: text));
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: const [
+          Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+          SizedBox(width: 8),
+          Text('Đã sao chép mã booking vào bộ nhớ tạm'),
+        ],
+      ),
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 2),
+    ),
+  );
 }
