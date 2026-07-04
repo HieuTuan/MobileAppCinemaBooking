@@ -165,12 +165,12 @@ class CacheManager {
   ///
   /// **Requirement 35.2**: Retrieve cached bookings when offline
   ///
-  /// Returns list of all cached bookings, ordered by showtime date (newest first).
+  /// Returns list of all cached bookings, ordered by booking date (newest first).
   Future<List<BookingDetails>> getCachedBookings() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       _bookingsTable,
-      orderBy: 'showtime_date_time DESC',
+      orderBy: 'created_at DESC',
     );
 
     return List.generate(maps.length, (i) {

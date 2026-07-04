@@ -233,16 +233,31 @@ public class BookingController {
     }
 
     @Operation(summary = "VNPay payment return",
-            description = "Handle VNPay payment gateway return callback")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "302", description = "Redirect to app with payment result")
-    @GetMapping("/payments/vnpay/return")
-    public ResponseEntity<Void> vnpayReturn(@RequestParam Map<String, String> parameters) {
+            description = "HTML+JS redirect so Android WebView intercepts cineluxe:// deep-link via onNavigationRequest.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "HTML page with JS redirect to cineluxe:// deep-link")
+    @GetMapping(value = {"/payments/vnpay/return", "/v1/payments/vnpay/return"}, produces = org.springframework.http.MediaType.TEXT_HTML_VALUE)
+    public String vnpayReturn(@RequestParam Map<String, String> parameters) {
         var result = bookingService.processPaymentReturn(parameters);
-        return ResponseEntity.status(HttpStatus.FOUND)
-                .location(java.net.URI.create(
-                        "cineluxe://payment-return?bookingId=" + result.bookingId()
-                                + "&status=" + result.paymentStatus()
-                                + "&responseCode=" + result.responseCode()))
-                .build();
+        var deepLink = "cineluxe://payment-return"
+                + "?bookingId=" + result.bookingId()
+                + "&status=" + result.paymentStatus()
+                + "&responseCode=" + result.responseCode();
+        // Android WebView CANNOT follow HTTP 302 to a custom URI scheme.
+        // Return HTML+JS so Flutter's onNavigationRequest intercepts cineluxe://
+        return "<!doctype html><html><head>"
+                + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+                + "<style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f5f5f5}p{color:#444}</style>"
+                + "</head><body><p>&#272;ang x&#7917; l&#253; k&#7871;t qu&#7843; thanh to&#225;n...</p>"
+                + "<script>window.location.href='" + deepLink + "';</script>"
+                + "</body></html>";
+    }
+
+    @Operation(summary = "Confirm sandbox payment (dev only)",
+            description = "Called by WebView JS to update booking status before navigating to cineluxe:// deep-link.")
+    @PostMapping("/payments/sandbox/{bookingId}/confirm")
+    public ResponseEntity<ApiResponse<PaymentStatusResponse>> confirmSandboxPayment(
+            @Parameter(description = "Booking ID") @PathVariable String bookingId,
+            @Parameter(description = "Response code") @RequestParam(defaultValue = "00") String responseCode) {
+        return success(bookingService.confirmSandboxPayment(bookingId, responseCode));
     }
 }

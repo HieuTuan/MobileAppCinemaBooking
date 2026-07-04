@@ -109,8 +109,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
           const SizedBox(height: 10),
           _MethodTile(
             icon: Icons.qr_code_2_rounded,
-            title: 'VNPay giả lập',
-            subtitle: 'Tạo giao dịch sandbox và trả kết quả thành công.',
+            title: 'VNPay',
+            subtitle: 'Mở cổng thanh toán và xác nhận kết quả tự động.',
             selected: _method == _PaymentMethod.vnpay,
             onTap: () => setState(() => _method = _PaymentMethod.vnpay),
           ),
@@ -203,8 +203,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
         await showDialog<void>(
           context: context,
           builder: (context) => AlertDialog(
-            icon: const Icon(Icons.no_adult_content_rounded,
-                color: Colors.deepOrange, size: 40),
+            icon: const Icon(
+              Icons.no_adult_content_rounded,
+              color: Colors.deepOrange,
+              size: 40,
+            ),
             title: const Text(
               'Xác minh độ tuổi thất bại',
               style: TextStyle(fontWeight: FontWeight.w900),
@@ -505,7 +508,7 @@ class _SandboxNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final methodName = method == _PaymentMethod.vnpay
-        ? 'VNPay sandbox'
+        ? 'VNPay'
         : 'ngân hàng $bank';
     return Container(
       padding: const EdgeInsets.all(14),
@@ -520,7 +523,7 @@ class _SandboxNotice extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Đây là thanh toán giả lập bằng $methodName. App sẽ tạo giao dịch thành công để bạn kiểm thử luồng đặt vé.',
+              'App sẽ mở $methodName trong WebView và tự xác nhận trạng thái sau khi cổng thanh toán trả kết quả.',
               style: const TextStyle(height: 1.4, fontWeight: FontWeight.w700),
             ),
           ),

@@ -408,6 +408,8 @@ class _AdminContentSectionState extends State<AdminContentSection> {
           startTime: saved.startTime,
           endTime: saved.endTime,
           basePrice: saved.basePrice,
+          vipSeatPrice: saved.vipSeatPrice,
+          coupleSeatPrice: saved.coupleSeatPrice,
           status: saved.status,
         ),
       );
@@ -729,6 +731,7 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                 spacing: 6,
                 children: [
                   Text(money(showtime.basePrice)),
+                  Text(showtime.statusLabel),
                   IconButton(
                     tooltip: 'Xóa suất',
                     onPressed: () => _confirmDelete(
@@ -2055,7 +2058,7 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                               ),
                               SizedBox(height: 4),
                               Text(
-                                'T\u1ea3i \u1ea3nh t\u1eeb thi\u1ebft b\u1ecb l\u00ean Cloudinary,\nho\u1eb7c d\u00e1n URL b\u00ean d\u01b0\u1edbi.',
+                                'T\u1ea3i \u1ea3nh t\u1eeb thi\u1ebft b\u1ecb l\u00ean Cloudinary.',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: AppColors.muted,
@@ -2140,7 +2143,6 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                       'Ti\u1ec3u s\u1eed / M\u00f4 t\u1ea3',
                       maxLines: 3,
                     ),
-                    _field(avatarCtrl, 'Avatar diễn viên'),
                     const SizedBox(height: 4),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
@@ -2325,7 +2327,9 @@ class _AdminContentSectionState extends State<AdminContentSection> {
     }
     var movieId = store.movies.first.id;
     var roomId = store.rooms.first.id;
-    final price = TextEditingController(text: '120000');
+    final standardPrice = TextEditingController(text: '120000');
+    final vipPrice = TextEditingController(text: '150000');
+    final couplePrice = TextEditingController(text: '220000');
     DateTime selectedDate = DateTime.now().add(const Duration(days: 1));
     TimeOfDay selectedTime = const TimeOfDay(hour: 19, minute: 0);
     showDialog<void>(
@@ -2357,15 +2361,31 @@ class _AdminContentSectionState extends State<AdminContentSection> {
               ),
               const SizedBox(height: 10),
               TextField(
-                controller: price,
+                controller: standardPrice,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Giá vé cơ bản'),
+                decoration: const InputDecoration(labelText: 'Giá ghế thường'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: vipPrice,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Giá ghế VIP'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: couplePrice,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Giá ghế đôi (1 cặp)',
+                ),
               ),
               const SizedBox(height: 10),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.event_rounded),
-                title: Text('Ngày: ${shortDate(selectedDate)}'),
+                title: Text(
+                  'Ngày: ${DateFormat('dd/MM/yyyy').format(selectedDate)}',
+                ),
                 onTap: () async {
                   final picked = await showDatePicker(
                     context: context,
@@ -2405,6 +2425,20 @@ class _AdminContentSectionState extends State<AdminContentSection> {
           FilledButton(
             onPressed: () {
               final movie = store.movieById(movieId);
+              final standard = int.tryParse(standardPrice.text.trim()) ?? 0;
+              final vip = int.tryParse(vipPrice.text.trim()) ?? 0;
+              final couple = int.tryParse(couplePrice.text.trim()) ?? 0;
+              if (standard <= 0 || vip <= 0 || couple <= 0) {
+                _showSnack('Giá ghế phải lớn hơn 0.', isError: true);
+                return;
+              }
+              if (vip < standard || couple < standard) {
+                _showSnack(
+                  'Giá ghế VIP và ghế đôi phải lớn hơn hoặc bằng ghế thường.',
+                  isError: true,
+                );
+                return;
+              }
               final start = DateTime(
                 selectedDate.year,
                 selectedDate.month,
@@ -2421,7 +2455,9 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                   endTime: start.add(
                     Duration(minutes: movie.durationMinutes + 20),
                   ),
-                  basePrice: int.tryParse(price.text) ?? 120000,
+                  basePrice: standard,
+                  vipSeatPrice: vip,
+                  coupleSeatPrice: couple,
                 ),
               );
             },

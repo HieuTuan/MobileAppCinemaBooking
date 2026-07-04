@@ -12,6 +12,9 @@ class AppColors {
   static const success = Color(0xFF1B9E66);
   static const danger = Color(0xFFD04747);
   static const warning = Color(0xFFE09622);
+
+  static const primary = gold;
+  static const background = ivory;
 }
 
 ThemeData buildAppTheme() {

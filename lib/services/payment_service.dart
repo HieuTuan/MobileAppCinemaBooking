@@ -1,10 +1,11 @@
-import 'dart:async';
-
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../api/api_client.dart';
 import '../models/booking_models.dart';
+import 'payment_webview_screen_stub.dart'
+    if (dart.library.io) 'payment_webview_screen.dart';
 
 class PaymentResult {
   const PaymentResult({
@@ -33,6 +34,12 @@ class PaymentService {
     String bookingId,
     String paymentUrl,
   ) async {
+    // On Flutter Web, webview_flutter is not supported.
+    // Open URL in a new browser tab and poll for payment status.
+    if (kIsWeb) {
+      return _processPaymentWeb(context, bookingId, paymentUrl);
+    }
+    // On mobile (Android/iOS) use the embedded WebView.
     final webResult = await Navigator.of(context).push<PaymentResult>(
       MaterialPageRoute(
         builder: (_) =>
@@ -40,6 +47,58 @@ class PaymentService {
       ),
     );
     return webResult ?? pollPaymentStatus(bookingId);
+  }
+
+  /// Web fallback: launch payment URL in browser tab, then poll backend.
+  Future<PaymentResult> _processPaymentWeb(
+    BuildContext context,
+    String bookingId,
+    String paymentUrl,
+  ) async {
+    final uri = Uri.parse(paymentUrl);
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched) {
+      return PaymentResult(
+        bookingId: bookingId,
+        status: ApiPaymentStatus.failed,
+        message: 'Could not open payment page',
+      );
+    }
+    if (!context.mounted) {
+      return pollPaymentStatus(bookingId);
+    }
+    // Show dialog so user knows to return here after completing payment
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hoàn tất thanh toán'),
+        content: const Text(
+          'Trang thanh toán VNPay đã mở trong trình duyệt.\n\n'
+          'Sau khi hoàn tất, nhấn "Đã thanh toán" để xác nhận.',
+          style: TextStyle(height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Huỷ'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.black),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Đã thanh toán'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) {
+      return PaymentResult(
+        bookingId: bookingId,
+        status: ApiPaymentStatus.failed,
+        message: 'User cancelled',
+      );
+    }
+    return pollPaymentStatus(bookingId, timeout: const Duration(seconds: 60));
   }
 
   Future<PaymentResult> pollPaymentStatus(
@@ -85,95 +144,6 @@ class PaymentService {
       bookingId: bookingId,
       status: status,
       responseCode: uri.queryParameters['responseCode'],
-    );
-  }
-}
-
-class PaymentWebViewScreen extends StatefulWidget {
-  const PaymentWebViewScreen({
-    super.key,
-    required this.bookingId,
-    required this.paymentUrl,
-  });
-
-  final String bookingId;
-  final String paymentUrl;
-
-  @override
-  State<PaymentWebViewScreen> createState() => _PaymentWebViewScreenState();
-}
-
-class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
-  late final WebViewController _controller;
-  Timer? _timeoutTimer;
-  int _progress = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onProgress: (progress) => setState(() => _progress = progress),
-          onNavigationRequest: (request) {
-            final result = PaymentService.parseReturnUrl(request.url);
-            if (result != null) {
-              Navigator.of(context).pop(result);
-              return NavigationDecision.prevent;
-            }
-            return NavigationDecision.navigate;
-          },
-        ),
-      )
-      ..loadRequest(Uri.parse(widget.paymentUrl));
-    _timeoutTimer = Timer(const Duration(minutes: 15), () {
-      if (!mounted) return;
-      Navigator.of(context).pop(
-        PaymentResult(
-          bookingId: widget.bookingId,
-          status: ApiPaymentStatus.timeout,
-          message: 'Payment expired after 15 minutes',
-        ),
-      );
-    });
-  }
-
-  @override
-  void dispose() {
-    _timeoutTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      child: Scaffold(
-        appBar: AppBar(
-          automaticallyImplyLeading: false,
-          title: const Text('VNPay'),
-          actions: [
-            IconButton(
-              tooltip: 'Reload',
-              onPressed: _controller.reload,
-              icon: const Icon(Icons.refresh),
-            ),
-            IconButton(
-              tooltip: 'Close and verify status',
-              onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.close),
-            ),
-          ],
-          bottom: _progress < 100
-              ? PreferredSize(
-                  preferredSize: const Size.fromHeight(3),
-                  child: LinearProgressIndicator(value: _progress / 100),
-                )
-              : null,
-        ),
-        body: WebViewWidget(controller: _controller),
-      ),
     );
   }
 }

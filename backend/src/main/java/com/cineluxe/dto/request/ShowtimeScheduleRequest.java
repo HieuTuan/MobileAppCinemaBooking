@@ -21,5 +21,11 @@ public record ShowtimeScheduleRequest(
         @Min(value = 0, message = "basePrice không được âm")
         int basePrice,
 
+        @Min(value = 0, message = "vipSeatPrice khong duoc am")
+        Integer vipSeatPrice,
+
+        @Min(value = 0, message = "coupleSeatPrice khong duoc am")
+        Integer coupleSeatPrice,
+
         String status
 ) {}

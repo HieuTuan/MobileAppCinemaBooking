@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:dio/dio.dart';
 import 'package:flutter/rendering.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -17,11 +18,13 @@ class BookingResult {
     required this.items,
     required this.fromCache,
     this.cachedAt,
+    this.errorMessage,
   });
 
   final List<BookingDetails> items;
   final bool fromCache;
   final DateTime? cachedAt;
+  final String? errorMessage;
 }
 
 /// Repository for bookings + QR codes. Single concrete class.
@@ -35,13 +38,12 @@ class BookingRepository {
     APIClient? api,
     CacheManager? cache,
     ConnectivityService? connectivity,
-  })  : _api = api ?? APIClient(),
-        _cache = cache ?? CacheManager(),
-        _connectivity = connectivity ?? ConnectivityService();
+  }) : _api = api ?? APIClient(),
+       _cache = cache ?? CacheManager(),
+       _connectivity = connectivity ?? ConnectivityService();
 
   static BookingRepository? _instance;
-  factory BookingRepository() =>
-      _instance ??= BookingRepository._();
+  factory BookingRepository() => _instance ??= BookingRepository._();
 
   final APIClient _api;
   final CacheManager _cache;
@@ -68,27 +70,34 @@ class BookingRepository {
     if (!forceRefresh && !_connectivity.isOnline) {
       final cached = await _cache.readBookings(status: status);
       return BookingResult(
-        items: cached,
+        items: _sortNewestFirst(cached),
         fromCache: true,
         cachedAt: null,
       );
     }
 
     try {
-      final bookings = await _api.getUserBookings(userId, status: status);
+      final bookings = _sortNewestFirst(
+        await _api.getUserBookings(userId, status: status),
+      );
       await _cache.upsertBookings(bookings);
-      if (!_changes.isClosed) _changes.add(null);
+      // NOTE: Do NOT emit _changes here — that would cause ApiTicketsScreen
+      // to re-call _refresh() on every successful fetch, creating an infinite
+      // loop. _changes is reserved for *external* background sync events only
+      // (see syncUserBookings below).
       return BookingResult(
         items: bookings,
         fromCache: false,
         cachedAt: DateTime.now(),
       );
-    } on ApiNetworkException {
+    } catch (error) {
+      if (!_isConnectivityError(error)) rethrow;
       final cached = await _cache.readBookings(status: status);
       return BookingResult(
-        items: cached,
+        items: _sortNewestFirst(cached),
         fromCache: true,
         cachedAt: null,
+        errorMessage: _messageForError(error),
       );
     }
   }
@@ -98,9 +107,10 @@ class BookingRepository {
     try {
       final details = await _api.getBookingDetails(bookingId);
       await _cache.upsertBookings([details]);
-      if (!_changes.isClosed) _changes.add(null);
+      // Do NOT emit _changes here — only background auto-sync should notify screens.
       return details;
-    } on ApiNetworkException {
+    } catch (error) {
+      if (!_isConnectivityError(error)) rethrow;
       return _cache.readBooking(bookingId);
     }
   }
@@ -118,9 +128,33 @@ class BookingRepository {
         await _cache.upsertQRCode(bookingId, bytes);
       }
       return qr;
-    } on ApiNetworkException {
+    } catch (error) {
+      if (!_isConnectivityError(error)) rethrow;
       return null;
     }
+  }
+
+  bool _isConnectivityError(Object error) {
+    if (error is ApiNetworkException || error is ApiTimeoutException) {
+      return true;
+    }
+    if (error is DioException) {
+      return error.error is ApiNetworkException ||
+          error.error is ApiTimeoutException;
+    }
+    return false;
+  }
+
+  String _messageForError(Object error) {
+    if (error is ApiNetworkException) return error.message;
+    if (error is ApiTimeoutException) return error.message;
+    if (error is DioException) {
+      final inner = error.error;
+      if (inner is ApiNetworkException) return inner.message;
+      if (inner is ApiTimeoutException) return inner.message;
+      return error.message ?? 'Không thể gọi API tải vé.';
+    }
+    return error.toString();
   }
 
   /// Returns the cached QR PNG bytes for [bookingId], or `null` if none.
@@ -131,7 +165,7 @@ class BookingRepository {
   /// Public sync entry point — fetches all tracked users' bookings.
   Future<bool> syncUserBookings(String userId) async {
     try {
-      final bookings = await _api.getUserBookings(userId);
+      final bookings = _sortNewestFirst(await _api.getUserBookings(userId));
       await _cache.upsertBookings(bookings);
       if (!_changes.isClosed) _changes.add(null);
       return true;
@@ -148,13 +182,23 @@ class BookingRepository {
         data: data,
         version: QrVersions.auto,
         gapless: true,
-        color: const Color(0xFF141822),
-        emptyColor: const Color(0xFFFFFFFF),
+        eyeStyle: const QrEyeStyle(
+          eyeShape: QrEyeShape.square,
+          color: Color(0xFF141822),
+        ),
+        dataModuleStyle: const QrDataModuleStyle(
+          dataModuleShape: QrDataModuleShape.square,
+          color: Color(0xFF141822),
+        ),
       );
-      final imageSize = 512.0;
+      const imageSize = 512.0;
       final recorder = ui.PictureRecorder();
       final canvas = ui.Canvas(recorder);
-      painter.paint(canvas, Size(imageSize, imageSize));
+      canvas.drawRect(
+        const ui.Offset(0, 0) & const Size(imageSize, imageSize),
+        ui.Paint()..color = const Color(0xFFFFFFFF),
+      );
+      painter.paint(canvas, const Size(imageSize, imageSize));
       final picture = recorder.endRecording();
       final image = await picture.toImage(imageSize.toInt(), imageSize.toInt());
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
@@ -186,5 +230,13 @@ class BookingRepository {
   Future<void> dispose() async {
     await stopAutoSync();
     await _changes.close();
+  }
+
+  List<BookingDetails> _sortNewestFirst(List<BookingDetails> bookings) {
+    return [...bookings]..sort((a, b) {
+      final createdCompare = b.createdAt.compareTo(a.createdAt);
+      if (createdCompare != 0) return createdCompare;
+      return b.showtimeDateTime.compareTo(a.showtimeDateTime);
+    });
   }
 }

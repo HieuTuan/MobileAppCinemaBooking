@@ -154,4 +154,18 @@ public class Booking {
     this.cinemaName = cinemaName;
     this.roomName = roomName;
   }
+
+  /** Cho phép service ngoài (RefundAndWalletService) đổi status qua luồng pendingRefund. */
+  public void setStatus(String status) {
+    this.status = status;
+    if ("cancelled".equals(status)) {
+      this.cancelledAt = Instant.now();
+    }
+  }
+
+  public void setRefundAmount(long refundAmount) {
+    this.refundAmount = refundAmount;
+    if (refundAmount > 0) this.paymentStatus = "refunded";
+  }
 }
+

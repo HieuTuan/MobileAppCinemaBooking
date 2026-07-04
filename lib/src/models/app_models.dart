@@ -189,8 +189,11 @@ class Showtime {
     required this.startTime,
     required this.endTime,
     required this.basePrice,
+    int? vipSeatPrice,
+    int? coupleSeatPrice,
     required this.status,
-  });
+  }) : vipSeatPrice = vipSeatPrice ?? basePrice,
+       coupleSeatPrice = coupleSeatPrice ?? basePrice;
 
   final String id;
   final String movieId;
@@ -198,7 +201,20 @@ class Showtime {
   final DateTime startTime;
   final DateTime endTime;
   final int basePrice;
+  final int vipSeatPrice;
+  final int coupleSeatPrice;
   final String status;
+
+  bool get isScheduled => status == 'scheduled';
+  bool get isCancelled => status == 'cancelled';
+  bool get isCompleted => status == 'completed';
+
+  String get statusLabel => switch (status) {
+    'scheduled' => 'Đang mở',
+    'cancelled' => 'Đã huỷ',
+    'completed' => 'Đóng',
+    _ => status,
+  };
 }
 
 class SeatSpot {

@@ -9,6 +9,7 @@ import '../../core/labels.dart';
 import '../../shared/widgets/glass_card.dart';
 import '../../state/cinema_store.dart';
 import 'notification_preferences_screen.dart';
+import 'wallet_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, required this.store});
@@ -346,6 +347,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+
+        // ── Wallet ───────────────────────────────────────────────────────
+        const SectionTitle(title: 'Tài chính'),
+        GlassCard(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary),
+            title: const Text('Ví Điện Tử'),
+            subtitle: const Text('Quản lý số dư và rút tiền'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => WalletScreen(store: widget.store),
+                ),
+              );
+            },
           ),
         ),
 

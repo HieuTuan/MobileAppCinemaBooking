@@ -11,6 +11,7 @@ import '../models/notification_preferences.dart';
 import '../models/user_profile.dart';
 import '../models/update_profile_request.dart';
 import '../models/admin_models.dart';
+import '../models/wallet_models.dart';
 import 'interceptors/auth_interceptor.dart';
 import 'interceptors/error_interceptor.dart';
 import 'interceptors/retry_interceptor.dart';
@@ -143,6 +144,7 @@ class APIClient {
         if (kDebugMode) {
           print('┌─────────────────────────────────────────────────');
           print('│ 🌐 REQUEST: ${options.method} ${options.path}');
+          print('│ URL: ${options.uri}');
           print('│ Headers: ${options.headers}');
           if (options.queryParameters.isNotEmpty) {
             print('│ Query Parameters: ${options.queryParameters}');
@@ -189,7 +191,20 @@ class APIClient {
 
   /// Update base URL (useful for testing or multi-environment setup)
   void updateBaseUrl(String baseUrl) {
+    _dio.options.extra['manualBaseUrl'] = true;
     _dio.options.baseUrl = baseUrl;
+  }
+
+  /// Keep the singleton Dio config aligned after hot reloads.
+  void _syncConfiguredBaseUrl() {
+    if (_dio.options.extra['manualBaseUrl'] == true) {
+      return;
+    }
+
+    final configuredBaseUrl = _defaultBaseUrl;
+    if (_dio.options.baseUrl != configuredBaseUrl) {
+      _dio.options.baseUrl = configuredBaseUrl;
+    }
   }
 
   /// Create options with standard timeout
@@ -247,6 +262,7 @@ class APIClient {
     CancelToken? cancelToken,
     ProgressCallback? onReceiveProgress,
   }) {
+    _syncConfiguredBaseUrl();
     return _dio.get<T>(
       path,
       queryParameters: queryParameters,
@@ -266,6 +282,7 @@ class APIClient {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) {
+    _syncConfiguredBaseUrl();
     return _dio.post<T>(
       path,
       data: data,
@@ -286,6 +303,7 @@ class APIClient {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) {
+    _syncConfiguredBaseUrl();
     return _dio.post<T>(
       path,
       data: data,
@@ -307,6 +325,7 @@ class APIClient {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) {
+    _syncConfiguredBaseUrl();
     return _dio.put<T>(
       path,
       data: data,
@@ -328,6 +347,7 @@ class APIClient {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) {
+    _syncConfiguredBaseUrl();
     return _dio.patch<T>(
       path,
       data: data,
@@ -347,6 +367,7 @@ class APIClient {
     Options? options,
     CancelToken? cancelToken,
   }) {
+    _syncConfiguredBaseUrl();
     return _dio.delete<T>(
       path,
       data: data,
@@ -424,11 +445,13 @@ class APIClient {
     // Backend trả ApiResponse { data: PagedMovieResponse }
     // PagedMovieResponse: { data:[...], page, pageSize, totalItems, totalPages, hasNext, hasPrevious }
     final raw = response.data!;
-    final pagedRaw = raw.containsKey('data') && raw['data'] is Map<String, dynamic>
+    final pagedRaw =
+        raw.containsKey('data') && raw['data'] is Map<String, dynamic>
         ? raw['data'] as Map<String, dynamic>
         : raw;
 
-    final List<dynamic> items = pagedRaw.containsKey('data') && pagedRaw['data'] is List
+    final List<dynamic> items =
+        pagedRaw.containsKey('data') && pagedRaw['data'] is List
         ? pagedRaw['data'] as List<dynamic>
         : _extractList(raw);
 
@@ -617,14 +640,14 @@ class APIClient {
       queryParameters['date'] = dateString;
     }
 
-    final response = await get<Map<String, dynamic>>(
+    final response = await get<dynamic>(
       '/api/showtimes',
       queryParameters: queryParameters,
       cancelToken: cancelToken,
     );
 
     return _extractList(
-      response.data!,
+      response.data,
     ).map((json) => Showtime.fromJson(json as Map<String, dynamic>)).toList();
   }
 
@@ -644,7 +667,7 @@ class APIClient {
       '/api/showtimes/$showtimeId/seats/hold',
       data: {'seatCodes': seatCodes, if (userId != null) 'userId': userId},
     );
-    return HoldResponse.fromJson(response.data!);
+    return HoldResponse.fromJson(_extractDataMap(response.data!));
   }
 
   Future<List<FoodCombo>> getFoodCombos() async {
@@ -861,12 +884,167 @@ class APIClient {
     return AdminFoodCombo.fromJson(data);
   }
 
+  // ============================================================================
+  // Refund & Wallet Endpoints
+  // ============================================================================
+
+  /// POST /api/bookings/{id}/request-cancel (Customer)
+  Future<RefundRequest> requestCancelBooking(
+    String bookingId, {
+    String? userId,
+  }) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/bookings/$bookingId/request-cancel',
+      options: createStandardOptions(
+        headers: {if (userId != null && userId.isNotEmpty) 'X-User-Id': userId},
+      ),
+    );
+    final raw = response.data!;
+    final data = raw.containsKey('data') && raw['data'] is Map
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    return RefundRequest.fromJson(data);
+  }
+
+  /// GET /api/users/{userId}/wallet (Customer)
+  Future<WalletInfo> getWallet(String userId) async {
+    final response = await get<Map<String, dynamic>>(
+      '/api/users/$userId/wallet',
+    );
+    final raw = response.data!;
+    final data = raw.containsKey('data') && raw['data'] is Map
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    return WalletInfo.fromJson(data);
+  }
+
+  /// POST /api/users/{userId}/wallet/withdraw (Customer)
+  Future<WithdrawalRequest> requestWithdrawal(
+    String userId,
+    int amount,
+    String bankName,
+    String accountNumber,
+    String accountHolder,
+  ) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/users/$userId/wallet/withdraw',
+      data: {
+        'amount': amount,
+        'bankName': bankName,
+        'accountNumber': accountNumber,
+        'accountHolder': accountHolder,
+      },
+    );
+    final raw = response.data!;
+    final data = raw.containsKey('data') && raw['data'] is Map
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    return WithdrawalRequest.fromJson(data);
+  }
+
+  /// GET /api/users/{userId}/refund-requests (Customer)
+  Future<List<RefundRequest>> getMyRefundRequests(String userId) async {
+    final response = await get<Map<String, dynamic>>(
+      '/api/users/$userId/refund-requests',
+    );
+    final items = _extractList(response.data!);
+    return items
+        .map((item) => RefundRequest.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  // ── Staff ──
+
+  /// GET /api/staff/refund-requests (Staff)
+  Future<List<RefundRequest>> staffGetRefundRequests() async {
+    final response = await get<Map<String, dynamic>>(
+      '/api/staff/refund-requests',
+    );
+    final items = _extractList(response.data!);
+    return items
+        .map((item) => RefundRequest.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /api/staff/refund-requests/{id}/approve (Staff)
+  Future<RefundRequest> staffApproveRefund(String id) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/staff/refund-requests/$id/approve',
+    );
+    final raw = response.data!;
+    final data = raw.containsKey('data') && raw['data'] is Map
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    return RefundRequest.fromJson(data);
+  }
+
+  /// POST /api/staff/refund-requests/{id}/reject (Staff)
+  Future<RefundRequest> staffRejectRefund(String id, String reason) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/staff/refund-requests/$id/reject',
+      data: {'reason': reason},
+    );
+    final raw = response.data!;
+    final data = raw.containsKey('data') && raw['data'] is Map
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    return RefundRequest.fromJson(data);
+  }
+
+  /// GET /api/staff/withdrawal-requests (Staff)
+  Future<List<WithdrawalRequest>> staffGetWithdrawalRequests() async {
+    final response = await get<Map<String, dynamic>>(
+      '/api/staff/withdrawal-requests',
+    );
+    final items = _extractList(response.data!);
+    return items
+        .map((item) => WithdrawalRequest.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /api/staff/withdrawal-requests/{id}/complete (Staff)
+  Future<WithdrawalRequest> staffCompleteWithdrawal(String id) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/staff/withdrawal-requests/$id/complete',
+    );
+    final raw = response.data!;
+    final data = raw.containsKey('data') && raw['data'] is Map
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    return WithdrawalRequest.fromJson(data);
+  }
+
+  /// POST /api/staff/withdrawal-requests/{id}/reject (Staff)
+  Future<WithdrawalRequest> staffRejectWithdrawal(
+    String id,
+    String reason,
+  ) async {
+    final response = await post<Map<String, dynamic>>(
+      '/api/staff/withdrawal-requests/$id/reject',
+      data: {'reason': reason},
+    );
+    final raw = response.data!;
+    final data = raw.containsKey('data') && raw['data'] is Map
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    return WithdrawalRequest.fromJson(data);
+  }
+
   // ── private helper ─────────────────────────────────────────────────────────
 
-  /// Unwraps our backend's {"status":200,"data":[...]} envelope.
-  List<dynamic> _extractList(Map<String, dynamic> raw) {
-    if (raw.containsKey('data') && raw['data'] is List) {
-      return raw['data'] as List<dynamic>;
+  /// Unwraps list responses, including our backend's {"status":200,"data":[...]} envelope.
+  List<dynamic> _extractList(dynamic raw) {
+    if (raw is List) {
+      return raw;
+    }
+    if (raw is Map<String, dynamic>) {
+      final data = raw['data'];
+      if (data is List) {
+        return data;
+      }
+      if (data is Map<String, dynamic> && data['data'] is List) {
+        return data['data'] as List<dynamic>;
+      }
     }
     return [];
   }
@@ -883,25 +1061,25 @@ class APIClient {
       '/api/bookings',
       data: request.toJson(),
     );
-    return BookingResponse.fromJson(response.data!);
+    return BookingResponse.fromJson(_extractDataMap(response.data!));
   }
 
   Future<BookingDetails> getBookingDetails(String bookingId) async {
     final response = await get<Map<String, dynamic>>(
       '/api/bookings/$bookingId',
     );
-    return BookingDetails.fromJson(response.data!);
+    return BookingDetails.fromJson(_extractDataMap(response.data!));
   }
 
   Future<List<BookingDetails>> getUserBookings(
     String userId, {
     String? status,
   }) async {
-    final response = await get<List<dynamic>>(
+    final response = await get<dynamic>(
       '/api/users/$userId/bookings',
       queryParameters: {if (status != null) 'status': status},
     );
-    return response.data!
+    return _extractList(response.data)
         .map((item) => BookingDetails.fromJson(item as Map<String, dynamic>))
         .toList();
   }
@@ -910,7 +1088,7 @@ class APIClient {
     final response = await get<Map<String, dynamic>>(
       '/api/bookings/$bookingId/qr',
     );
-    return BookingQr.fromJson(response.data!);
+    return BookingQr.fromJson(_extractDataMap(response.data!));
   }
 
   Future<CancelBookingResponse> cancelBooking(
@@ -921,14 +1099,14 @@ class APIClient {
       '/api/bookings/$bookingId/cancel',
       data: {if (userId != null) 'userId': userId},
     );
-    return CancelBookingResponse.fromJson(response.data!);
+    return CancelBookingResponse.fromJson(_extractDataMap(response.data!));
   }
 
   Future<PaymentStatusResult> getPaymentStatus(String bookingId) async {
     final response = await get<Map<String, dynamic>>(
       '/api/bookings/$bookingId/payment-status',
     );
-    return PaymentStatusResult.fromJson(response.data!);
+    return PaymentStatusResult.fromJson(_extractDataMap(response.data!));
   }
 
   Future<ValidationResult> validateTicket(
@@ -946,7 +1124,7 @@ class APIClient {
         headers: {if (staffId != null) 'X-Staff-Id': staffId},
       ),
     );
-    return ValidationResult.fromJson(response.data!);
+    return ValidationResult.fromJson(_extractDataMap(response.data!));
   }
 
   /// Search bookings by booking ID or customer name for staff operations.
@@ -989,13 +1167,13 @@ class APIClient {
       queryParameters['customerName'] = customerName;
     }
 
-    final response = await get<List<dynamic>>(
+    final response = await get<dynamic>(
       '/api/bookings/search',
       queryParameters: queryParameters,
       cancelToken: cancelToken,
     );
 
-    return (response.data as List<dynamic>)
+    return _extractList(response.data)
         .map((json) => BookingDetails.fromJson(json as Map<String, dynamic>))
         .toList();
   }

@@ -61,6 +61,10 @@ public class AdminShowtimeController {
                 request.startTime(),
                 request.endTime(),
                 request.basePrice());
+        showtime.setSeatPrices(
+                request.basePrice(),
+                seatPriceOrDefault(request.vipSeatPrice(), request.basePrice()),
+                seatPriceOrDefault(request.coupleSeatPrice(), request.basePrice()));
         showtime.setStatus(normalizeStatus(request.status()));
         showtimeRepository.save(showtime);
 
@@ -94,7 +98,10 @@ public class AdminShowtimeController {
         showtime.setRoomId(request.roomId());
         showtime.setStartTime(request.startTime());
         showtime.setEndTime(request.endTime());
-        showtime.setBasePrice(request.basePrice());
+        showtime.setSeatPrices(
+                request.basePrice(),
+                seatPriceOrDefault(request.vipSeatPrice(), request.basePrice()),
+                seatPriceOrDefault(request.coupleSeatPrice(), request.basePrice()));
         showtime.setStatus(normalizeStatus(request.status()));
         showtimeRepository.save(showtime);
         return ApiResponse.success(ShowtimeResponse.from(showtime, room), "Cập nhật suất chiếu thành công");
@@ -112,6 +119,7 @@ public class AdminShowtimeController {
     }
 
     private void validateRequest(ShowtimeScheduleRequest request) {
+        validateSeatPrices(request);
         if (!movieRepository.existsById(request.movieId())) {
             throw new ApiException(HttpStatus.NOT_FOUND, "Không tìm thấy phim");
         }
@@ -124,6 +132,19 @@ public class AdminShowtimeController {
         if (request.startTime().isBefore(Instant.now().minusSeconds(60))) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Không thể tạo suất chiếu trong quá khứ");
         }
+    }
+
+    private void validateSeatPrices(ShowtimeScheduleRequest request) {
+        if (request.vipSeatPrice() != null && request.vipSeatPrice() < request.basePrice()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Gia ghe VIP phai lon hon hoac bang ghe thuong");
+        }
+        if (request.coupleSeatPrice() != null && request.coupleSeatPrice() < request.basePrice()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Gia ghe doi phai lon hon hoac bang ghe thuong");
+        }
+    }
+
+    private int seatPriceOrDefault(Integer value, int fallback) {
+        return value == null ? fallback : value;
     }
 
     private String normalizeStatus(String status) {

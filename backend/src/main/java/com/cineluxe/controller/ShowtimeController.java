@@ -5,6 +5,7 @@ import com.cineluxe.dto.response.ShowtimeResponse;
 import com.cineluxe.entity.Showtime;
 import com.cineluxe.repository.RoomRepository;
 import com.cineluxe.repository.ShowtimeRepository;
+import com.cineluxe.service.ShowtimeStatusService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
@@ -23,11 +24,13 @@ public class ShowtimeController {
 
     private final ShowtimeRepository showtimeRepository;
     private final RoomRepository roomRepository;
+    private final ShowtimeStatusService showtimeStatusService;
 
     @GetMapping
     @Operation(summary = "Lấy danh sách suất chiếu, có thể lọc theo movieId")
     public ResponseEntity<ApiResponse<List<ShowtimeResponse>>> listShowtimes(
             @RequestParam(required = false) String movieId) {
+        showtimeStatusService.closeExpiredShowtimes();
         var showtimes = movieId == null || movieId.isBlank()
                 ? showtimeRepository.findByStatusNotOrderByStartTimeAsc(Showtime.STATUS_CANCELLED)
                 : showtimeRepository.findByMovieIdAndStatusNotOrderByStartTimeAsc(

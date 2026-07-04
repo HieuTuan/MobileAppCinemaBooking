@@ -73,7 +73,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final movie = widget.movie;
     final showtimes = store.showtimesForMovie(movie.id);
     final firstOpenShowtime = showtimes
-        .where((item) => store.roomById(item.roomId).status == RoomStatus.ready)
+        .where(
+          (item) =>
+              item.isScheduled &&
+              store.roomById(item.roomId).status == RoomStatus.ready,
+        )
         .firstOrNull;
 
     return Scaffold(
@@ -650,7 +654,8 @@ class _ShowtimeSection extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final showtime = showtimes[index];
                   final room = store.roomById(showtime.roomId);
-                  final ready = room.status == RoomStatus.ready;
+                  final ready =
+                      showtime.isScheduled && room.status == RoomStatus.ready;
                   return _ShowtimeTile(
                     showtime: showtime,
                     room: room,

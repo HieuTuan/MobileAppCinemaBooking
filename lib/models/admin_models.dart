@@ -615,6 +615,8 @@ class ShowtimeScheduleRequest {
     required this.startTime,
     required this.endTime,
     required this.basePrice,
+    required this.vipSeatPrice,
+    required this.coupleSeatPrice,
     this.status = 'scheduled',
   });
 
@@ -623,6 +625,8 @@ class ShowtimeScheduleRequest {
   final DateTime startTime;
   final DateTime endTime;
   final int basePrice;
+  final int vipSeatPrice;
+  final int coupleSeatPrice;
   final String status;
 
   Map<String, dynamic> toJson() => {
@@ -631,6 +635,8 @@ class ShowtimeScheduleRequest {
     'startTime': startTime.toUtc().toIso8601String(),
     'endTime': endTime.toUtc().toIso8601String(),
     'basePrice': basePrice,
+    'vipSeatPrice': vipSeatPrice,
+    'coupleSeatPrice': coupleSeatPrice,
     'status': status,
   };
 }

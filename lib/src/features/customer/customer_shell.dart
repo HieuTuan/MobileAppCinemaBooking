@@ -20,6 +20,7 @@ class CustomerShell extends StatefulWidget {
 
 class _CustomerShellState extends State<CustomerShell> {
   int _index = 0;
+  int _ticketsRefreshToken = 0;
 
   Future<void> _handleLogout() async {
     await LogoutService.signOut(context: context, store: widget.store);
@@ -31,7 +32,10 @@ class _CustomerShellState extends State<CustomerShell> {
     final screens = [
       MovieListScreen(store: widget.store),
       isLoggedIn
-          ? ApiTicketsScreen(store: widget.store)
+          ? ApiTicketsScreen(
+              store: widget.store,
+              refreshToken: _ticketsRefreshToken,
+            )
           : _GuestAuthPanel(
               icon: Icons.confirmation_number_outlined,
               title: 'Vé của tôi',
@@ -56,7 +60,14 @@ class _CustomerShellState extends State<CustomerShell> {
       actions: isLoggedIn ? _loggedInActions() : _guestActions(context),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (value) => setState(() => _index = value),
+        onDestinationSelected: (value) {
+          setState(() {
+            _index = value;
+            if (value == 1 && isLoggedIn) {
+              _ticketsRefreshToken++;
+            }
+          });
+        },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.movie_filter_outlined),

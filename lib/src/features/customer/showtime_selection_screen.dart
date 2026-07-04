@@ -55,7 +55,12 @@ class _ShowtimeSelectionScreenState extends State<ShowtimeSelectionScreen> {
     try {
       final showtimes = await _api.getShowtimes(widget.movie.id);
       widget.store.replaceShowtimesFromApi(showtimes);
-      await _loadAvailabilityLabels(showtimes.map((item) => item.id).toList());
+      await _loadAvailabilityLabels(
+        showtimes
+            .where((showtime) => showtime.isScheduled)
+            .map((item) => item.id)
+            .toList(),
+      );
       if (!mounted) return;
       setState(() {
         _dateIndex = 0;
@@ -94,7 +99,10 @@ class _ShowtimeSelectionScreenState extends State<ShowtimeSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
-    final showtimes = store.showtimesForMovie(widget.movie.id);
+    final showtimes = store
+        .showtimesForMovie(widget.movie.id)
+        .where((showtime) => showtime.isScheduled)
+        .toList();
     final dates = _datesFrom(showtimes);
     final selectedDate = dates[_dateIndex.clamp(0, dates.length - 1)];
     final selectedSlot = _timeSlots[_timeIndex];

@@ -29,6 +29,8 @@ public class Showtime {
     private Instant startTime;
     private Instant endTime;
     private int basePrice;
+    private int vipSeatPrice;
+    private int coupleSeatPrice;
 
     /** scheduled | cancelled | completed */
     private String status = STATUS_SCHEDULED;
@@ -52,6 +54,8 @@ public class Showtime {
         this.startTime = startTime;
         this.endTime = endTime;
         this.basePrice = basePrice;
+        this.vipSeatPrice = basePrice;
+        this.coupleSeatPrice = basePrice;
         this.status = STATUS_SCHEDULED;
         this.createdAt = Instant.now();
         this.updatedAt = Instant.now();
@@ -70,6 +74,8 @@ public class Showtime {
     public Instant getStartTime()  { return startTime; }
     public Instant getEndTime()    { return endTime; }
     public int getBasePrice()      { return basePrice; }
+    public int getVipSeatPrice()   { return vipSeatPrice > 0 ? vipSeatPrice : basePrice; }
+    public int getCoupleSeatPrice(){ return coupleSeatPrice > 0 ? coupleSeatPrice : basePrice; }
     public String getStatus()      { return status; }
     public Instant getCreatedAt()  { return createdAt; }
     public Instant getUpdatedAt()  { return updatedAt; }
@@ -81,5 +87,13 @@ public class Showtime {
     public void setStartTime(Instant startTime)  { this.startTime = startTime; }
     public void setEndTime(Instant endTime)      { this.endTime = endTime; }
     public void setBasePrice(int basePrice)      { this.basePrice = basePrice; }
+    public void setVipSeatPrice(int vipSeatPrice) { this.vipSeatPrice = vipSeatPrice; }
+    public void setCoupleSeatPrice(int coupleSeatPrice) { this.coupleSeatPrice = coupleSeatPrice; }
     public void setCinemaName(String cinemaName) { this.cinemaName = cinemaName; }
+
+    public void setSeatPrices(int standardSeatPrice, int vipSeatPrice, int coupleSeatPrice) {
+        this.basePrice = standardSeatPrice;
+        this.vipSeatPrice = vipSeatPrice;
+        this.coupleSeatPrice = coupleSeatPrice;
+    }
 }

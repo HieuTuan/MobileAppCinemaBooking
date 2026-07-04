@@ -18,17 +18,8 @@ UpdateProfileRequest _$UpdateProfileRequestFromJson(
 
 Map<String, dynamic> _$UpdateProfileRequestToJson(
   UpdateProfileRequest instance,
-) {
-  final val = <String, dynamic>{};
-
-  void writeNotNull(String key, dynamic value) {
-    if (value != null) {
-      val[key] = value;
-    }
-  }
-
-  writeNotNull('fullName', instance.fullName);
-  writeNotNull('phone', instance.phone);
-  writeNotNull('birthdate', instance.birthdate?.toIso8601String());
-  return val;
-}
+) => <String, dynamic>{
+  'fullName': ?instance.fullName,
+  'phone': ?instance.phone,
+  'birthdate': ?instance.birthdate?.toIso8601String(),
+};

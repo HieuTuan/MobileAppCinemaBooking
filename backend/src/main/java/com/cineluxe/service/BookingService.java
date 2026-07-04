@@ -83,5 +83,8 @@ public interface BookingService {
      * Trả về payload dữ liệu để app nhân viên cache offline.
      * Chứa toàn bộ vé active trong khoảng thời gian sync (mở cửa sổ validate).
      */
+    /** Confirm sandbox payment without signature (dev only). */
+    PaymentStatusResponse confirmSandboxPayment(String bookingId, String responseCode);
+
     StaffOfflineSyncDto getOfflineSyncData();
 }

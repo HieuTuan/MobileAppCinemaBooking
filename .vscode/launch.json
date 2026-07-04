@@ -16,7 +16,7 @@
       "flutterMode": "debug",
       "program": "lib/main.dart",
       "args": [
-        "--dart-define=DEV_SERVER_HOST=10.11.64.190"
+        "--dart-define=DEV_SERVER_HOST=192.168.1.18"
       ]
     },
     {
@@ -34,7 +34,7 @@
       "flutterMode": "profile",
       "program": "lib/main.dart",
       "args": [
-        "--dart-define=DEV_SERVER_HOST=10.11.64.190"
+        "--dart-define=DEV_SERVER_HOST=192.168.1.18"
       ]
     }
   ]

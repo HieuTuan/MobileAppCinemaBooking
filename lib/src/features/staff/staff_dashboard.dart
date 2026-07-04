@@ -8,9 +8,11 @@ import 'package:flutter/material.dart';
 
 import 'staff_customer_support_section.dart';
 import 'staff_food_combo_section.dart';
+import 'staff_refund_section.dart';
 import 'staff_room_management_section.dart';
 import 'staff_showtime_bookings_section.dart';
 import 'staff_ticket_verification_section.dart';
+import 'staff_withdrawal_section.dart';
 
 class StaffDashboard extends StatefulWidget {
   const StaffDashboard({super.key, required this.store});
@@ -45,6 +47,9 @@ class _StaffDashboardState extends State<StaffDashboard> {
           const SizedBox(height: 12),
           _StaffMetrics(store: widget.store),
           StaffTicketVerificationSection(store: widget.store),
+          const SizedBox(height: 8),
+          const StaffRefundSection(),
+          const StaffWithdrawalSection(),
           const StaffFoodComboSection(),
           StaffCustomerSupportSection(store: widget.store),
           StaffRoomManagementSection(store: widget.store),

@@ -242,7 +242,7 @@ class _BookingScreenState extends State<BookingScreen> {
         userId: widget.store.currentUser?.id,
       );
       if (!mounted) return;
-      Navigator.of(context).push(
+      await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => ComboSelectionScreen(
             store: widget.store,
@@ -253,6 +253,9 @@ class _BookingScreenState extends State<BookingScreen> {
           ),
         ),
       );
+      if (mounted) {
+        await _syncSeatState(widget.showtime.id);
+      }
     } on DioException catch (error) {
       final conflict = error.error;
       if (conflict is ApiConflictException) {
@@ -261,9 +264,23 @@ class _BookingScreenState extends State<BookingScreen> {
         await _syncSeatState(widget.showtime.id);
       } else if (conflict is ApiAuthorizationException) {
         if (mounted) _showAgeVerificationRequired();
+      } else if (conflict is ApiException && mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(conflict.error.message)));
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Không thể giữ ghế. Vui lòng thử lại.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Không thể chuyển sang chọn combo. Vui lòng thử lại.',
+            ),
+          ),
         );
       }
     } finally {
@@ -486,7 +503,6 @@ class _CinemaAddressBanner extends StatelessWidget {
                 ),
               ),
             ),
-
           ],
         ),
       ),

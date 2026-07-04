@@ -43,7 +43,13 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.net.URLEncoder;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.TreeMap;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import lombok.RequiredArgsConstructor;
@@ -78,6 +84,21 @@ public class BookingServiceImpl implements BookingService {
 
     @Value("${booking.api-base-url:http://10.0.2.2:8080}")
     private String apiBaseUrl;
+
+    @Value("${booking.vnpay-pay-url:}")
+    private String vnpayPayUrl;
+
+    @Value("${booking.vnpay-terminal-id:}")
+    private String vnpayTerminalId;
+
+    @Value("${booking.vnpay-return-url:}")
+    private String vnpayReturnUrl;
+
+    @Value("${booking.vnpay-order-type:other}")
+    private String vnpayOrderType;
+
+    @Value("${booking.vnpay-locale:vn}")
+    private String vnpayLocale;
 
     private static long offlineSyncVersionCounter = 0L;
 
@@ -240,8 +261,6 @@ public class BookingServiceImpl implements BookingService {
         seatRepository.saveAll(seats);
         comboRepository.saveAll(selectedCombos);
         webSocketHandler.broadcastAll(booking.getShowtimeId(), seats);
-        var paymentParameters = "amount=" + total + "&bookingId=" + bookingId;
-
         // Req 41.5 — funnel: payment_initiate
         analyticsService.logPaymentInitiate(userId, bookingId, seats.get(0).getShowtimeId(), total);
 
@@ -250,8 +269,7 @@ public class BookingServiceImpl implements BookingService {
                 booking.getStatus(),
                 booking.getPaymentStatus(),
                 total,
-                stripTrailingSlash(apiBaseUrl) + "/api/payments/sandbox/" + bookingId
-                        + "?" + paymentParameters + "&signature=" + sign(paymentParameters),
+                createPaymentUrl(bookingId, total),
                 booking.getPaymentExpiresAt());
     }
 
@@ -421,44 +439,88 @@ public class BookingServiceImpl implements BookingService {
         if (!"pendingPayment".equals(booking.getStatus())) {
             return "<html><body><h2>Payment already processed</h2></body></html>";
         }
-        var transactionId = "VNP-" + System.currentTimeMillis();
-        var success = paymentReturnUrl(bookingId, "00", transactionId);
-        var failure = paymentReturnUrl(bookingId, "24", transactionId);
+        // JS fetch calls confirm endpoint (updates DB), then navigates to cineluxe:// deep-link.
+        // Android WebView cannot follow HTTP 302 to a custom URI scheme (ERR_UNKNOWN_URL_SCHEME).
+        var apiBase = stripTrailingSlash(apiBaseUrl);
         return """
         <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-        <style>body{font-family:sans-serif;padding:32px;background:#f5f5f5}main{max-width:520px;margin:auto;background:white;padding:28px;border-radius:16px}
-        a{display:block;margin:16px 0;padding:16px;text-align:center;text-decoration:none;border-radius:8px;background:#111;color:white}
-        a.fail{background:#b42318}</style></head><body><main><h2>VNPay Sandbox</h2>
-        <p>Booking: %s</p><p>Amount: %,d VND</p>
-        <a href="%s">Complete payment</a><a class="fail" href="%s">Simulate failure</a>
-        </main></body></html>
-        """.formatted(bookingId, booking.getTotalAmount(), success, failure);
+        <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+        main{background:white;border-radius:16px;padding:32px;max-width:420px;width:100%%;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+        .logo{font-size:28px;font-weight:900;color:#111;margin-bottom:4px}
+        .badge{display:inline-block;background:#fff2c5;color:#a37200;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;margin-bottom:20px}
+        .info{background:#f8f8f8;border-radius:8px;padding:14px;margin-bottom:24px;font-size:14px;line-height:1.7}
+        .btn{display:block;padding:16px;text-align:center;font-size:15px;font-weight:700;border-radius:10px;cursor:pointer;margin-bottom:12px;border:none;width:100%%}
+        .btn-ok{background:#111;color:white}.btn-fail{background:white;color:#b42318;border:2px solid #b42318}
+        </style></head>
+        <body><main>
+          <div class="logo">VNPay</div><span class="badge">SANDBOX</span>
+          <div class="info"><div><b>Mã vé:</b> %s</div><div><b>Số tiền:</b> %,d VND</div></div>
+          <button class="btn btn-ok"   onclick="pay('00')">Thanh toán thành công</button>
+          <button class="btn btn-fail" onclick="pay('24')">Giả lập thất bại</button>
+        </main>
+        <script>
+        async function pay(code){
+          var s=code==='00'?'success':'failed';
+          try{await fetch('%s/api/payments/sandbox/%s/confirm?responseCode='+code,{method:'POST'});}catch(e){}
+          window.location.href='cineluxe://payment-return?bookingId=%s&status='+s+'&responseCode='+code;
+        }
+        </script></body></html>
+        """.formatted(bookingId, booking.getTotalAmount(), apiBase, bookingId, bookingId);
     }
 
     @Override
     public PaymentStatusResponse processPaymentReturn(Map<String, String> parameters) {
-        var bookingId = parameters.getOrDefault("bookingId", "");
+        if (parameters.containsKey("vnp_SecureHash")) {
+            return processVnpayGatewayReturn(parameters);
+        }
+        var bookingId    = parameters.getOrDefault("bookingId", "");
         var responseCode = parameters.getOrDefault("responseCode", "");
         var transactionId = parameters.getOrDefault("transactionId", "");
-        var signature = parameters.getOrDefault("signature", "");
+        var signature    = parameters.getOrDefault("signature", "");
         var payload = callbackPayload(bookingId, responseCode, transactionId);
         if (!MessageDigest.isEqual(
                 sign(payload).getBytes(StandardCharsets.UTF_8),
                 signature.getBytes(StandardCharsets.UTF_8))) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid sandbox callback signature");
+        }
+        return applyPaymentResult(bookingId, responseCode, transactionId);
+    }
+
+    private PaymentStatusResponse processVnpayGatewayReturn(Map<String, String> parameters) {
+        var signedParams = new TreeMap<>(parameters);
+        var receivedHash = signedParams.remove("vnp_SecureHash");
+        signedParams.remove("vnp_SecureHashType");
+        if (receivedHash == null || !MessageDigest.isEqual(
+                sign(buildHashData(signedParams)).getBytes(StandardCharsets.UTF_8),
+                receivedHash.getBytes(StandardCharsets.UTF_8))) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid VNPay signature");
         }
+        var bookingId     = parameters.getOrDefault("vnp_TxnRef", "");
+        var responseCode  = parameters.getOrDefault("vnp_ResponseCode", "");
+        var transactionId = parameters.getOrDefault("vnp_TransactionNo",
+                            parameters.getOrDefault("vnp_BankTranNo", ""));
+        return applyPaymentResult(bookingId, responseCode, transactionId);
+    }
+
+    @Override
+    public PaymentStatusResponse confirmSandboxPayment(String bookingId, String responseCode) {
+        return applyPaymentResult(bookingId, responseCode, "VNP-" + System.currentTimeMillis());
+    }
+
+    private PaymentStatusResponse applyPaymentResult(
+            String bookingId, String responseCode, String transactionId) {
         var booking = requireBooking(bookingId);
         if ("pendingPayment".equals(booking.getStatus())) {
             if ("00".equals(responseCode)) {
                 booking.completePayment(transactionId, responseCode);
                 notificationService.sendPaymentConfirmation(booking.getUserId(), booking);
-                // Req 41.6 — funnel: payment_complete
                 analyticsService.logPaymentComplete(
                         booking.getUserId(), bookingId, transactionId, booking.getTotalAmount());
             } else {
                 booking.failPayment(transactionId, responseCode);
                 releaseBookingSeats(booking);
-                // Req 41.6 — funnel: payment_fail
                 analyticsService.logPaymentFail(booking.getUserId(), bookingId, responseCode);
             }
             bookingRepository.save(booking);
@@ -576,6 +638,62 @@ public class BookingServiceImpl implements BookingService {
     private String callbackPayload(String bookingId, String responseCode, String transactionId) {
         return "bookingId=" + bookingId + "&responseCode=" + responseCode
                 + "&transactionId=" + transactionId;
+    }
+
+
+    private String createPaymentUrl(String bookingId, long totalAmount) {
+        if (!isVnpayGatewayConfigured()) {
+            var p = "amount=" + totalAmount + "&bookingId=" + bookingId;
+            return stripTrailingSlash(apiBaseUrl) + "/api/payments/sandbox/" + bookingId
+                    + "?" + p + "&signature=" + sign(p);
+        }
+        var zone = ZoneId.of("Asia/Ho_Chi_Minh");
+        var fmt  = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+        var now  = LocalDateTime.now(zone);
+        var returnUrl = (vnpayReturnUrl == null || vnpayReturnUrl.isBlank())
+                ? stripTrailingSlash(apiBaseUrl) + "/api/payments/vnpay/return"
+                : vnpayReturnUrl.trim();
+        var params = new TreeMap<String, String>();
+        params.put("vnp_Version",   "2.1.0");
+        params.put("vnp_Command",   "pay");
+        params.put("vnp_TmnCode",   vnpayTerminalId.trim());
+        params.put("vnp_Amount",    String.valueOf(totalAmount * 100));
+        params.put("vnp_CurrCode",  "VND");
+        params.put("vnp_TxnRef",    bookingId);
+        params.put("vnp_OrderInfo", "Thanh toan don hang " + bookingId);
+        params.put("vnp_OrderType", vnpayOrderType);
+        params.put("vnp_Locale",    vnpayLocale);
+        params.put("vnp_ReturnUrl", returnUrl);
+        params.put("vnp_IpAddr",    "127.0.0.1");
+        params.put("vnp_CreateDate",  fmt.format(now));
+        params.put("vnp_ExpireDate",  fmt.format(now.plusMinutes(15)));
+        return stripTrailingSlash(vnpayPayUrl) + "?"
+                + buildQueryString(params)
+                + "&vnp_SecureHash=" + sign(buildHashData(params));
+    }
+
+    private boolean isVnpayGatewayConfigured() {
+        return vnpayPayUrl != null && !vnpayPayUrl.isBlank()
+                && vnpayTerminalId != null && !vnpayTerminalId.isBlank()
+                && vnpaySecret != null && !vnpaySecret.isBlank();
+    }
+
+    private String buildQueryString(Map<String, String> params) {
+        return params.entrySet().stream()
+                .filter(e -> e.getValue() != null && !e.getValue().isBlank())
+                .map(e -> encode(e.getKey()) + "=" + encode(e.getValue()))
+                .collect(Collectors.joining("&"));
+    }
+
+    private String buildHashData(Map<String, String> params) {
+        return params.entrySet().stream()
+                .filter(e -> e.getValue() != null && !e.getValue().isBlank())
+                .map(e -> e.getKey() + "=" + encode(e.getValue()))
+                .collect(Collectors.joining("&"));
+    }
+
+    private String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     private String sign(String payload) {

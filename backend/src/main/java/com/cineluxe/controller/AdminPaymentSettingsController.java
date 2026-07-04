@@ -20,12 +20,17 @@ public class AdminPaymentSettingsController {
 
     public AdminPaymentSettingsController(
             @Value("${booking.vnpay-secret}") String secretKey,
+            @Value("${booking.vnpay-terminal-id:CINELUXE_SANDBOX}") String terminalId,
+            @Value("${booking.vnpay-return-url:}") String returnUrl,
             @Value("${booking.api-base-url}") String apiBaseUrl) {
+        var resolvedReturnUrl = returnUrl == null || returnUrl.isBlank()
+                ? stripTrailingSlash(apiBaseUrl) + "/api/payments/vnpay/return"
+                : returnUrl.trim();
         this.settings = new PaymentSettingsResponse(
-                "CINELUXE_SANDBOX",
+                terminalId == null || terminalId.isBlank() ? "CINELUXE_SANDBOX" : terminalId,
                 secretKey,
                 "sandbox",
-                stripTrailingSlash(apiBaseUrl) + "/api/payments/vnpay/return",
+                resolvedReturnUrl,
                 true);
     }
 

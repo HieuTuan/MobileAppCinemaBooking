@@ -111,6 +111,8 @@ class CinemaStore extends ChangeNotifier {
         startTime: item.startTime,
         endTime: item.endTime,
         basePrice: item.basePrice,
+        vipSeatPrice: item.vipSeatPrice,
+        coupleSeatPrice: item.coupleSeatPrice,
         status: item.status,
       );
     }).toList()..sort((a, b) => a.startTime.compareTo(b.startTime));
@@ -254,9 +256,9 @@ class CinemaStore extends ChangeNotifier {
 
   int seatPrice(SeatSpot seat, Showtime showtime) {
     return switch (seat.type) {
-      SeatType.standard => showtime.basePrice + standardSeatSurcharge,
-      SeatType.vip => showtime.basePrice + vipSeatSurcharge,
-      SeatType.couple => showtime.basePrice + (coupleSeatSurcharge ~/ 2),
+      SeatType.standard => showtime.basePrice,
+      SeatType.vip => showtime.vipSeatPrice,
+      SeatType.couple => showtime.coupleSeatPrice,
     };
   }
 
@@ -338,10 +340,17 @@ class CinemaStore extends ChangeNotifier {
     List<String> selectedSeats,
     Iterable<String> selectedCombos,
   ) {
-    final seatTotal = selectedSeats.fold<int>(0, (sum, code) {
-      final seat = seats.firstWhere((item) => item.code == code);
-      return sum + seatPrice(seat, showtime);
-    });
+    var coupleSeatCount = 0;
+    final seatTotal =
+        selectedSeats.fold<int>(0, (sum, code) {
+          final seat = seats.firstWhere((item) => item.code == code);
+          if (seat.type == SeatType.couple) {
+            coupleSeatCount += 1;
+            return sum;
+          }
+          return sum + seatPrice(seat, showtime);
+        }) +
+        (coupleSeatCount ~/ 2) * showtime.coupleSeatPrice;
     final comboTotal = selectedCombos.fold<int>(0, (sum, comboId) {
       final combo = combos.firstWhere((item) => item.id == comboId);
       return sum + combo.price;
