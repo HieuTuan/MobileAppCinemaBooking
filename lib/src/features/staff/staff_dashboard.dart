@@ -34,10 +34,17 @@ class _StaffDashboardState extends State<StaffDashboard> {
     return LuxuryScaffold(
       title: 'Bảng nhân viên',
       actions: [
-        IconButton(
-          tooltip: 'Đăng xuất',
-          onPressed: _handleLogout,
-          icon: const Icon(Icons.logout_rounded),
+        InkWell(
+          onTap: _handleLogout,
+          borderRadius: BorderRadius.circular(20),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Icon(
+              Icons.logout_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
+          ),
         ),
       ],
       child: ListView(
@@ -103,11 +110,12 @@ class CollapsibleSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: AppColors.line),
+        boxShadow: softShadow(0.05),
       ),
       child: Theme(
         data: Theme.of(context).copyWith(
@@ -117,12 +125,15 @@ class CollapsibleSection extends StatelessWidget {
           title: Text(
             title,
             style: const TextStyle(
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w800,
               fontSize: 15,
+              color: AppColors.ink,
             ),
           ),
-          leading: Icon(icon, color: AppColors.ink),
-          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          leading: Icon(icon, color: const Color(0xFFF59E0B)),
+          iconColor: AppColors.ink,
+          collapsedIconColor: AppColors.muted,
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           children: [
             child,
           ],
@@ -143,15 +154,26 @@ class _StaffHeader extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 50,
+            height: 50,
             decoration: BoxDecoration(
-              color: AppColors.ink,
-              borderRadius: BorderRadius.circular(8),
+              gradient: const LinearGradient(
+                colors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFF59E0B).withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-            child: const Icon(Icons.badge_rounded, color: Colors.white),
+            child: const Icon(Icons.badge_rounded, color: Colors.white, size: 24),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -161,20 +183,53 @@ class _StaffHeader extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
+                    color: AppColors.ink,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  (user?.permissions.isEmpty ?? true)
-                      ? 'Tài khoản nội bộ Staff'
-                      : user!.permissions.join(' • '),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.muted,
-                    fontWeight: FontWeight.w700,
+                const SizedBox(height: 6),
+                if (user?.permissions.isEmpty ?? true)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.line,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'Tài khoản nội bộ Staff',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                  )
+                else
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      for (final perm in user!.permissions)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF59E0B).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: const Color(0xFFF59E0B).withOpacity(0.25),
+                              width: 0.6,
+                            ),
+                          ),
+                          child: Text(
+                            perm,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFD97706),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                ),
               ],
             ),
           ),

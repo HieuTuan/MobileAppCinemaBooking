@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../api/api_client.dart';
 import '../../../models/admin_models.dart';
-import '../../core/labels.dart';
+import '../../core/app_theme.dart';
 import '../../models/app_models.dart';
 import '../../shared/widgets/glass_card.dart';
 import '../../state/cinema_store.dart';
@@ -85,46 +85,211 @@ class _AdminAccountSectionState extends State<AdminAccountSection> {
             padding: EdgeInsets.symmetric(vertical: 16),
             child: Center(child: CircularProgressIndicator()),
           ),
-        ...users.map(
-          (user) => GlassCard(
-            margin: const EdgeInsets.only(bottom: 10),
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(_roleIcon(user.role)),
-              title: Text(
-                user.fullName,
-                style: const TextStyle(fontWeight: FontWeight.w900),
-              ),
-              subtitle: Text(
-                '${user.email} • ${user.phone} • ${roleLabel(user.role, language: widget.store.language)}'
-                '${user.permissions.isEmpty ? '' : ' • ${user.permissions.join(', ')}'}',
-              ),
-              trailing: Wrap(
-                children: [
-                  if (user.role == UserRole.staff)
-                    IconButton(
-                      tooltip: 'Phân quyền',
-                      onPressed: () => _permissionsDialog(context, user),
-                      icon: const Icon(Icons.security_rounded),
-                    ),
-                  Switch(
-                    value: user.isActive,
-                    onChanged: user.role == UserRole.admin
-                        ? null
-                        : (value) => _setUserActive(user, value),
-                  ),
-                  if (user.role != UserRole.admin)
-                    IconButton(
-                      tooltip: 'Xóa tài khoản',
-                      onPressed: () => _deleteUser(user),
-                      icon: const Icon(Icons.delete_outline_rounded),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
+        ...users.map(_buildUserCard),
       ],
+    );
+  }
+
+  Widget _buildUserCard(AppUser user) {
+    final isAdmin = user.role == UserRole.admin;
+    final isStaff = user.role == UserRole.staff;
+
+    Color roleBg;
+    Color roleText;
+    String roleName;
+    IconData roleIcon;
+    switch (user.role) {
+      case UserRole.admin:
+        roleBg = const Color(0xFFEF4444).withValues(alpha: 0.12);
+        roleText = const Color(0xFFB91C1C);
+        roleName = 'Quản trị viên';
+        roleIcon = Icons.admin_panel_settings_rounded;
+        break;
+      case UserRole.staff:
+        roleBg = const Color(0xFFF59E0B).withValues(alpha: 0.12);
+        roleText = const Color(0xFFD97706);
+        roleName = 'Nhân viên';
+        roleIcon = Icons.badge_rounded;
+        break;
+      case UserRole.customer:
+        roleBg = const Color(0xFF3B82F6).withValues(alpha: 0.12);
+        roleText = const Color(0xFF1D4ED8);
+        roleName = 'Khách hàng';
+        roleIcon = Icons.person_rounded;
+        break;
+    }
+
+    return GlassCard(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: roleBg,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(roleIcon, color: roleText, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user.fullName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      user.email,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.muted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!isAdmin) ...[
+                Text(
+                  user.isActive ? 'Hoạt động' : 'Khóa',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: user.isActive
+                        ? const Color(0xFF047857)
+                        : const Color(0xFFB91C1C),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Switch(
+                  value: user.isActive,
+                  onChanged: (value) => _setUserActive(user, value),
+                  activeThumbColor: const Color(0xFF10B981),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: roleBg,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  roleName,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    color: roleText,
+                  ),
+                ),
+              ),
+              if (user.phone.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.pearl,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.line),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.phone_rounded,
+                        size: 10,
+                        color: AppColors.muted,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        user.phone,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const Spacer(),
+              if (isStaff)
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  tooltip: 'Phân quyền',
+                  onPressed: () => _permissionsDialog(context, user),
+                  icon: const Icon(
+                    Icons.security_rounded,
+                    color: Color(0xFFD97706),
+                    size: 20,
+                  ),
+                ),
+              if (!isAdmin)
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  tooltip: 'Xóa tài khoản',
+                  onPressed: () => _deleteUser(user),
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Color(0xFFEF4444),
+                    size: 20,
+                  ),
+                ),
+            ],
+          ),
+          if (isStaff && user.permissions.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Divider(height: 1, color: AppColors.line),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                for (final perm in user.permissions)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF59E0B).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                        width: 0.6,
+                      ),
+                    ),
+                    child: Text(
+                      perm,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFB45309),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -194,14 +359,6 @@ class _AdminAccountSectionState extends State<AdminAccountSection> {
         behavior: SnackBarBehavior.floating,
       ),
     );
-  }
-
-  IconData _roleIcon(UserRole role) {
-    return switch (role) {
-      UserRole.admin => Icons.admin_panel_settings_rounded,
-      UserRole.staff => Icons.badge_rounded,
-      UserRole.customer => Icons.person_rounded,
-    };
   }
 
   void _staffDialog(BuildContext context) {

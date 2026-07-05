@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
 public class UserProfileServiceImpl implements UserProfileService {
 
     private static final Pattern PHONE_PATTERN =
-            Pattern.compile("^(0[0-9]{9}|\\+84[0-9]{9})$");
+            Pattern.compile("^(03|05|07|08|09)[0-9]{8}$");
 
     private final UserProfileRepository userProfileRepository;
 
@@ -38,7 +38,7 @@ public class UserProfileServiceImpl implements UserProfileService {
         if (request.phone() != null) {
             if (!PHONE_PATTERN.matcher(request.phone()).matches()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST,
-                        "Invalid phone format: must be 0XXXXXXXXX or +84XXXXXXXXX");
+                        "Số điện thoại phải gồm 10 số và bắt đầu bằng 03, 05, 07, 08 hoặc 09");
             }
             profile.setPhone(request.phone());
         }

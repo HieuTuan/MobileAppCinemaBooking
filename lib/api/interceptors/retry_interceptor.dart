@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:meta/meta.dart';
 import '../models/retry_policy.dart';
 
 /// Retry interceptor that implements exponential backoff for network failures
@@ -25,9 +24,15 @@ class RetryInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
+    if (_skipRetry(err.requestOptions)) {
+      return handler.next(err);
+    }
+
+    final silent = _isSilentRequest(err.requestOptions);
+
     // Check if request is retryable
     if (!isRetryable(err)) {
-      if (kDebugMode) {
+      if (kDebugMode && !silent) {
         print(
           '❌ RetryInterceptor: Request not retryable - ${err.requestOptions.path}',
         );
@@ -40,7 +45,7 @@ class RetryInterceptor extends Interceptor {
 
     // Check if we can retry
     if (!policy.canRetry(currentAttempt)) {
-      if (kDebugMode) {
+      if (kDebugMode && !silent) {
         print(
           '❌ RetryInterceptor: Max attempts reached ($currentAttempt/${policy.maxAttempts}) - ${err.requestOptions.path}',
         );
@@ -51,7 +56,7 @@ class RetryInterceptor extends Interceptor {
     // Calculate delay for this attempt
     final delay = policy.getDelayForAttempt(currentAttempt);
 
-    if (kDebugMode) {
+    if (kDebugMode && !silent) {
       print(
         '🔄 RetryInterceptor: Retrying request (attempt ${currentAttempt + 1}/${policy.maxAttempts}) '
         'after ${delay.inMilliseconds}ms - ${err.requestOptions.method} ${err.requestOptions.path}',
@@ -74,18 +79,26 @@ class RetryInterceptor extends Interceptor {
       // Retry the request
       final response = await dio.fetch(newOptions);
 
-      if (kDebugMode) {
+      if (kDebugMode && !silent) {
         print('✅ RetryInterceptor: Retry successful - ${newOptions.path}');
       }
 
       return handler.resolve(response);
     } on DioException catch (retryError) {
       // Retry failed, pass to next error handler (may trigger another retry)
-      if (kDebugMode) {
+      if (kDebugMode && !silent) {
         print('⚠️ RetryInterceptor: Retry failed - ${newOptions.path}');
       }
       return handler.next(retryError);
     }
+  }
+
+  bool _skipRetry(RequestOptions options) {
+    return options.extra['skipRetry'] == true;
+  }
+
+  bool _isSilentRequest(RequestOptions options) {
+    return options.extra['silentRequest'] == true;
   }
 
   /// Check if a request is retryable based on method, error type, and status code

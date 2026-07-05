@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../models/booking_models.dart';
 import '../../../services/staff_booking_service.dart';
+import '../../core/app_theme.dart';
 
 /// Screen for staff to manually search and validate bookings.
 ///
@@ -446,23 +447,23 @@ class _ManualBookingLookupScreenState
 
     switch (status.toLowerCase()) {
       case 'active':
-        color = Colors.green;
+        color = AppColors.success;
         displayText = 'Active';
         break;
       case 'used':
-        color = Colors.blue;
+        color = AppColors.muted;
         displayText = 'Used';
         break;
       case 'cancelled':
-        color = Colors.red;
+        color = AppColors.danger;
         displayText = 'Cancelled';
         break;
       case 'refunded':
-        color = Colors.orange;
+        color = AppColors.warning;
         displayText = 'Refunded';
         break;
       default:
-        color = Colors.grey;
+        color = AppColors.muted;
         displayText = status;
     }
 

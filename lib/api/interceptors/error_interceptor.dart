@@ -23,7 +23,7 @@ class ErrorInterceptor extends Interceptor {
       // Create an exception for this error response
       final exception = _mapStatusCodeToException(response);
 
-      if (kDebugMode) {
+      if (kDebugMode && !_isSilentRequest(response.requestOptions)) {
         print('┌─────────────────────────────────────────────────');
         print('│ 🔥 ERROR INTERCEPTOR (Response)');
         print('│ Status: ${response.statusCode}');
@@ -50,7 +50,7 @@ class ErrorInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    if (kDebugMode) {
+    if (kDebugMode && !_isSilentRequest(err.requestOptions)) {
       print('┌─────────────────────────────────────────────────');
       print('│ 🔥 ERROR INTERCEPTOR');
       print('│ Type: ${err.type}');
@@ -106,6 +106,10 @@ class ErrorInterceptor extends Interceptor {
     );
 
     handler.reject(wrappedException);
+  }
+
+  bool _isSilentRequest(RequestOptions options) {
+    return options.extra['silentRequest'] == true;
   }
 
   /// Check if status code represents an error

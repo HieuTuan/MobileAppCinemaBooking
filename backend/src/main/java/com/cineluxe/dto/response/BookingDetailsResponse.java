@@ -7,6 +7,7 @@ public record BookingDetailsResponse(
     String bookingId,
     String userId,
     String showtimeId,
+    String movieId,
     String movieTitle,
     String roomName,
     String cinemaName,

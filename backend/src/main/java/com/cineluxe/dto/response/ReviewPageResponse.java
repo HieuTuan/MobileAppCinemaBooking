@@ -5,6 +5,9 @@ import java.util.List;
 public record ReviewPageResponse(
     List<ReviewResponse> data,
     int page,
+    int pageSize,
+    int totalItems,
     int totalPages,
-    int totalItems
+    boolean hasNext,
+    boolean hasPrevious
 ) {}

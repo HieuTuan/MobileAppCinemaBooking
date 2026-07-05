@@ -128,9 +128,7 @@ class PaymentService {
 
   static PaymentResult? parseReturnUrl(String rawUrl) {
     final uri = Uri.tryParse(rawUrl);
-    if (uri == null ||
-        uri.scheme != 'cineluxe' ||
-        uri.host != 'payment-return') {
+    if (uri == null || !isAppPaymentReturnUrl(uri)) {
       return null;
     }
     final bookingId = uri.queryParameters['bookingId'];
@@ -145,5 +143,20 @@ class PaymentService {
       status: status,
       responseCode: uri.queryParameters['responseCode'],
     );
+  }
+
+  static bool isAppPaymentReturnUrl(Uri uri) {
+    return (uri.scheme == 'cineluxe' || uri.scheme == 'cinema') &&
+        uri.host == 'payment-return';
+  }
+
+  static bool isBackendPaymentReturnUrl(String rawUrl) {
+    final uri = Uri.tryParse(rawUrl);
+    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+      return false;
+    }
+    final normalizedPath = uri.path.replaceFirst(RegExp(r'/+$'), '');
+    return normalizedPath == '/api/payments/vnpay/return' ||
+        normalizedPath == '/v1/payments/vnpay/return';
   }
 }

@@ -25,6 +25,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -90,8 +91,12 @@ public class BookingController {
     @PostMapping("/bookings")
     public ResponseEntity<ApiResponse<BookingResponse>> createBooking(
             @Valid @RequestBody CreateBookingRequest request,
-            @RequestHeader(value = "X-User-Id", defaultValue = "demo-user") String userId) {
-        return created(bookingService.createBooking(request, userId));
+            @RequestHeader(value = "X-User-Id", defaultValue = "demo-user") String userId,
+            HttpServletRequest servletRequest) {
+        return created(bookingService.createBooking(
+                request,
+                userId,
+                requestBaseUrl(servletRequest)));
     }
 
     @Operation(summary = "Get booking details",
@@ -259,5 +264,25 @@ public class BookingController {
             @Parameter(description = "Booking ID") @PathVariable String bookingId,
             @Parameter(description = "Response code") @RequestParam(defaultValue = "00") String responseCode) {
         return success(bookingService.confirmSandboxPayment(bookingId, responseCode));
+    }
+
+    private String requestBaseUrl(HttpServletRequest request) {
+        var forwardedProto = request.getHeader("X-Forwarded-Proto");
+        var scheme = forwardedProto == null || forwardedProto.isBlank()
+                ? request.getScheme()
+                : forwardedProto.split(",")[0].trim();
+
+        var forwardedHost = request.getHeader("X-Forwarded-Host");
+        var host = forwardedHost == null || forwardedHost.isBlank()
+                ? request.getHeader("Host")
+                : forwardedHost.split(",")[0].trim();
+
+        if (host == null || host.isBlank()) {
+            var port = request.getServerPort();
+            var defaultPort = ("https".equalsIgnoreCase(scheme) && port == 443)
+                    || ("http".equalsIgnoreCase(scheme) && port == 80);
+            host = request.getServerName() + (defaultPort ? "" : ":" + port);
+        }
+        return scheme + "://" + host;
     }
 }

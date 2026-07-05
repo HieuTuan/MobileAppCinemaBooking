@@ -92,39 +92,94 @@ class _CustomerShellState extends State<CustomerShell> {
 
   List<Widget> _loggedInActions() {
     return [
-      IconButton(
-        tooltip: 'Đăng xuất',
-        onPressed: _handleLogout,
-        icon: const Icon(Icons.logout_rounded),
+      InkWell(
+        onTap: _handleLogout,
+        borderRadius: BorderRadius.circular(20),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Icon(
+            Icons.logout_rounded,
+            color: Colors.white,
+            size: 22,
+          ),
+        ),
       ),
     ];
   }
 
   List<Widget> _guestActions(BuildContext context) {
     return [
-      TextButton.icon(
-        onPressed: () => context.go('/auth'),
-        icon: const Icon(Icons.login_rounded, size: 18),
-        label: const Text('Đăng nhập'),
-        style: TextButton.styleFrom(
-          foregroundColor: AppColors.ink,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+      // ── Đăng nhập (ghost) ────────────────────────────────────────
+      GestureDetector(
+        onTap: () => context.go('/auth'),
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: .10),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: .25),
+              width: .8,
+            ),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.login_rounded, color: Colors.white, size: 15),
+              SizedBox(width: 5),
+              Text(
+                'Đăng nhập',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-      Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: FilledButton.icon(
-          onPressed: () => context.go('/auth?mode=register'),
-          icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-          label: const Text('Đăng ký'),
-          style: FilledButton.styleFrom(
-            backgroundColor: AppColors.gold,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(40, 40),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+      const SizedBox(width: 8),
+      // ── Đăng ký (amber gradient) ──────────────────────────────────
+      GestureDetector(
+        onTap: () => context.go('/auth?mode=register'),
+        child: Container(
+          margin: const EdgeInsets.only(right: 8, top: 10, bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFF59E0B).withValues(alpha: .45),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.person_add_alt_1_rounded,
+                color: Colors.white,
+                size: 15,
+              ),
+              SizedBox(width: 5),
+              Text(
+                'Đăng ký',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
         ),
       ),

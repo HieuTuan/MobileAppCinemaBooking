@@ -41,7 +41,10 @@ public interface BookingService {
     // ─── Booking operations ─────────────────────────────────────────────
 
     /** Create a new booking from held seats. */
-    BookingResponse createBooking(CreateBookingRequest request, String authenticatedUserId);
+    BookingResponse createBooking(
+            CreateBookingRequest request,
+            String authenticatedUserId,
+            String requestBaseUrl);
 
     /** Get booking details by booking ID. */
     BookingDetailsResponse getBooking(String bookingId);

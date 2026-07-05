@@ -27,11 +27,9 @@ class OfflineService {
   final CacheManager _cacheManager;
   final APIClient _apiClient;
 
-  OfflineService({
-    CacheManager? cacheManager,
-    APIClient? apiClient,
-  })  : _cacheManager = cacheManager ?? CacheManager(),
-        _apiClient = apiClient ?? APIClient();
+  OfflineService({CacheManager? cacheManager, APIClient? apiClient})
+    : _cacheManager = cacheManager ?? CacheManager(),
+      _apiClient = apiClient ?? APIClient();
 
   /// Get bookings with offline fallback.
   ///
@@ -52,7 +50,10 @@ class OfflineService {
     if (isOnline) {
       try {
         // Fetch fresh data from API
-        final bookings = await _apiClient.getUserBookings(userId, status: status);
+        final bookings = await _apiClient.getUserBookings(
+          userId,
+          status: status,
+        );
 
         // Cache each booking for offline access
         for (final booking in bookings) {
@@ -109,6 +110,7 @@ class OfflineService {
           search: search,
           genre: genre,
           status: status,
+          quiet: true,
         );
 
         // Cache movies for offline access

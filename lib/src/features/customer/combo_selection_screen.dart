@@ -5,19 +5,22 @@ import 'package:flutter/material.dart';
 
 import '../../../api/api_client.dart';
 import '../../../models/booking_models.dart' as api_models;
-import '../../core/app_theme.dart';
 import '../../core/formatters.dart';
 import '../../models/app_models.dart';
 import '../../state/cinema_store.dart';
 import 'payment_screen.dart';
 
-/// Màn hình Chọn combo đồ ăn — Luồng R8.
-///
-/// Bước 1: GET /api/food-combos → danh sách combo active (trong 200ms)
-/// Bước 2: Chọn combo + số lượng, lưu trong local state
-/// Bước 3: Tổng tiền combo = Σ(price × quantity)
-/// Bước 4: Submit booking: gửi kèm combos: [{comboId, quantity}]
-/// Lỗi: ComboId invalid hoặc inactive → 400 (xử lý ở payment_screen)
+// ── Premium Light Theme Colors ────────────────────────────────────────────────
+const _kLightBg      = Color(0xFFF8FAFC); // Clean off-white
+const _kCardBg       = Colors.white;
+const _kGold         = Color(0xFFC9A44C);
+const _kGoldSoft     = Color(0xFFFDFBF7);
+const _kDarkText     = Color(0xFF0F172A); // Deep slate black
+const _kMutedText    = Color(0xFF64748B); // Slate gray
+const _kBorder       = Color(0xFFE2E8F0); // Light gray border
+const _kRed          = Color(0xFFD04747);
+const _kRedSoft      = Color(0xFFFFEEEE);
+
 class ComboSelectionScreen extends StatefulWidget {
   const ComboSelectionScreen({
     super.key,
@@ -40,10 +43,7 @@ class ComboSelectionScreen extends StatefulWidget {
 
 class _ComboSelectionScreenState extends State<ComboSelectionScreen> {
   final APIClient _apiClient = APIClient();
-
-  // Bước 2: local state lưu số lượng mỗi combo đã chọn
   final Map<String, int> _quantities = {};
-
   List<api_models.FoodCombo> _combos = const [];
   Timer? _holdTimer;
   Duration _remaining = Duration.zero;
@@ -53,7 +53,6 @@ class _ComboSelectionScreenState extends State<ComboSelectionScreen> {
   @override
   void initState() {
     super.initState();
-    // Bước 1: gọi API ngay khi mở màn hình
     _loadCombos();
     _tick();
     _holdTimer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
@@ -65,8 +64,6 @@ class _ComboSelectionScreenState extends State<ComboSelectionScreen> {
     super.dispose();
   }
 
-  // ── Bước 1: GET /api/food-combos ─────────────────────────────────────────
-
   Future<void> _loadCombos() async {
     setState(() {
       _loading = true;
@@ -76,7 +73,6 @@ class _ComboSelectionScreenState extends State<ComboSelectionScreen> {
       final combos = await _apiClient.getFoodCombos();
       if (mounted) {
         setState(() {
-          // Chỉ hiển thị combo active và còn hàng
           _combos = combos.where((c) => c.quantity > 0).toList();
           _loading = false;
         });
@@ -91,8 +87,6 @@ class _ComboSelectionScreenState extends State<ComboSelectionScreen> {
     }
   }
 
-  // ── Hold timer ────────────────────────────────────────────────────────────
-
   void _tick() {
     final remaining = widget.hold.expiresAt.difference(DateTime.now());
     if (remaining <= Duration.zero) {
@@ -103,15 +97,24 @@ class _ComboSelectionScreenState extends State<ComboSelectionScreen> {
         context: context,
         barrierDismissible: false,
         builder: (context) => AlertDialog(
-          title: const Text('Thời gian giữ ghế đã hết'),
-          content: const Text('Ghế đã được trả lại. Vui lòng chọn ghế lại.'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: Colors.white,
+          title: const Text(
+            'Hết thời gian giữ ghế',
+            style: TextStyle(color: _kDarkText, fontWeight: FontWeight.w900),
+          ),
+          content: const Text(
+            'Phiên giữ ghế đã hết hạn. Vui lòng thực hiện chọn lại ghế.',
+            style: TextStyle(color: _kMutedText),
+          ),
           actions: [
             FilledButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                Navigator.of(context).pop(); // quay về booking_screen
+                Navigator.of(context).pop();
               },
-              child: const Text('Chọn lại ghế'),
+              style: FilledButton.styleFrom(backgroundColor: _kDarkText),
+              child: const Text('Chọn lại ghế', style: TextStyle(fontWeight: FontWeight.w800)),
             ),
           ],
         ),
@@ -120,8 +123,6 @@ class _ComboSelectionScreenState extends State<ComboSelectionScreen> {
     }
     if (mounted) setState(() => _remaining = remaining);
   }
-
-  // ── Bước 3: Tổng tiền combo = Σ(price × quantity) ────────────────────────
 
   int get _comboTotal => _combos.fold(
         0,
@@ -133,15 +134,11 @@ class _ComboSelectionScreenState extends State<ComboSelectionScreen> {
 
   int get _grandTotal => _seatTotal + _comboTotal;
 
-  // ── Bước 4: combos: [{comboId, quantity}] — chỉ các combo có quantity > 0 ─
-
   List<api_models.ComboSelection> get _selections =>
       _quantities.entries
           .where((e) => e.value > 0)
           .map((e) => api_models.ComboSelection(comboId: e.key, quantity: e.value))
           .toList();
-
-  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -151,62 +148,125 @@ class _ComboSelectionScreenState extends State<ComboSelectionScreen> {
     final hasSelections = _selections.isNotEmpty;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: _kLightBg,
       appBar: AppBar(
         backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        iconTheme: const IconThemeData(color: _kDarkText),
         title: const Text(
-          'Chọn combo đồ ăn',
-          style: TextStyle(fontWeight: FontWeight.w900),
+          'Dịch vụ bắp nước',
+          style: TextStyle(
+            color: _kDarkText,
+            fontWeight: FontWeight.w900,
+            fontSize: 20,
+            letterSpacing: 0.3,
+          ),
         ),
       ),
-      // ── Bottom bar: tổng tiền + nút tiếp tục ──────────────────────────────
       bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: _kBorder)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Bước 3: hiển thị tổng tiền realtime
+              // Ticket details row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Ghế đã chọn',
+                        style: TextStyle(color: _kMutedText, fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${widget.selectedSeats.length} vé (${widget.selectedSeats.join(', ')})',
+                        style: const TextStyle(
+                          color: _kDarkText,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text(
+                        'Tổng cộng',
+                        style: TextStyle(color: _kMutedText, fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        money(_grandTotal),
+                        style: const TextStyle(
+                          color: _kDarkText,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
               if (hasSelections) ...[
+                const SizedBox(height: 10),
+                // Breakdown row
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: AppColors.pearl,
+                    color: _kLightBg,
                     borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: _kBorder),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.fastfood_rounded, size: 18, color: AppColors.muted),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Combo: ${money(_comboTotal)}',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      const Icon(Icons.fastfood_rounded, size: 14, color: _kMutedText),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Tiền bắp nước:',
+                        style: TextStyle(color: _kMutedText, fontSize: 12, fontWeight: FontWeight.w500),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 4),
                       Text(
-                        'Tổng: ${money(_grandTotal)}',
-                        style: const TextStyle(fontWeight: FontWeight.w900),
+                        money(_comboTotal),
+                        style: const TextStyle(
+                          color: _kDarkText,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 8),
               ],
+              const SizedBox(height: 14),
               FilledButton(
                 onPressed: expired ? null : _continue,
                 style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(54),
-                  backgroundColor: Colors.black,
-                  disabledBackgroundColor: AppColors.muted,
+                  minimumSize: const Size.fromHeight(50),
+                  backgroundColor: _kDarkText,
+                  disabledBackgroundColor: _kBorder,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
                 child: Text(
                   hasSelections
-                      ? 'Tiếp tục • ${money(_grandTotal)}'
-                      : 'Bỏ qua • ${money(_seatTotal)}',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+                      ? 'Thanh toán ngay · ${money(_grandTotal)}'
+                      : 'Bỏ qua & Tiếp tục',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ],
@@ -214,18 +274,18 @@ class _ComboSelectionScreenState extends State<ComboSelectionScreen> {
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
           // Hold timer banner
           _HoldTimerBanner(remaining: _remaining, warning: warning),
           const SizedBox(height: 16),
 
-          // Bước 1: loading / error / danh sách combo
+          // Load state
           if (_loading)
             const Center(
               child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: CircularProgressIndicator(),
+                padding: EdgeInsets.symmetric(vertical: 48),
+                child: CircularProgressIndicator(color: _kDarkText),
               ),
             )
           else if (_error != null)
@@ -233,11 +293,24 @@ class _ComboSelectionScreenState extends State<ComboSelectionScreen> {
           else if (_combos.isEmpty)
             const _EmptyComboState()
           else ...[
-            const _SectionHeader('Combo đồ ăn & thức uống'),
-            const SizedBox(height: 10),
+            const Row(
+              children: [
+                Icon(Icons.fastfood_rounded, color: _kGold, size: 18),
+                SizedBox(width: 8),
+                Text(
+                  'Chọn bắp & nước uống',
+                  style: TextStyle(
+                    color: _kDarkText,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
             for (final combo in _combos)
-              // Bước 2: chọn combo + số lượng
-              _ComboTile(
+              _ComboCard(
                 combo: combo,
                 quantity: _quantities[combo.id] ?? 0,
                 onChanged: (qty) => setState(() => _quantities[combo.id] = qty),
@@ -248,9 +321,6 @@ class _ComboSelectionScreenState extends State<ComboSelectionScreen> {
     );
   }
 
-  // ── Navigation ────────────────────────────────────────────────────────────
-
-  /// Bước 4: điều hướng sang PaymentScreen kèm combos: [{comboId, quantity}]
   void _continue() {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -261,7 +331,6 @@ class _ComboSelectionScreenState extends State<ComboSelectionScreen> {
           selectedSeats: widget.selectedSeats,
           total: _grandTotal,
           hold: widget.hold,
-          // Bước 4: gửi kèm combos (rỗng nếu không chọn)
           comboSelections: _selections,
         ),
       ),
@@ -269,7 +338,9 @@ class _ComboSelectionScreenState extends State<ComboSelectionScreen> {
   }
 }
 
-// ── Widgets ───────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// HOLD TIMER BANNER
+// ═════════════════════════════════════════════════════════════════════════════
 
 class _HoldTimerBanner extends StatelessWidget {
   const _HoldTimerBanner({required this.remaining, required this.warning});
@@ -283,18 +354,20 @@ class _HoldTimerBanner extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFE8E8),
-          borderRadius: BorderRadius.circular(8),
+          color: _kRedSoft,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: _kRed.withValues(alpha: .5)),
         ),
         child: const Row(
           children: [
-            Icon(Icons.timer_off_rounded, color: AppColors.danger, size: 18),
+            Icon(Icons.timer_off_rounded, color: _kRed, size: 18),
             SizedBox(width: 8),
             Text(
-              'Thời gian giữ ghế đã hết',
+              'Đã hết thời gian giữ ghế',
               style: TextStyle(
-                color: AppColors.danger,
+                color: _kRed,
                 fontWeight: FontWeight.w900,
+                fontSize: 13,
               ),
             ),
           ],
@@ -303,110 +376,61 @@ class _HoldTimerBanner extends StatelessWidget {
     }
     final mins = remaining.inMinutes.toString().padLeft(2, '0');
     final secs = (remaining.inSeconds % 60).toString().padLeft(2, '0');
+    final color = warning ? _kRed : _kGold;
+    final bg = warning ? _kRedSoft : Colors.white;
+    final border = warning ? _kRed.withValues(alpha: .4) : _kBorder;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
-        color: warning ? const Color(0xFFFFE8E8) : AppColors.pearl,
-        borderRadius: BorderRadius.circular(8),
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: .02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
       ),
       child: Row(
         children: [
           Icon(
             Icons.timer_rounded,
-            size: 18,
-            color: warning ? AppColors.danger : AppColors.muted,
+            size: 16,
+            color: color,
           ),
           const SizedBox(width: 8),
           Text(
-            'Ghế giữ còn $mins:$secs',
+            'Thời gian thanh toán còn $mins:$secs',
             style: TextStyle(
-              fontWeight: FontWeight.w900,
-              color: warning ? AppColors.danger : AppColors.ink,
+              fontWeight: FontWeight.w800,
+              color: color,
+              fontSize: 13,
             ),
           ),
-          if (warning) ...[
-            const SizedBox(width: 6),
-            const Text(
-              '• Hãy hoàn tất sớm',
-              style: TextStyle(color: AppColors.danger, fontSize: 13),
+          const Spacer(),
+          Text(
+            warning ? 'Hoàn tất nhanh!' : 'Giữ ghế',
+            style: TextStyle(
+              color: warning ? _kRed : _kMutedText,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
             ),
-          ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.title);
-  final String title;
+// ═════════════════════════════════════════════════════════════════════════════
+// COMBO CARD
+// ═════════════════════════════════════════════════════════════════════════════
 
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-    );
-  }
-}
-
-class _ErrorRetry extends StatelessWidget {
-  const _ErrorRetry({required this.message, required this.onRetry});
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 32),
-        child: Column(
-          children: [
-            const Icon(Icons.wifi_off_rounded, size: 48, color: AppColors.muted),
-            const SizedBox(height: 12),
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Thử lại'),
-              style: FilledButton.styleFrom(backgroundColor: Colors.black),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyComboState extends StatelessWidget {
-  const _EmptyComboState();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 48),
-        child: Column(
-          children: [
-            const Icon(Icons.no_food_outlined, size: 56, color: AppColors.muted),
-            const SizedBox(height: 12),
-            Text(
-              'Hiện chưa có combo nào.',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: AppColors.muted,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Bước 2: tile hiển thị combo + stepper chọn số lượng.
-class _ComboTile extends StatelessWidget {
-  const _ComboTile({
+class _ComboCard extends StatelessWidget {
+  const _ComboCard({
     required this.combo,
     required this.quantity,
     required this.onChanged,
@@ -420,38 +444,44 @@ class _ComboTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final selected = quantity > 0;
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
+      duration: const Duration(milliseconds: 200),
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: selected ? _kGoldSoft : _kCardBg,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: selected ? Colors.black : AppColors.line,
+          color: selected ? _kGold : _kBorder,
           width: selected ? 1.5 : 1,
         ),
-        boxShadow: selected ? softShadow(.07) : null,
+        boxShadow: [
+          BoxShadow(
+            color: selected ? _kGold.withValues(alpha: .06) : Colors.black.withValues(alpha: .03),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          )
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Ảnh combo (CachedNetworkImage hoặc icon fallback)
+            // Image with rounded corners
             ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(10),
               child: combo.imageUrl.isNotEmpty
                   ? CachedNetworkImage(
                       imageUrl: combo.imageUrl,
-                      width: 64,
-                      height: 64,
+                      width: 72,
+                      height: 72,
                       fit: BoxFit.cover,
-                      placeholder: (_, __) => const _ComboIcon(),
-                      errorWidget: (_, __, ___) => const _ComboIcon(),
+                      placeholder: (_, __) => const _ComboIconFallback(),
+                      errorWidget: (_, __, ___) => const _ComboIconFallback(),
                     )
-                  : const _ComboIcon(),
+                  : const _ComboIconFallback(),
             ),
             const SizedBox(width: 14),
-            // Tên, mô tả, giá
+            // Information
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -459,70 +489,74 @@ class _ComboTile extends StatelessWidget {
                   Text(
                     combo.name,
                     style: const TextStyle(
+                      color: _kDarkText,
                       fontWeight: FontWeight.w900,
-                      fontSize: 15,
+                      fontSize: 14,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 4),
                   Text(
                     combo.description,
                     style: const TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 13,
+                      color: _kMutedText,
+                      fontSize: 12,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 6),
-                  // Bước 3: giá × quantity realtime
-                  Row(
+                  const SizedBox(height: 8),
+                  // Price row
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
                     children: [
                       Text(
                         money(combo.price),
                         style: const TextStyle(
+                          color: _kGold,
                           fontWeight: FontWeight.w900,
-                          fontSize: 15,
+                          fontSize: 14,
                         ),
                       ),
-                      if (quantity > 1) ...[
-                        const SizedBox(width: 6),
+                      if (quantity > 1)
                         Text(
                           '× $quantity = ${money(combo.price * quantity)}',
                           style: const TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 13,
+                            color: _kMutedText,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                      ],
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            // Stepper: - qty +
+            const SizedBox(width: 10),
+            // Stepper controls
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _StepperButton(
-                  icon: Icons.remove_circle_outline,
+                _StepperBtn(
+                  icon: Icons.remove_rounded,
                   enabled: quantity > 0,
                   onTap: () => onChanged(quantity - 1),
                 ),
                 SizedBox(
-                  width: 32,
+                  width: 30,
                   child: Text(
                     '$quantity',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
+                      color: _kDarkText,
                       fontWeight: FontWeight.w900,
-                      fontSize: 18,
+                      fontSize: 16,
                     ),
                   ),
                 ),
-                _StepperButton(
-                  icon: Icons.add_circle_outline,
-                  // Không cho phép vượt quá tồn kho
+                _StepperBtn(
+                  icon: Icons.add_rounded,
                   enabled: quantity < combo.quantity,
                   onTap: () => onChanged(quantity + 1),
                 ),
@@ -535,8 +569,8 @@ class _ComboTile extends StatelessWidget {
   }
 }
 
-class _StepperButton extends StatelessWidget {
-  const _StepperButton({
+class _StepperBtn extends StatelessWidget {
+  const _StepperBtn({
     required this.icon,
     required this.enabled,
     required this.onTap,
@@ -550,25 +584,105 @@ class _StepperButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: enabled ? onTap : null,
-      child: Icon(
-        icon,
-        size: 30,
-        color: enabled ? Colors.black : AppColors.line,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: enabled ? _kDarkText.withValues(alpha: .04) : Colors.transparent,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: enabled ? _kDarkText.withValues(alpha: .35) : _kBorder,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Icon(
+          icon,
+          size: 16,
+          color: enabled ? _kDarkText : _kMutedText.withValues(alpha: .4),
+        ),
       ),
     );
   }
 }
 
-class _ComboIcon extends StatelessWidget {
-  const _ComboIcon();
+class _ComboIconFallback extends StatelessWidget {
+  const _ComboIconFallback();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 64,
-      height: 64,
-      color: AppColors.pearl,
-      child: const Icon(Icons.fastfood_rounded, size: 36, color: AppColors.muted),
+      width: 72,
+      height: 72,
+      color: _kLightBg,
+      alignment: Alignment.center,
+      child: const Icon(Icons.fastfood_rounded, size: 30, color: _kMutedText),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// HELPER STATES
+// ═════════════════════════════════════════════════════════════════════════════
+
+class _EmptyComboState extends StatelessWidget {
+  const _EmptyComboState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 60),
+        child: Column(
+          children: [
+            Icon(Icons.no_food_outlined, size: 48, color: _kMutedText),
+            SizedBox(height: 12),
+            Text(
+              'Hiện chưa có combo bắp nước nào',
+              style: TextStyle(color: _kMutedText, fontSize: 14),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorRetry extends StatelessWidget {
+  const _ErrorRetry({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 48),
+        child: Column(
+          children: [
+            const Icon(Icons.wifi_off_rounded, size: 48, color: _kMutedText),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: _kMutedText),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Thử lại'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _kDarkText,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

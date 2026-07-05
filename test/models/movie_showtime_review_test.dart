@@ -10,7 +10,8 @@ void main() {
       final movieJson = {
         'id': 'movie123',
         'title': 'The Matrix',
-        'description': 'A computer hacker learns about the true nature of reality.',
+        'description':
+            'A computer hacker learns about the true nature of reality.',
         'genres': ['Action', 'Sci-Fi'],
         'durationMinutes': 136,
         'director': 'Wachowski Brothers',
@@ -141,7 +142,7 @@ void main() {
     test('Showtime duration calculation should work correctly', () {
       final startTime = DateTime(2024, 1, 15, 19, 30);
       final endTime = DateTime(2024, 1, 15, 21, 46);
-      
+
       final showtime = Showtime(
         id: 'showtime123',
         movieId: 'movie123',
@@ -167,7 +168,7 @@ void main() {
         'userId': 'user123',
         'userName': 'John Doe',
         'movieId': 'movie123',
-        'rating': 5,
+        'rating': 9,
         'comment': 'Excellent movie! Highly recommended.',
         'isVerified': true,
         'createdAt': '2024-01-15T10:30:00.000Z',
@@ -182,7 +183,7 @@ void main() {
       expect(review.userId, 'user123');
       expect(review.userName, 'John Doe');
       expect(review.movieId, 'movie123');
-      expect(review.rating, 5);
+      expect(review.rating, 9);
       expect(review.comment, 'Excellent movie! Highly recommended.');
       expect(review.isVerified, true);
       expect(review.isPositive, true);
@@ -190,7 +191,7 @@ void main() {
       expect(review.isNeutral, false);
       expect(review.starEmojis, '⭐⭐⭐⭐⭐');
       expect(reviewToJson['id'], 'review123');
-      expect(reviewToJson['rating'], 5);
+      expect(reviewToJson['rating'], 9);
     });
 
     test('Review rating classification should work correctly', () {
@@ -199,7 +200,7 @@ void main() {
         userId: 'user1',
         userName: 'User 1',
         movieId: 'movie1',
-        rating: 4,
+        rating: 8,
         comment: 'Good movie',
         isVerified: true,
         createdAt: DateTime.now(),
@@ -227,7 +228,7 @@ void main() {
         userId: 'user3',
         userName: 'User 3',
         movieId: 'movie1',
-        rating: 3,
+        rating: 6,
         comment: 'Average',
         isVerified: true,
         createdAt: DateTime.now(),
@@ -244,7 +245,8 @@ void main() {
         userName: 'User 1',
         movieId: 'movie1',
         rating: 5,
-        comment: 'This is a very long comment that should be truncated when displaying in a limited space',
+        comment:
+            'This is a very long comment that should be truncated when displaying in a limited space',
         isVerified: true,
         createdAt: DateTime.now(),
       );

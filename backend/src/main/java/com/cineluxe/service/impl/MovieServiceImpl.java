@@ -3,6 +3,7 @@ package com.cineluxe.service.impl;
 import com.cineluxe.dto.response.MovieResponse;
 import com.cineluxe.exception.ApiException;
 import com.cineluxe.repository.MovieRepository;
+import com.cineluxe.repository.ReviewRepository;
 import com.cineluxe.service.MovieService;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class MovieServiceImpl implements MovieService {
     private static final int MAX_PAGE_SIZE     = 100;
 
     private final MovieRepository movieRepository;
+    private final ReviewRepository reviewRepository;
 
     @Override
     public Page<MovieResponse> getMovies(String search, String genre, String status,
@@ -60,13 +62,19 @@ public class MovieServiceImpl implements MovieService {
         // Thực hiện truy vấn — nếu không có kết quả JPQL trả Page rỗng → 200 OK với data=[]
         return movieRepository
                 .searchMovies(normalizedSearch, normalizedGenre, normalizedStatus, today, pageable)
-                .map(MovieResponse::from);
+                .map(m -> MovieResponse.from(
+                        m,
+                        reviewRepository.findAverageRatingByMovieId(m.getId()).orElse(null)
+                ));
     }
 
     @Override
     public MovieResponse getMovieById(String movieId) {
         return movieRepository.findById(movieId)
-                .map(MovieResponse::from)
+                .map(m -> MovieResponse.from(
+                        m,
+                        reviewRepository.findAverageRatingByMovieId(m.getId()).orElse(null)
+                ))
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND,
                         "Movie not found: " + movieId));
     }

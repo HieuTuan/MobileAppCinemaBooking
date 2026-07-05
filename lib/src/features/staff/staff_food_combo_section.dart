@@ -106,7 +106,7 @@ class _StaffFoodComboSectionState extends State<StaffFoodComboSection> {
         else
           ..._combos.map(
             (combo) => GlassCard(
-              margin: const EdgeInsets.only(bottom: 10),
+              margin: const EdgeInsets.only(bottom: 12),
               child: Row(
                 children: [
                   Container(
@@ -114,13 +114,16 @@ class _StaffFoodComboSectionState extends State<StaffFoodComboSection> {
                     height: 44,
                     decoration: BoxDecoration(
                       color: combo.isActive
-                          ? AppColors.gold.withValues(alpha: .16)
-                          : Colors.grey.withValues(alpha: .14),
+                          ? const Color(0xFFF59E0B).withValues(alpha: 0.12)
+                          : Colors.grey.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
                       Icons.fastfood_rounded,
-                      color: combo.isActive ? AppColors.gold : AppColors.muted,
+                      color: combo.isActive
+                          ? const Color(0xFFF59E0B)
+                          : AppColors.muted,
+                      size: 20,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -130,18 +133,26 @@ class _StaffFoodComboSectionState extends State<StaffFoodComboSection> {
                       children: [
                         Text(
                           combo.name,
-                          style: const TextStyle(fontWeight: FontWeight.w900),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                            color: AppColors.ink,
+                          ),
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          '${_money.format(combo.price)} VND • Còn ${combo.quantity}',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: combo.quantity == 0
-                                    ? Colors.redAccent
-                                    : AppColors.muted,
-                                fontWeight: FontWeight.w700,
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Text(
+                              '${_money.format(combo.price)} đ',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFFEF4444),
                               ),
+                            ),
+                            const SizedBox(width: 8),
+                            _FoodStatusBadge(quantity: combo.quantity),
+                          ],
                         ),
                       ],
                     ),
@@ -149,12 +160,55 @@ class _StaffFoodComboSectionState extends State<StaffFoodComboSection> {
                   Switch(
                     value: combo.isActive,
                     onChanged: (_) => _toggleCombo(combo),
+                    activeThumbColor: const Color(0xFF10B981),
                   ),
                 ],
               ),
             ),
           ),
       ],
+    );
+  }
+}
+
+class _FoodStatusBadge extends StatelessWidget {
+  const _FoodStatusBadge({required this.quantity});
+  final int quantity;
+
+  @override
+  Widget build(BuildContext context) {
+    Color bgColor;
+    Color textColor;
+    String label;
+
+    if (quantity == 0) {
+      bgColor = const Color(0xFFEF4444).withValues(alpha: 0.12);
+      textColor = const Color(0xFFB91C1C);
+      label = 'Hết hàng';
+    } else if (quantity < 10) {
+      bgColor = const Color(0xFFF59E0B).withValues(alpha: 0.12);
+      textColor = const Color(0xFFB45309);
+      label = 'Sắp hết: $quantity';
+    } else {
+      bgColor = const Color(0xFF10B981).withValues(alpha: 0.12);
+      textColor = const Color(0xFF047857);
+      label = 'Còn lại: $quantity';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+          color: textColor,
+        ),
+      ),
     );
   }
 }

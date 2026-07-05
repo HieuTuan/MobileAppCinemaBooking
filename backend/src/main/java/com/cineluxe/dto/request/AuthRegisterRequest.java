@@ -24,8 +24,8 @@ public record AuthRegisterRequest(
 
         @NotBlank(message = "Số điện thoại không được để trống")
         @Pattern(
-                regexp = "^(0[35789][0-9]{8}|\\+84[35789][0-9]{8})$",
-                message = "Số điện thoại không đúng định dạng."
+                regexp = "^(03|05|07|08|09)[0-9]{8}$",
+                message = "Số điện thoại phải gồm 10 số và bắt đầu bằng 03, 05, 07, 08 hoặc 09."
         )
         String phone,
 

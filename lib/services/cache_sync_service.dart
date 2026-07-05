@@ -43,11 +43,9 @@ class CacheSyncService {
   SyncStatus get currentStatus =>
       _isSyncing ? SyncStatus.syncing : SyncStatus.idle;
 
-  CacheSyncService({
-    CacheManager? cacheManager,
-    APIClient? apiClient,
-  })  : _cacheManager = cacheManager ?? CacheManager(),
-        _apiClient = apiClient ?? APIClient();
+  CacheSyncService({CacheManager? cacheManager, APIClient? apiClient})
+    : _cacheManager = cacheManager ?? CacheManager(),
+      _apiClient = apiClient ?? APIClient();
 
   /// Initialize the sync service.
   ///
@@ -100,10 +98,7 @@ class CacheSyncService {
 
     try {
       // Parallel sync of bookings and movies
-      await Future.wait([
-        _syncBookings(),
-        _syncMovies(),
-      ]);
+      await Future.wait([_syncBookings(), _syncMovies()]);
 
       _syncStatusController.add(SyncStatus.completed);
     } catch (e) {
@@ -126,8 +121,9 @@ class CacheSyncService {
       // Fetch fresh data for each booking
       for (final booking in cachedBookings) {
         try {
-          final freshBooking =
-              await _apiClient.getBookingDetails(booking.bookingId);
+          final freshBooking = await _apiClient.getBookingDetails(
+            booking.bookingId,
+          );
 
           // Update cache with fresh data
           await _cacheManager.cacheBooking(freshBooking);
@@ -152,7 +148,7 @@ class CacheSyncService {
       // Check if cache is stale
       if (await _cacheManager.isCacheStale()) {
         // Fetch fresh movies
-        final response = await _apiClient.getMovies(pageSize: 50);
+        final response = await _apiClient.getMovies(pageSize: 50, quiet: true);
 
         // Update cache
         await _cacheManager.cacheMovies(response.data);
@@ -238,7 +234,6 @@ class CacheSyncService {
   ///
   /// Returns null if never synced.
   Future<DateTime?> getLastSyncTime() async {
-    final stats = await _cacheManager.getCacheStats();
     // Implementation would need to track last sync time in cache
     return null; // Placeholder
   }

@@ -27,10 +27,14 @@ class BackendConfig {
     // 3️⃣ Web dev server
     if (kIsWeb) return 'http://localhost:8080';
 
-    // 4️⃣ Android Emulator & Physical Devices / iOS Simulator & Physical Devices
-    if (defaultTargetPlatform == TargetPlatform.android ||
-        defaultTargetPlatform == TargetPlatform.iOS) {
-      return 'http://192.168.1.18:8080';
+    // 4️⃣ Local mobile development defaults.
+    // Android emulator reaches the host machine via 10.0.2.2.
+    // Physical phones should pass DEV_SERVER_HOST=<PC_LAN_IP>.
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8080';
+    }
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return 'http://localhost:8080';
     }
 
     // 5️⃣ Web / desktop localhost

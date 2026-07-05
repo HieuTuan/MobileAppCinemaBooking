@@ -21,4 +21,14 @@ void main() {
       throwsA(isA<QrCodeFormatException>()),
     );
   });
+
+  test('extracts booking id from QR data and pasted text', () {
+    const bookingId = 'BK-448fd3bc-4a4b-4d03-8b6b-949377ad888a';
+
+    expect(
+      parseTicketBookingId('CINELUXE|$bookingId|U-1|ST001|A1-A2'),
+      bookingId,
+    );
+    expect(parseTicketBookingId('Mã booking: $bookingId'), bookingId);
+  });
 }

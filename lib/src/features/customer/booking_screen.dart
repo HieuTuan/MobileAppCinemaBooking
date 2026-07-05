@@ -1151,7 +1151,7 @@ class _SeatCheckoutBar extends StatelessWidget {
                     : Text(
                         selectedSeats.isEmpty
                             ? 'Chọn ghế để tiếp tục'
-                            : 'Tiếp tục  →  Chọn Combo',
+                            : 'Tiếp tục',
                       ),
               ),
             ),

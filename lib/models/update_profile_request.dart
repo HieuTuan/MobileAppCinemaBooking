@@ -6,7 +6,7 @@ part 'update_profile_request.g.dart';
 ///
 /// **Requirements Coverage:**
 /// - Requirement 17.1: PUT /api/users/{userId}/profile with fullName, phone, and birthdate
-/// - Requirement 17.2: Phone number must match format +84 or 0 followed by 9-10 digits
+/// - Requirement 17.2: Phone number must be 10 digits and start with 03/05/07/08/09
 /// - Requirement 17.3: Birthdate must be a valid date and not in the future
 ///
 /// Usage:
@@ -23,35 +23,43 @@ class UpdateProfileRequest {
   /// Updated full name of the user
   final String? fullName;
 
-  /// Updated phone number (format: 0XXXXXXXXX or +84XXXXXXXXX)
+  /// Updated phone number (10 digits, prefix 03/05/07/08/09)
   final String? phone;
 
   /// Updated date of birth (must not be in the future)
   final DateTime? birthdate;
 
-  const UpdateProfileRequest({
-    this.fullName,
-    this.phone,
-    this.birthdate,
-  });
+  const UpdateProfileRequest({this.fullName, this.phone, this.birthdate});
 
   /// Creates an instance from JSON map
   factory UpdateProfileRequest.fromJson(Map<String, dynamic> json) =>
       _$UpdateProfileRequestFromJson(json);
 
-  /// Converts instance to JSON map
-  Map<String, dynamic> toJson() => _$UpdateProfileRequestToJson(this);
+  /// Converts instance to JSON map.
+  ///
+  /// Backend expects LocalDate for birthdate, so send yyyy-MM-dd instead of
+  /// a full ISO timestamp.
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{};
+    if (fullName != null) json['fullName'] = fullName;
+    if (phone != null) json['phone'] = phone;
+    final date = birthdate;
+    if (date != null) {
+      json['birthdate'] =
+          '${date.year.toString().padLeft(4, '0')}-'
+          '${date.month.toString().padLeft(2, '0')}-'
+          '${date.day.toString().padLeft(2, '0')}';
+    }
+    return json;
+  }
 
   /// Validates phone number format.
   ///
-  /// Accepts:
-  /// - 0 followed by exactly 9 digits (e.g., 0901234567)
-  /// - +84 followed by exactly 9 digits (e.g., +84901234567)
   String? validatePhone() {
     if (phone == null) return null;
-    final phoneRegex = RegExp(r'^(0[0-9]{9}|\+84[0-9]{9})$');
+    final phoneRegex = RegExp(r'^(03|05|07|08|09)[0-9]{8}$');
     if (!phoneRegex.hasMatch(phone!)) {
-      return 'Phone number must start with 0 or +84 followed by 9 digits';
+      return 'Số điện thoại phải gồm 10 số và bắt đầu bằng 03, 05, 07, 08 hoặc 09';
     }
     return null;
   }

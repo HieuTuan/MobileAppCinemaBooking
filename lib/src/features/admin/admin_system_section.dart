@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../api/api_client.dart';
-import '../../../models/admin_models.dart';
+import '../../core/app_theme.dart';
 import '../../core/formatters.dart';
 import '../../models/app_models.dart';
 import '../../shared/widgets/glass_card.dart';
@@ -72,49 +72,7 @@ class AdminSystemSection extends StatelessWidget {
             ),
           ),
         ),
-        SectionTitle(
-          title: 'Tích hợp VNPay',
-          action: TextButton.icon(
-            onPressed: () => _vnpayDialog(context),
-            icon: const Icon(Icons.edit_outlined),
-            label: const Text('Sửa'),
-          ),
-        ),
-        GlassCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Terminal ID: ${store.vnpayConfig.terminalId}'),
-              Text('Secret Key: ${store.vnpayConfig.secretKey}'),
-              Text('Môi trường: ${store.vnpayConfig.environment}'),
-              const SizedBox(height: 8),
-              const Text(
-                'Giao dịch demo dùng sandbox, Refund API được mô phỏng trong Admin.',
-              ),
-            ],
-          ),
-        ),
-        const SectionTitle(title: 'Bản địa hóa'),
-        GlassCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SegmentedButton<AppLanguage>(
-                segments: const [
-                  ButtonSegment(
-                    value: AppLanguage.vi,
-                    label: Text('Tiếng Việt'),
-                  ),
-                  ButtonSegment(value: AppLanguage.en, label: Text('English')),
-                ],
-                selected: {store.language},
-                onSelectionChanged: (value) => store.setLanguage(value.first),
-              ),
-              const SizedBox(height: 10),
-              Text('Tiền tệ mặc định: ${money(125000)}'),
-            ],
-          ),
-        ),
+
         const SectionTitle(title: 'Sự cố phòng chiếu từ Staff'),
         if (store.issues.isEmpty)
           const GlassCard(child: Text('Chưa có sự cố nào.'))
@@ -267,110 +225,6 @@ class AdminSystemSection extends StatelessWidget {
     );
   }
 
-  void _vnpayDialog(BuildContext context) {
-    final terminal = TextEditingController(text: store.vnpayConfig.terminalId);
-    final secret = TextEditingController(text: store.vnpayConfig.secretKey);
-    final env = TextEditingController(text: store.vnpayConfig.environment);
-    final returnUrl = TextEditingController();
-    var enabled = true;
-    var saving = false;
-    showDialog<void>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Cấu hình VNPay'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: terminal,
-                decoration: const InputDecoration(labelText: 'Terminal ID'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: secret,
-                decoration: const InputDecoration(labelText: 'Secret Key'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: env,
-                decoration: const InputDecoration(
-                  labelText: 'Môi trường sandbox/production',
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: returnUrl,
-                decoration: const InputDecoration(
-                  labelText: 'Return URL (tuỳ chọn)',
-                ),
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                value: enabled,
-                title: const Text('Bật thanh toán VNPay'),
-                onChanged: (value) => setDialogState(() => enabled = value),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: saving ? null : () => Navigator.pop(context),
-              child: const Text('Hủy'),
-            ),
-            FilledButton(
-              onPressed: saving
-                  ? null
-                  : () async {
-                      setDialogState(() => saving = true);
-                      try {
-                        final saved = await APIClient().updatePaymentSettings(
-                          UpdatePaymentSettingsRequest(
-                            terminalId: terminal.text.trim(),
-                            secretKey: secret.text.trim(),
-                            environment: env.text.trim(),
-                            returnUrl: returnUrl.text.trim(),
-                            enabled: enabled,
-                          ),
-                        );
-                        store.updateVnpayConfig(
-                          VnpayConfig(
-                            terminalId: saved.terminalId,
-                            secretKey: saved.secretKey,
-                            environment: saved.environment,
-                          ),
-                        );
-                        if (context.mounted) {
-                          Navigator.pop(context);
-                          _showSnack(context, 'Đã lưu cấu hình VNPay');
-                        }
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        _showSnack(
-                          context,
-                          'Lưu cấu hình thất bại: $e',
-                          isError: true,
-                        );
-                      } finally {
-                        if (context.mounted) {
-                          setDialogState(() => saving = false);
-                        }
-                      }
-                    },
-              child: saving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Lưu'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _showSnack(
     BuildContext context,
     String message, {
@@ -410,11 +264,48 @@ class _ConfigRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon),
-      title: Text(title),
-      subtitle: Text(subtitle),
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.line, width: 0.8)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: const Color(0xFFD97706), size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

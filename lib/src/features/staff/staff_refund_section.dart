@@ -131,71 +131,79 @@ class _StaffRefundSectionState extends State<StaffRefundSection> {
           Padding(
             padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
             child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.danger.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.currency_exchange_rounded,
-                  color: AppColors.danger,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Xử lý hoàn tiền',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.danger.withValues(alpha: .1),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  Text(
-                    'Duyệt yêu cầu và hủy vé cho khách',
-                    style: TextStyle(fontSize: 12, color: AppColors.muted),
+                  child: Icon(
+                    Icons.currency_exchange_rounded,
+                    color: AppColors.danger,
+                    size: 20,
                   ),
-                ],
-              ),
-            ],
-          ),
-        ),
-
-        // ── Mode Toggle ───────────────────────────────────────────────────────
-        Container(
-          width: double.infinity,
-          margin: const EdgeInsets.only(bottom: 16),
-          child: SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(
-                value: true,
-                label: Text('Yêu cầu chờ duyệt'),
-                icon: Icon(Icons.list_alt_rounded),
-              ),
-              ButtonSegment(
-                value: false,
-                label: Text('Tra cứu thủ công'),
-                icon: Icon(Icons.search_rounded),
-              ),
-            ],
-            selected: {_showRequests},
-            onSelectionChanged: (set) {
-              setState(() => _showRequests = set.first);
-              if (set.first) _fetchRequests();
-            },
-            style: ButtonStyle(
-              backgroundColor: WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.selected)) return AppColors.ink;
-                return Colors.white;
-              }),
-              foregroundColor: WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.selected)) return Colors.white;
-                return AppColors.ink;
-              }),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Xử lý hoàn tiền',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      'Duyệt yêu cầu và hủy vé cho khách',
+                      style: TextStyle(fontSize: 12, color: AppColors.muted),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-        ),
+
+        // ── Mode Toggle ───────────────────────────────────────────────────────
+        if (!_showRequests)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 16),
+            child: SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(
+                  value: true,
+                  label: Text('Yêu cầu chờ duyệt'),
+                  icon: Icon(Icons.list_alt_rounded),
+                ),
+                ButtonSegment(
+                  value: false,
+                  label: Text('Tra cứu thủ công'),
+                  icon: Icon(Icons.search_rounded),
+                ),
+              ],
+              selected: {_showRequests},
+              onSelectionChanged: (set) {
+                setState(() => _showRequests = set.first);
+                if (set.first) _fetchRequests();
+              },
+              style: ButtonStyle(
+                backgroundColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return AppColors.ink;
+                  }
+                  return Colors.white;
+                }),
+                foregroundColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return Colors.white;
+                  }
+                  return AppColors.ink;
+                }),
+              ),
+            ),
+          ),
 
         if (_showRequests) ...[
           // ── Pending Requests List ───────────────────────────────────────────

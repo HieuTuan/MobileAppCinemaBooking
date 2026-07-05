@@ -9,4 +9,8 @@ public interface ReviewService {
     ReviewResponse createReview(CreateReviewRequest request, String authenticatedUserId);
 
     ReviewPageResponse getMovieReviews(String movieId, int page, int pageSize);
+
+    ReviewPageResponse getAllReviews(int page, int pageSize);
+
+    void deleteReview(String reviewId);
 }

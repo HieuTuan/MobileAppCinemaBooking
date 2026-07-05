@@ -173,7 +173,10 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
-    public BookingResponse createBooking(CreateBookingRequest request, String authenticatedUserId) {
+    public BookingResponse createBooking(
+            CreateBookingRequest request,
+            String authenticatedUserId,
+            String requestBaseUrl) {
         // Age verification for T18 movies — Requirements 7.5, 7.6, 7.7
         var userId = request.userId() == null || request.userId().isBlank()
                 ? authenticatedUserId
@@ -269,7 +272,7 @@ public class BookingServiceImpl implements BookingService {
                 booking.getStatus(),
                 booking.getPaymentStatus(),
                 total,
-                createPaymentUrl(bookingId, total),
+                createPaymentUrl(bookingId, total, requestBaseUrl),
                 booking.getPaymentExpiresAt());
     }
 
@@ -443,7 +446,6 @@ public class BookingServiceImpl implements BookingService {
         }
         // JS fetch calls confirm endpoint (updates DB), then navigates to cineluxe:// deep-link.
         // Android WebView cannot follow HTTP 302 to a custom URI scheme (ERR_UNKNOWN_URL_SCHEME).
-        var apiBase = stripTrailingSlash(apiBaseUrl);
         return """
         <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
         <style>
@@ -465,11 +467,11 @@ public class BookingServiceImpl implements BookingService {
         <script>
         async function pay(code){
           var s=code==='00'?'success':'failed';
-          try{await fetch('%s/api/payments/sandbox/%s/confirm?responseCode='+code,{method:'POST'});}catch(e){}
+          try{await fetch('/api/payments/sandbox/%s/confirm?responseCode='+code,{method:'POST'});}catch(e){}
           window.location.href='cineluxe://payment-return?bookingId=%s&status='+s+'&responseCode='+code;
         }
         </script></body></html>
-        """.formatted(bookingId, booking.getTotalAmount(), apiBase, bookingId, bookingId);
+        """.formatted(bookingId, booking.getTotalAmount(), bookingId, bookingId);
     }
 
     @Override
@@ -603,6 +605,9 @@ public class BookingServiceImpl implements BookingService {
                 booking.getId(),
                 booking.getUserId(),
                 booking.getShowtimeId(),
+                showtimeRepository.findById(booking.getShowtimeId())
+                        .map(showtime -> showtime.getMovieId())
+                        .orElse(null),
                 booking.getMovieTitle(),
                 booking.getRoomName(),
                 booking.getCinemaName(),
@@ -643,17 +648,18 @@ public class BookingServiceImpl implements BookingService {
     }
 
 
-    private String createPaymentUrl(String bookingId, long totalAmount) {
+    private String createPaymentUrl(String bookingId, long totalAmount, String requestBaseUrl) {
+        var callbackBaseUrl = resolveCallbackBaseUrl(requestBaseUrl);
         if (!isVnpayGatewayConfigured()) {
             var p = "amount=" + totalAmount + "&bookingId=" + bookingId;
-            return stripTrailingSlash(apiBaseUrl) + "/api/payments/sandbox/" + bookingId
+            return stripTrailingSlash(callbackBaseUrl) + "/api/payments/sandbox/" + bookingId
                     + "?" + p + "&signature=" + sign(p);
         }
         var zone = ZoneId.of("Asia/Ho_Chi_Minh");
         var fmt  = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
         var now  = LocalDateTime.now(zone);
         var returnUrl = (vnpayReturnUrl == null || vnpayReturnUrl.isBlank())
-                ? stripTrailingSlash(apiBaseUrl) + "/api/payments/vnpay/return"
+                ? stripTrailingSlash(callbackBaseUrl) + "/api/payments/vnpay/return"
                 : vnpayReturnUrl.trim();
         var params = new TreeMap<String, String>();
         params.put("vnp_Version",   "2.1.0");
@@ -678,6 +684,13 @@ public class BookingServiceImpl implements BookingService {
         return vnpayPayUrl != null && !vnpayPayUrl.isBlank()
                 && vnpayTerminalId != null && !vnpayTerminalId.isBlank()
                 && vnpaySecret != null && !vnpaySecret.isBlank();
+    }
+
+    private String resolveCallbackBaseUrl(String requestBaseUrl) {
+        if (requestBaseUrl != null && !requestBaseUrl.isBlank()) {
+            return stripTrailingSlash(requestBaseUrl);
+        }
+        return stripTrailingSlash(apiBaseUrl);
     }
 
     private String buildQueryString(Map<String, String> params) {

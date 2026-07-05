@@ -26,7 +26,29 @@ public record MovieResponse(
         Instant createdAt,
         Instant updatedAt
 ) {
+    /**
+     * Build response using the movie's static rating field.
+     * Used when averageRating from reviews is not needed.
+     */
     public static MovieResponse from(Movie m) {
+        return from(m, null);
+    }
+
+    /**
+     * Build response, replacing `rating` with the live average from reviews
+     * when available (thang 1–10). Falls back to the movie's stored rating
+     * (also on a 1–10 scale after * 2 normalisation) when no reviews exist.
+     *
+     * @param m             the Movie entity
+     * @param averageRating AVG(review.rating) for this movie, or null if no reviews yet
+     */
+    public static MovieResponse from(Movie m, Double averageRating) {
+        // Use live average when reviews exist; otherwise keep the stored value.
+        // Stored value is on a 0–5 scale → multiply by 2 to normalise to 0–10.
+        double displayRating = (averageRating != null)
+                ? averageRating
+                : m.getRating() * 2.0;
+
         return new MovieResponse(
                 m.getId(),
                 m.getTitle(),
@@ -39,7 +61,7 @@ public record MovieResponse(
                 m.getGenres() != null ? m.getGenres() : List.of(),
                 m.getCast() != null ? m.getCast() : List.of(),
                 m.getDirector() != null ? m.getDirector() : "",
-                m.getRating(),
+                displayRating,
                 m.getStatus(),
                 m.getCreatedAt(),
                 m.getUpdatedAt()

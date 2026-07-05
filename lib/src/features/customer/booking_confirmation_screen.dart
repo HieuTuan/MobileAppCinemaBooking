@@ -111,6 +111,7 @@ class _TicketContent extends StatelessWidget {
               child: QrImageView(
                 data: ticket.qrCode,
                 size: 300,
+                padding: const EdgeInsets.all(18),
                 backgroundColor: Colors.white,
               ),
             ),
@@ -135,7 +136,9 @@ class _TicketContent extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.muted.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.muted.withValues(alpha: 0.15)),
+              border: Border.all(
+                color: AppColors.muted.withValues(alpha: 0.15),
+              ),
             ),
             child: Row(
               children: [
@@ -192,7 +195,7 @@ class _CachedTicketContent extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        _OfflineBadge(),
+        const _OfflineBadge(),
         const SizedBox(height: 16),
         Center(
           child: Image.memory(
@@ -213,7 +216,9 @@ class _CachedTicketContent extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppColors.muted.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.muted.withValues(alpha: 0.15)),
+                border: Border.all(
+                  color: AppColors.muted.withValues(alpha: 0.15),
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -253,9 +258,9 @@ class _OfflineBadge extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: AppColors.warning.withValues(alpha: .45)),
         ),
-        child: Row(
+        child: const Row(
           mainAxisSize: MainAxisSize.min,
-          children: const [
+          children: [
             Icon(Icons.cloud_off_rounded, size: 16, color: AppColors.warning),
             SizedBox(width: 6),
             Text(
@@ -293,6 +298,7 @@ class _FullScreenQr extends StatelessWidget {
                 child: QrImageView(
                   data: ticket.qrCode,
                   size: 340,
+                  padding: const EdgeInsets.all(20),
                   backgroundColor: Colors.white,
                 ),
               ),
@@ -310,16 +316,16 @@ class _FullScreenQr extends StatelessWidget {
 void _copyToClipboard(BuildContext context, String text) {
   Clipboard.setData(ClipboardData(text: text));
   ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
+    const SnackBar(
       content: Row(
-        children: const [
+        children: [
           Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
           SizedBox(width: 8),
           Text('Đã sao chép mã booking vào bộ nhớ tạm'),
         ],
       ),
       behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 2),
+      duration: Duration(seconds: 2),
     ),
   );
 }

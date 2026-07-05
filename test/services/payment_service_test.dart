@@ -18,4 +18,23 @@ void main() {
     expect(PaymentService.parseReturnUrl('https://example.com'), isNull);
     expect(PaymentService.parseReturnUrl('cineluxe://payment-return'), isNull);
   });
+
+  test('recognizes backend VNPay return pages', () {
+    expect(
+      PaymentService.isBackendPaymentReturnUrl(
+        'http://192.168.1.18:8080/api/payments/vnpay/return?vnp_ResponseCode=00',
+      ),
+      isTrue,
+    );
+    expect(
+      PaymentService.isBackendPaymentReturnUrl(
+        'https://example.com/v1/payments/vnpay/return?vnp_ResponseCode=24',
+      ),
+      isTrue,
+    );
+    expect(
+      PaymentService.isBackendPaymentReturnUrl('https://example.com/other'),
+      isFalse,
+    );
+  });
 }

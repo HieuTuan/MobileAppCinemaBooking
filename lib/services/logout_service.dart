@@ -39,7 +39,7 @@ class LogoutService {
           style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
         ),
         content: const Text(
-          'Bạn có chắc chắn muốn đăng xuất không?\nPhiên đăng nhập hiện tại sẽ kết thúc.',
+          'Bạn có chắc chắn muốn đăng xuất không?',
           textAlign: TextAlign.center,
           style: TextStyle(height: 1.5, fontSize: 14),
         ),
@@ -49,10 +49,10 @@ class LogoutService {
             onPressed: () => Navigator.of(dialogContext).pop(false),
             style: TextButton.styleFrom(
               foregroundColor: const Color(0xFF71788A),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             child: const Text(
               'Huỷ',
@@ -64,11 +64,11 @@ class LogoutService {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFD04747),
               foregroundColor: Colors.white,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               elevation: 0,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             child: const Text(
               'Đăng xuất',
@@ -89,9 +89,56 @@ class LogoutService {
     messenger
       ?..clearSnackBars()
       ..showSnackBar(
-        const SnackBar(
-          content: Text('Đang đăng xuất...'),
-          duration: Duration(milliseconds: 900),
+        SnackBar(
+          duration: const Duration(milliseconds: 1500),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+          content: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1E293B), Color(0xFF334155)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: Colors.white24,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: .3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: const Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: Color(0xFFC9A44C),
+                  ),
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    'Đang đăng xuất...',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       );
 
@@ -112,7 +159,78 @@ class LogoutService {
     messenger2
       ?..clearSnackBars()
       ..showSnackBar(
-        const SnackBar(content: Text('Đăng xuất thành công')),
+        SnackBar(
+          duration: const Duration(seconds: 3),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+          content: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF2E1A1A), Color(0xFF451A1A)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: const Color(0xFFD04747).withValues(alpha: .5),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFD04747).withValues(alpha: .15),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD04747).withValues(alpha: .2),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFFD04747).withValues(alpha: .5),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.logout_rounded,
+                    color: Color(0xFFFF7A7A),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Đăng xuất thành công',
+                        style: TextStyle(
+                          color: Color(0xFFFF7A7A),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        'Hẹn gặp lại bạn sớm! 🎬',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
   }
 }

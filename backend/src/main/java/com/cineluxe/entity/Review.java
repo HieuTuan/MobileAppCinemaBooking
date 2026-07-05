@@ -17,7 +17,7 @@ public class Review {
     @Column(length = 500)
     private String comment;
 
-    private int rating;       // 1-5
+    private int rating;       // 1-10
     private boolean verified; // true when user has a "used" booking
 
     private Instant createdAt;

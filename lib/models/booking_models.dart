@@ -152,12 +152,14 @@ class BookingDetails {
     required this.status,
     required this.paymentStatus,
     required this.createdAt,
+    this.movieId,
     this.qrCode,
   });
 
   final String bookingId;
   final String userId;
   final String showtimeId;
+  final String? movieId;
   final String movieTitle;
   final String roomName;
   final String cinemaName;

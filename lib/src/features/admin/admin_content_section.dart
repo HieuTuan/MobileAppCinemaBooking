@@ -10,6 +10,7 @@ import '../../../api/api_client.dart';
 import '../../../models/admin_models.dart' as admin_models;
 import '../../../models/admin_models.dart'
     hide Room; // app_models.dart Room is used instead
+import '../../../models/review.dart' as review_models;
 import '../../core/app_theme.dart';
 import '../../core/formatters.dart';
 import '../../models/app_models.dart';
@@ -29,12 +30,16 @@ class AdminContentSection extends StatefulWidget {
 class _AdminContentSectionState extends State<AdminContentSection> {
   final _api = APIClient();
 
+  bool _moviesLoading = false;
   List<AdminFoodCombo> _combos = [];
   bool _combosLoading = false;
   List<AdminActor> _actors = [];
   bool _actorsLoading = false;
   List<admin_models.Room> _adminRooms = [];
   bool _roomsLoading = false;
+  List<review_models.Review> _reviews = [];
+  bool _reviewsLoading = false;
+  final Set<String> _expandedContentSections = {'reviews'};
   OverlayEntry? _adminToastEntry;
 
   @override
@@ -47,12 +52,30 @@ class _AdminContentSectionState extends State<AdminContentSection> {
   @override
   void initState() {
     super.initState();
+    _loadMovies();
     _loadCombos();
     _loadActors();
     _loadRooms();
+    _loadReviews();
   }
 
   // ─── Load ─────────────────────────────────────────────────────────────────
+
+  Future<void> _loadMovies() async {
+    if (mounted) setState(() => _moviesLoading = true);
+    try {
+      final page = await _api.getMovies(pageSize: 200, quiet: true);
+      if (mounted) {
+        setState(() => widget.store.replaceMoviesFromApi(page.data));
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnack('Loi tai danh sach phim: ${_errorMsg(e)}', isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _moviesLoading = false);
+    }
+  }
 
   Future<void> _loadCombos() async {
     setState(() => _combosLoading = true);
@@ -90,6 +113,32 @@ class _AdminContentSectionState extends State<AdminContentSection> {
     }
   }
 
+  Future<void> _loadReviews() async {
+    setState(() => _reviewsLoading = true);
+    try {
+      final page = await _api.getAdminReviews(pageSize: 50);
+      if (mounted) setState(() => _reviews = page.data);
+    } catch (e) {
+      if (mounted) {
+        _showSnack('Lỗi tải đánh giá: ${_errorMsg(e)}', isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _reviewsLoading = false);
+    }
+  }
+
+  Future<void> _apiDeleteReview(review_models.Review review) async {
+    try {
+      await _api.deleteReview(review.id);
+      setState(() {
+        _reviews = _reviews.where((item) => item.id != review.id).toList();
+      });
+      _showSnack('Đã xóa đánh giá!');
+    } catch (e) {
+      _showSnack('Lỗi xóa đánh giá: ${_errorMsg(e)}', isError: true);
+    }
+  }
+
   // ─── Movie CRUD ───────────────────────────────────────────────────────────
 
   Future<void> _apiSaveMovie(Movie uiMovie, {bool isNew = false}) async {
@@ -113,7 +162,12 @@ class _AdminContentSectionState extends State<AdminContentSection> {
       final saved = isNew
           ? await _api.adminCreateMovie(req)
           : await _api.adminUpdateMovie(uiMovie.id, req);
-      widget.store.saveMovie(_uiMovieFromApi(saved, fallback: uiMovie));
+      final savedMovie = _uiMovieFromApi(saved, fallback: uiMovie);
+      if (mounted) {
+        setState(() => widget.store.saveMovie(savedMovie));
+      } else {
+        widget.store.saveMovie(savedMovie);
+      }
       _showSnack(isNew ? 'Đã thêm phim!' : 'Đã cập nhật phim!');
     } catch (e) {
       _showSnack('Lỗi: ${_errorMsg(e)}', isError: true);
@@ -144,7 +198,11 @@ class _AdminContentSectionState extends State<AdminContentSection> {
   Future<void> _apiDeleteMovie(String movieId) async {
     try {
       await _api.adminDeleteMovie(movieId);
-      widget.store.deleteMovie(movieId);
+      if (mounted) {
+        setState(() => widget.store.deleteMovie(movieId));
+      } else {
+        widget.store.deleteMovie(movieId);
+      }
       _showSnack('Đã xoá phim!');
     } catch (e) {
       final msg = _errorMsg(e);
@@ -327,7 +385,23 @@ class _AdminContentSectionState extends State<AdminContentSection> {
     });
   }
 
-  String _errorMsg(Object e) => e.toString().replaceFirst('Exception: ', '');
+  String _errorMsg(Object e) {
+    final text = e.toString().replaceFirst('Exception: ', '');
+    if (text.contains('/api/admin/movies') &&
+        (text.contains('500') || text.contains('bad response'))) {
+      return 'Không lưu được phim. Hãy restart backend để cập nhật schema; nếu vẫn lỗi, kiểm tra URL poster/trailer có quá dài không.';
+    }
+    final messageMatch = RegExp(r'message:\s*([^,}]+)').firstMatch(text);
+    if (messageMatch != null) return messageMatch.group(1)!.trim();
+    return text.length > 180 ? '${text.substring(0, 180)}...' : text;
+  }
+
+  String _movieTitleForReview(review_models.Review review) {
+    for (final movie in widget.store.movies) {
+      if (movie.id == review.movieId) return movie.title;
+    }
+    return review.movieId;
+  }
 
   Room _roomFromAdmin(admin_models.Room room) {
     return Room(
@@ -448,6 +522,8 @@ class _AdminContentSectionState extends State<AdminContentSection> {
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
+    return _buildAccordionContent(context, store);
+    // ignore: dead_code
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
       children: [
@@ -474,6 +550,65 @@ class _AdminContentSectionState extends State<AdminContentSection> {
         ),
 
         // ── Movies ────────────────────────────────────────────────────────
+        SectionTitle(
+          title: 'Quản lý đánh giá',
+          action: IconButton(
+            tooltip: 'Tải lại đánh giá',
+            onPressed: _reviewsLoading ? null : _loadReviews,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ),
+        if (_reviewsLoading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (_reviews.isEmpty)
+          const GlassCard(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Chưa có đánh giá nào.',
+                style: TextStyle(color: AppColors.muted),
+              ),
+            ),
+          )
+        else
+          ..._reviews.map(
+            (review) => GlassCard(
+              margin: const EdgeInsets.only(bottom: 10),
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: AppColors.ink,
+                  foregroundColor: Colors.white,
+                  child: Text(
+                    '${review.rating}',
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+                title: Text(
+                  _movieTitleForReview(review),
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                subtitle: Text(
+                  '${review.userName} • ${review.rating}/10 • ${review.comment}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: IconButton(
+                  tooltip: 'Xóa đánh giá',
+                  onPressed: () => _confirmDelete(
+                    context,
+                    title: 'Xóa đánh giá ${review.rating}/10?',
+                    subtitle: 'Hành động này không thể hoàn tác.',
+                    onConfirm: () => _apiDeleteReview(review),
+                  ),
+                  icon: const Icon(Icons.delete_outline_rounded),
+                ),
+              ),
+            ),
+          ),
         SectionTitle(
           title: 'Quản lý phim',
           action: FilledButton.icon(
@@ -751,7 +886,7 @@ class _AdminContentSectionState extends State<AdminContentSection> {
 
         // ── Food Combos ───────────────────────────────────────────────────
         SectionTitle(
-          title: 'Quản lý Combo đồ ăn',
+          title: 'Quản lý Combo bắp nước',
           action: FilledButton.icon(
             onPressed: () => _comboDialog(context),
             icon: const Icon(Icons.add_rounded),
@@ -853,6 +988,636 @@ class _AdminContentSectionState extends State<AdminContentSection> {
   }
 
   // ─── Movie editor dialog (step-by-step wizard) ───────────────────────────
+
+  Widget _buildAccordionContent(BuildContext context, CinemaStore store) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: MetricCard(
+                label: 'Phim',
+                value: '${store.movies.length}',
+                icon: Icons.local_movies_rounded,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: MetricCard(
+                label: 'Suất chiếu',
+                value: '${store.showtimes.length}',
+                icon: Icons.event_rounded,
+                color: AppColors.success,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _adminSection(
+          id: 'reviews',
+          title: 'Quản lý đánh giá',
+          icon: Icons.star_rate_rounded,
+          badge: _reviewsLoading ? 'Đang tải' : '${_reviews.length}',
+          action: IconButton(
+            tooltip: 'Tải lại đánh giá',
+            onPressed: _reviewsLoading ? null : _loadReviews,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+          children: _reviewChildren(context),
+        ),
+        _adminSection(
+          id: 'movies',
+          title: 'Quản lý phim',
+          icon: Icons.local_movies_rounded,
+          badge: _moviesLoading ? 'Đang tải' : '${store.movies.length}',
+          action: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: 'Tải lại phim từ API',
+                onPressed: _moviesLoading ? null : _loadMovies,
+                icon: const Icon(Icons.refresh_rounded),
+              ),
+              FilledButton.icon(
+                onPressed: () => _movieEditorDialog(context),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Thêm'),
+              ),
+            ],
+          ),
+          children: _movieChildren(context, store),
+        ),
+        _adminSection(
+          id: 'genres',
+          title: 'Danh mục thể loại',
+          icon: Icons.category_rounded,
+          badge: '${store.genres.skip(1).length}',
+          action: TextButton.icon(
+            onPressed: () => _genreDialog(context),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Thêm'),
+          ),
+          children: _genreChildren(context, store),
+        ),
+        _adminSection(
+          id: 'actors',
+          title: 'Quản lý diễn viên',
+          icon: Icons.groups_rounded,
+          badge: _actorsLoading ? 'Đang tải' : '${_actors.length}',
+          action: FilledButton.icon(
+            onPressed: () => _openActorDialog(context),
+            icon: const Icon(Icons.person_add_alt_rounded),
+            label: const Text('Thêm'),
+          ),
+          children: _actorChildren(context),
+        ),
+        _adminSection(
+          id: 'rooms',
+          title: 'Quản lý phòng chiếu',
+          icon: Icons.meeting_room_rounded,
+          badge: _roomsLoading ? 'Đang tải' : '${store.rooms.length}',
+          action: FilledButton.icon(
+            onPressed: () => _roomDialog(context),
+            icon: const Icon(Icons.meeting_room_rounded),
+            label: const Text('Thêm phòng'),
+          ),
+          children: _roomChildren(context, store),
+        ),
+        _adminSection(
+          id: 'showtimes',
+          title: 'Lịch chiếu',
+          icon: Icons.schedule_rounded,
+          badge: '${store.showtimes.length}',
+          action: FilledButton.icon(
+            onPressed: () => _showtimeDialog(context),
+            icon: const Icon(Icons.add_alarm_rounded),
+            label: const Text('Tạo suất'),
+          ),
+          children: _showtimeChildren(context, store),
+        ),
+        _adminSection(
+          id: 'combos',
+          title: 'Quản lý Combo bắp nước',
+          icon: Icons.fastfood_rounded,
+          badge: _combosLoading ? 'Đang tải' : '${_combos.length}',
+          action: FilledButton.icon(
+            onPressed: () => _comboDialog(context),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Thêm'),
+          ),
+          children: _comboChildren(context),
+        ),
+      ],
+    );
+  }
+
+  Widget _adminSection({
+    required String id,
+    required String title,
+    required IconData icon,
+    required String badge,
+    required Widget action,
+    required List<Widget> children,
+  }) {
+    return _AdminAccordionSection(
+      title: title,
+      icon: icon,
+      badge: badge,
+      isExpanded: _expandedContentSections.contains(id),
+      onToggle: () => setState(() {
+        if (_expandedContentSections.contains(id)) {
+          _expandedContentSections.remove(id);
+        } else {
+          _expandedContentSections.add(id);
+        }
+      }),
+      children: [_sectionActionRow(action), ...children],
+    );
+  }
+
+  Widget _sectionActionRow(Widget action) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Align(alignment: Alignment.centerRight, child: action),
+    );
+  }
+
+  List<Widget> _reviewChildren(BuildContext context) {
+    if (_reviewsLoading) return [_loadingContent()];
+    if (_reviews.isEmpty) return [_emptyContent('Chưa có đánh giá nào.')];
+    return _reviews
+        .map(
+          (review) => GlassCard(
+            margin: const EdgeInsets.only(bottom: 10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: AppColors.ink,
+                        foregroundColor: Colors.white,
+                        child: Text(
+                          '${review.rating}',
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _movieTitleForReview(review),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.ink,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  review.userName,
+                                  style: const TextStyle(
+                                    color: AppColors.muted,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                Text(
+                                  '${review.rating}/10',
+                                  style: const TextStyle(
+                                    color: AppColors.ink,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                Text(
+                                  shortDate(review.createdAt),
+                                  style: const TextStyle(
+                                    color: AppColors.muted,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                if (review.isVerified)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.success.withValues(
+                                        alpha: .12,
+                                      ),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: const Text(
+                                      'Đã xem',
+                                      style: TextStyle(
+                                        color: AppColors.success,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Xóa đánh giá',
+                        onPressed: () => _confirmDelete(
+                          context,
+                          title: 'Xóa đánh giá ${review.rating}/10?',
+                          subtitle: 'Hành động này không thể hoàn tác.',
+                          onConfirm: () => _apiDeleteReview(review),
+                        ),
+                        icon: const Icon(Icons.delete_outline_rounded),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.pearl.withValues(alpha: .7),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.line),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Nội dung đánh giá',
+                          style: TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          review.comment.trim().isEmpty
+                              ? 'Không có nội dung.'
+                              : review.comment.trim(),
+                          style: const TextStyle(
+                            color: AppColors.ink,
+                            height: 1.35,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        )
+        .toList();
+  }
+
+  List<Widget> _movieChildren(BuildContext context, CinemaStore store) {
+    if (_moviesLoading) return [_loadingContent()];
+    if (store.movies.isEmpty) return [_emptyContent('Chưa có phim nào.')];
+    return store.movies
+        .map(
+          (movie) => GlassCard(
+            margin: const EdgeInsets.only(bottom: 10),
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: CachedNetworkImage(
+                  imageUrl: movie.posterUrl,
+                  width: 48,
+                  height: 64,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(
+                    width: 48,
+                    height: 64,
+                    color: AppColors.pearl,
+                    child: const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    width: 48,
+                    height: 64,
+                    color: AppColors.pearl,
+                    child: const Icon(Icons.broken_image_outlined),
+                  ),
+                ),
+              ),
+              title: Text(
+                movie.title,
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+              subtitle: Text(
+                '${movie.genres.join(', ')} • ${movie.ageRating} • ${movie.director}',
+              ),
+              trailing: Wrap(
+                children: [
+                  IconButton(
+                    tooltip: 'Sửa phim',
+                    onPressed: () => _movieEditorDialog(context, movie: movie),
+                    icon: const Icon(Icons.edit_outlined),
+                  ),
+                  IconButton(
+                    tooltip: 'Xóa phim',
+                    onPressed: () => _confirmDelete(
+                      context,
+                      title: 'Xoá phim "${movie.title}"?',
+                      subtitle:
+                          'Hành động này không thể hoàn tác. Phim có suất chiếu active sẽ không bị xoá.',
+                      onConfirm: () => _apiDeleteMovie(movie.id),
+                    ),
+                    icon: const Icon(Icons.delete_outline_rounded),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        )
+        .toList();
+  }
+
+  List<Widget> _genreChildren(BuildContext context, CinemaStore store) {
+    final genres = store.genres.skip(1).toList();
+    if (genres.isEmpty) return [_emptyContent('Chưa có thể loại nào.')];
+    return [
+      GlassCard(
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final genre in genres)
+              InputChip(
+                avatar: const Icon(Icons.category_outlined, size: 18),
+                label: Text(genre),
+                onPressed: () => _genreDialog(context, genre: genre),
+                onDeleted: () => store.deleteGenre(genre),
+              ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  List<Widget> _actorChildren(BuildContext context) {
+    if (_actorsLoading) return [_loadingContent()];
+    if (_actors.isEmpty) {
+      return [_emptyContent('Chưa có diễn viên. Nhấn "Thêm" để tạo hồ sơ.')];
+    }
+    return _actors
+        .map(
+          (actor) => GlassCard(
+            margin: const EdgeInsets.only(bottom: 10),
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: CircleAvatar(
+                backgroundColor: AppColors.pearl,
+                backgroundImage: actor.avatarUrl.isEmpty
+                    ? null
+                    : CachedNetworkImageProvider(actor.avatarUrl),
+                child: actor.avatarUrl.isEmpty
+                    ? const Icon(Icons.person_outline_rounded)
+                    : null,
+              ),
+              title: Text(
+                actor.name,
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+              subtitle: Text(
+                actor.description.isEmpty ? 'Chưa có mô tả' : actor.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: Wrap(
+                children: [
+                  IconButton(
+                    tooltip: 'Sửa diễn viên',
+                    onPressed: () => _openActorDialog(context, actor: actor),
+                    icon: const Icon(Icons.edit_outlined),
+                  ),
+                  IconButton(
+                    tooltip: 'Xóa diễn viên',
+                    onPressed: () => _confirmDelete(
+                      context,
+                      title: 'Xóa diễn viên "${actor.name}"?',
+                      subtitle: 'Hành động này không thể hoàn tác.',
+                      onConfirm: () => _apiDeleteActor(actor),
+                    ),
+                    icon: const Icon(Icons.delete_outline_rounded),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        )
+        .toList();
+  }
+
+  List<Widget> _roomChildren(BuildContext context, CinemaStore store) {
+    if (_roomsLoading) return [_loadingContent()];
+    if (store.rooms.isEmpty) {
+      return [
+        _emptyContent(
+          'Chưa có phòng chiếu. Nhấn "Thêm phòng" để tạo layout ghế.',
+        ),
+      ];
+    }
+    return store.rooms
+        .map(
+          (room) => GlassCard(
+            margin: const EdgeInsets.only(bottom: 10),
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.meeting_room_rounded),
+              title: Text('${room.name} • ${room.screenType}'),
+              subtitle: Text(
+                'Sức chứa ${room.capacity} • ${room.status == RoomStatus.ready ? 'Sẵn sàng' : 'Bảo trì'}',
+              ),
+              trailing: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  IconButton(
+                    tooltip: 'Xem sơ đồ ghế',
+                    onPressed: () {
+                      final adminRoom = _adminRoomFor(room.id);
+                      if (adminRoom == null) {
+                        _showSnack(
+                          'Chưa tải được sơ đồ ghế của phòng này.',
+                          isError: true,
+                        );
+                        return;
+                      }
+                      _roomSeatLayoutDialog(context, adminRoom);
+                    },
+                    icon: const Icon(Icons.event_seat_outlined),
+                  ),
+                  Switch(
+                    value: room.status == RoomStatus.ready,
+                    onChanged: (value) => _apiUpdateRoomStatus(room, value),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        )
+        .toList();
+  }
+
+  List<Widget> _showtimeChildren(BuildContext context, CinemaStore store) {
+    if (store.showtimes.isEmpty) return [_emptyContent('Chưa có lịch chiếu.')];
+    return store.showtimes.map((showtime) {
+      final movie = store.movieById(showtime.movieId);
+      final room = store.roomById(showtime.roomId);
+      return GlassCard(
+        margin: const EdgeInsets.only(bottom: 10),
+        child: ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.schedule_rounded),
+          title: Text(movie.title),
+          subtitle: Text(
+            '${room.name} • ${shortDate(showtime.startTime)} ${shortTime(showtime.startTime)}',
+          ),
+          trailing: Wrap(
+            spacing: 6,
+            children: [
+              Text(money(showtime.basePrice)),
+              Text(showtime.statusLabel),
+              IconButton(
+                tooltip: 'Xóa suất',
+                onPressed: () => _confirmDelete(
+                  context,
+                  title: 'Huỷ suất chiếu "${movie.title}"?',
+                  subtitle:
+                      'Suất chiếu sẽ được chuyển sang trạng thái cancelled trên backend.',
+                  onConfirm: () => _apiDeleteShowtime(showtime),
+                ),
+                icon: const Icon(Icons.delete_outline_rounded),
+              ),
+            ],
+          ),
+        ),
+      );
+    }).toList();
+  }
+
+  List<Widget> _comboChildren(BuildContext context) {
+    if (_combosLoading) return [_loadingContent()];
+    if (_combos.isEmpty) {
+      return [_emptyContent('Chưa có combo nào. Nhấn "Thêm" để tạo mới.')];
+    }
+    return _combos
+        .map(
+          (combo) => GlassCard(
+            margin: const EdgeInsets.only(bottom: 10),
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: combo.imageUrl.isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: CachedNetworkImage(
+                        imageUrl: combo.imageUrl,
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) =>
+                            const Icon(Icons.fastfood_rounded, size: 32),
+                      ),
+                    )
+                  : const Icon(Icons.fastfood_rounded, size: 32),
+              title: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      combo.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (!combo.isActive)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: .18),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'Ẩn',
+                        style: TextStyle(fontSize: 11, color: AppColors.muted),
+                      ),
+                    ),
+                ],
+              ),
+              subtitle: Text(
+                '${NumberFormat.decimalPattern('vi').format(combo.price)} VND'
+                ' • Còn ${combo.quantity}'
+                '${combo.description.isNotEmpty ? ' • ${combo.description}' : ''}',
+              ),
+              trailing: Wrap(
+                children: [
+                  IconButton(
+                    tooltip: 'Sửa combo',
+                    onPressed: () => _comboDialog(context, combo: combo),
+                    icon: const Icon(Icons.edit_outlined),
+                  ),
+                  IconButton(
+                    tooltip: combo.isActive ? 'Ẩn combo' : 'Hiện combo',
+                    onPressed: () => _apiToggleCombo(combo),
+                    icon: Icon(
+                      combo.isActive
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: combo.isActive
+                          ? AppColors.muted
+                          : AppColors.success,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        )
+        .toList();
+  }
+
+  Widget _loadingContent() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 24),
+      child: Center(child: CircularProgressIndicator()),
+    );
+  }
+
+  Widget _emptyContent(String message) {
+    return GlassCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(message, style: const TextStyle(color: AppColors.muted)),
+      ),
+    );
+  }
 
   void _movieEditorDialog(BuildContext context, {Movie? movie}) {
     final now = DateTime.now();
@@ -1000,6 +1765,7 @@ class _AdminContentSectionState extends State<AdminContentSection> {
               'Ph\u01b0\u01a1ng ti\u1ec7n',
               'Di\u1ec5n vi\u00ean',
             ];
+            const goldColor = Color(0xFFFFB300);
             return Padding(
               padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
               child: Row(
@@ -1009,7 +1775,7 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                     return Expanded(
                       child: Container(
                         height: 2,
-                        color: done ? AppColors.gold : Colors.white24,
+                        color: done ? goldColor : Colors.white24,
                       ),
                     );
                   }
@@ -1026,13 +1792,13 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: isDone
-                              ? AppColors.gold
+                              ? goldColor
                               : isCurrent
-                              ? AppColors.gold.withValues(alpha: .25)
+                              ? goldColor.withValues(alpha: .25)
                               : Colors.white12,
                           border: Border.all(
                             color: isCurrent || isDone
-                                ? AppColors.gold
+                                ? goldColor
                                 : Colors.white30,
                             width: 2,
                           ),
@@ -1050,7 +1816,7 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                                     fontSize: 12,
                                     fontWeight: FontWeight.w800,
                                     color: isCurrent
-                                        ? AppColors.gold
+                                        ? goldColor
                                         : Colors.white38,
                                   ),
                                 ),
@@ -1550,7 +2316,7 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                                     width: 16,
                                     height: 16,
                                     decoration: BoxDecoration(
-                                      color: Colors.amber,
+                                      color: AppColors.ink,
                                       shape: BoxShape.circle,
                                       border: Border.all(
                                         color: Colors.white,
@@ -1594,7 +2360,7 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                                         ? Icons.star_rounded
                                         : Icons.star_border_rounded,
                                     color: isMain
-                                        ? Colors.amber
+                                        ? AppColors.ink
                                         : AppColors.muted,
                                     size: 22,
                                   ),
@@ -1731,12 +2497,14 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                               Container(
                                 padding: const EdgeInsets.all(7),
                                 decoration: BoxDecoration(
-                                  color: AppColors.gold.withValues(alpha: .18),
+                                  color: const Color(
+                                    0xFFFFB300,
+                                  ).withValues(alpha: .18),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: const Icon(
                                   Icons.movie_creation_rounded,
-                                  color: AppColors.gold,
+                                  color: Color(0xFFFFB300),
                                   size: 20,
                                 ),
                               ),
@@ -2237,8 +3005,38 @@ class _AdminContentSectionState extends State<AdminContentSection> {
     final quantityCtrl = TextEditingController(
       text: combo != null ? '${combo.quantity}' : '',
     );
-    final imageCtrl = TextEditingController(text: combo?.imageUrl ?? '');
+    final imagePicker = ImagePicker();
+    var imageUrl = combo?.imageUrl ?? '';
+    var uploadingImage = false;
     bool isActive = combo?.isActive ?? true;
+
+    Future<void> pickAndUploadComboImage(StateSetter setS) async {
+      final picked = await imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1400,
+        imageQuality: 88,
+      );
+      if (picked == null) return;
+      setS(() => uploadingImage = true);
+      try {
+        final url = await _api.adminUploadImage(
+          bytes: await picked.readAsBytes(),
+          filename: picked.name,
+          contentType: _imageContentType(picked.name),
+        );
+        setS(() => imageUrl = url);
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Không thể tải ảnh sản phẩm: ${_errorMsg(e)}'),
+            ),
+          );
+        }
+      } finally {
+        setS(() => uploadingImage = false);
+      }
+    }
 
     showDialog<void>(
       context: context,
@@ -2263,7 +3061,114 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                     'Số lượng tồn *',
                     keyboardType: TextInputType.number,
                   ),
-                  _field(imageCtrl, 'Ảnh URL'),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.pearl,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.line),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.image_rounded,
+                              color: AppColors.gold,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Ảnh sản phẩm',
+                                style: TextStyle(
+                                  color: AppColors.ink,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            if (uploadingImage)
+                              const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        if (imageUrl.isNotEmpty)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: CachedNetworkImage(
+                              imageUrl: imageUrl,
+                              height: 130,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => const SizedBox(
+                                height: 80,
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (_, __, ___) => Container(
+                                height: 130,
+                                color: Colors.white,
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.broken_image_outlined,
+                                    size: 42,
+                                    color: AppColors.muted,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          Container(
+                            height: 110,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppColors.line),
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.fastfood_rounded,
+                                size: 42,
+                                color: AppColors.muted,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: uploadingImage
+                                ? null
+                                : () => pickAndUploadComboImage(setS),
+                            icon: const Icon(
+                              Icons.cloud_upload_rounded,
+                              size: 16,
+                            ),
+                            label: Text(
+                              uploadingImage
+                                  ? 'Đang tải ảnh...'
+                                  : imageUrl.isEmpty
+                                  ? 'Chọn ảnh sản phẩm'
+                                  : 'Đổi ảnh sản phẩm',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   SwitchListTile(
                     title: const Text('Hiển thị cho khách hàng'),
                     value: isActive,
@@ -2279,33 +3184,37 @@ class _AdminContentSectionState extends State<AdminContentSection> {
               child: const Text('Hủy'),
             ),
             FilledButton(
-              onPressed: () {
-                final price = int.tryParse(priceCtrl.text.trim()) ?? 0;
-                final quantity = int.tryParse(quantityCtrl.text.trim()) ?? -1;
-                if (nameCtrl.text.trim().isEmpty ||
-                    price <= 0 ||
-                    quantity < 0) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Vui lòng nhập tên, giá và số lượng hợp lệ!',
-                      ),
-                    ),
-                  );
-                  return;
-                }
-                final newCombo = AdminFoodCombo(
-                  id: combo?.id ?? '',
-                  name: nameCtrl.text.trim(),
-                  description: descCtrl.text.trim(),
-                  price: price,
-                  quantity: quantity,
-                  imageUrl: imageCtrl.text.trim(),
-                  isActive: isActive,
-                );
-                Navigator.pop(ctx);
-                _apiSaveCombo(newCombo, isNew: combo == null);
-              },
+              onPressed: uploadingImage
+                  ? null
+                  : () {
+                      final price = int.tryParse(priceCtrl.text.trim()) ?? 0;
+                      final quantity =
+                          int.tryParse(quantityCtrl.text.trim()) ?? -1;
+                      if (nameCtrl.text.trim().isEmpty ||
+                          price <= 0 ||
+                          quantity < 0 ||
+                          imageUrl.trim().isEmpty) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Vui lòng nhập tên, giá, số lượng và tải ảnh sản phẩm!',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+                      final newCombo = AdminFoodCombo(
+                        id: combo?.id ?? '',
+                        name: nameCtrl.text.trim(),
+                        description: descCtrl.text.trim(),
+                        price: price,
+                        quantity: quantity,
+                        imageUrl: imageUrl.trim(),
+                        isActive: isActive,
+                      );
+                      Navigator.pop(ctx);
+                      _apiSaveCombo(newCombo, isNew: combo == null);
+                    },
               child: const Text('Lưu'),
             ),
           ],
@@ -2446,6 +3355,17 @@ class _AdminContentSectionState extends State<AdminContentSection> {
                 selectedTime.hour,
                 selectedTime.minute,
               );
+              // Validation: suất chiếu phải sau hiện tại ít nhất 15 phút
+              final minAllowed = DateTime.now().add(
+                const Duration(minutes: 15),
+              );
+              if (!start.isAfter(minAllowed)) {
+                _showSnack(
+                  'Suất chiếu phải bắt đầu sau ít nhất 15 phút kể từ bây giờ.',
+                  isError: true,
+                );
+                return;
+              }
               Navigator.pop(context);
               _apiCreateShowtime(
                 ShowtimeScheduleRequest(
@@ -3023,6 +3943,121 @@ class _AdminContentSectionState extends State<AdminContentSection> {
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: AppColors.gold, width: 1.5),
+      ),
+    );
+  }
+}
+
+class _AdminAccordionSection extends StatelessWidget {
+  const _AdminAccordionSection({
+    required this.title,
+    required this.icon,
+    required this.badge,
+    required this.isExpanded,
+    required this.onToggle,
+    required this.children,
+  });
+
+  final String title;
+  final IconData icon;
+  final String badge;
+  final bool isExpanded;
+  final VoidCallback onToggle;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Material(
+            color: Colors.white.withValues(alpha: .9),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: const BorderSide(color: AppColors.line),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: onToggle,
+                    borderRadius: const BorderRadius.horizontal(
+                      left: Radius.circular(10),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(icon, size: 20, color: AppColors.ink),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.ink,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.gold.withValues(alpha: .16),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              badge,
+                              style: const TextStyle(
+                                color: AppColors.ink,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: isExpanded ? 'Thu gọn' : 'Mở rộng',
+                  onPressed: onToggle,
+                  icon: AnimatedRotation(
+                    turns: isExpanded ? .5 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: const Icon(Icons.keyboard_arrow_down_rounded),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Column(children: children),
+            ),
+            crossFadeState: isExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 180),
+            firstCurve: Curves.easeOut,
+            secondCurve: Curves.easeOut,
+            sizeCurve: Curves.easeOut,
+          ),
+        ],
       ),
     );
   }

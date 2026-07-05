@@ -9,9 +9,9 @@ class AppColors {
   static const gold = Color(0xFF000000);     // Luxury solid black for main items
   static const goldSoft = Color(0xFFE2E8F0); // Sleek gray for selections/indicators
   static const platinum = Color(0xFFF1F5F9);
-  static const success = Color(0xFF10B981);  // Emerald green
-  static const danger = Color(0xFFEF4444);   // Crimson red
-  static const warning = Color(0xFFF59E0B);  // Amber orange
+  static const success = Color(0xFF0F172A);  // Deep slate black
+  static const danger = Color(0xFF475569);   // Dark slate gray
+  static const warning = Color(0xFF94A3B8);  // Light slate gray
 
   static const primary = gold;
   static const background = ivory;

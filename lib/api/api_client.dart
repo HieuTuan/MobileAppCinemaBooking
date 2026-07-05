@@ -52,6 +52,9 @@ class APIClient {
   /// Standard timeout for regular API requests (30 seconds)
   static const Duration _standardTimeout = Duration(seconds: 30);
 
+  /// Short timeout for optional dashboard widgets so app startup stays clean.
+  static const Duration _optionalRequestTimeout = Duration(seconds: 6);
+
   /// Extended timeout for payment operations (60 seconds)
   static const Duration _paymentTimeout = Duration(seconds: 60);
 
@@ -141,7 +144,7 @@ class APIClient {
   Interceptor _createLoggingInterceptor() {
     return InterceptorsWrapper(
       onRequest: (options, handler) {
-        if (kDebugMode) {
+        if (kDebugMode && !_isSilentRequest(options)) {
           print('┌─────────────────────────────────────────────────');
           print('│ 🌐 REQUEST: ${options.method} ${options.path}');
           print('│ URL: ${options.uri}');
@@ -157,7 +160,7 @@ class APIClient {
         handler.next(options);
       },
       onResponse: (response, handler) {
-        if (kDebugMode) {
+        if (kDebugMode && !_isSilentRequest(response.requestOptions)) {
           print('┌─────────────────────────────────────────────────');
           print(
             '│ ✅ RESPONSE: ${response.statusCode} ${response.requestOptions.method} ${response.requestOptions.path}',
@@ -169,7 +172,7 @@ class APIClient {
         handler.next(response);
       },
       onError: (error, handler) {
-        if (kDebugMode) {
+        if (kDebugMode && !_isSilentRequest(error.requestOptions)) {
           print('┌─────────────────────────────────────────────────');
           print(
             '│ ❌ ERROR: ${error.requestOptions.method} ${error.requestOptions.path}',
@@ -184,6 +187,10 @@ class APIClient {
         handler.next(error);
       },
     );
+  }
+
+  bool _isSilentRequest(RequestOptions options) {
+    return options.extra['silentRequest'] == true;
   }
 
   /// Get the configured Dio instance
@@ -212,13 +219,19 @@ class APIClient {
     Map<String, dynamic>? headers,
     ResponseType? responseType,
     String? contentType,
+    Duration? connectTimeout,
+    Duration? receiveTimeout,
+    Duration? sendTimeout,
+    Map<String, dynamic>? extra,
   }) {
     return Options(
       headers: headers,
       responseType: responseType,
       contentType: contentType,
-      sendTimeout: _standardTimeout,
-      receiveTimeout: _standardTimeout,
+      connectTimeout: connectTimeout ?? _standardTimeout,
+      sendTimeout: sendTimeout ?? _standardTimeout,
+      receiveTimeout: receiveTimeout ?? _standardTimeout,
+      extra: extra,
     );
   }
 
@@ -420,6 +433,7 @@ class APIClient {
     int page = 1,
     int pageSize = 20,
     CancelToken? cancelToken,
+    bool quiet = false,
   }) async {
     final queryParameters = <String, dynamic>{
       'page': page,
@@ -439,6 +453,14 @@ class APIClient {
     final response = await get<Map<String, dynamic>>(
       '/api/movies',
       queryParameters: queryParameters,
+      options: quiet
+          ? createStandardOptions(
+              connectTimeout: _optionalRequestTimeout,
+              receiveTimeout: _optionalRequestTimeout,
+              sendTimeout: _optionalRequestTimeout,
+              extra: const {'silentRequest': true, 'skipRetry': true},
+            )
+          : null,
       cancelToken: cancelToken,
     );
 
@@ -506,11 +528,11 @@ class APIClient {
   /// **Requirements:**
   /// - 14.1: Authenticated customers can submit reviews via POST /api/reviews
   /// - 14.2: Returns 403 Forbidden if the user has not watched the movie
-  /// - 14.3: Request body includes userId, movieId, rating (1-5), and comment
+  /// - 14.3: Request body includes userId, movieId, rating (1-10), and comment
   ///
   /// Parameters:
   /// - [movieId]: ID of the movie to review
-  /// - [rating]: Integer rating from 1 to 5
+  /// - [rating]: Integer rating from 1 to 10
   /// - [comment]: Review text (10–500 characters)
   ///
   /// Throws [ApiAuthorizationException] (403) when the user has not watched the movie.
@@ -548,7 +570,7 @@ class APIClient {
       cancelToken: cancelToken,
     );
 
-    return Review.fromJson(response.data!);
+    return Review.fromJson(_extractDataMap(response.data!));
   }
 
   /// Get reviews for a specific movie with pagination.
@@ -589,9 +611,27 @@ class APIClient {
       cancelToken: cancelToken,
     );
 
-    return PaginatedResponse<Review>.fromJson(
-      response.data!,
-      (json) => Review.fromJson(json as Map<String, dynamic>),
+    return _parseReviewPage(response.data!, page: page, pageSize: pageSize);
+  }
+
+  Future<PaginatedResponse<Review>> getAdminReviews({
+    int page = 1,
+    int pageSize = 20,
+    CancelToken? cancelToken,
+  }) async {
+    final response = await get<Map<String, dynamic>>(
+      '/api/admin/reviews',
+      queryParameters: {'page': page, 'pageSize': pageSize},
+      cancelToken: cancelToken,
+    );
+
+    return _parseReviewPage(response.data!, page: page, pageSize: pageSize);
+  }
+
+  Future<void> deleteReview(String reviewId, {CancelToken? cancelToken}) async {
+    await delete<Map<String, dynamic>>(
+      '/api/admin/reviews/$reviewId',
+      cancelToken: cancelToken,
     );
   }
 
@@ -1056,6 +1096,35 @@ class APIClient {
     return raw;
   }
 
+  PaginatedResponse<Review> _parseReviewPage(
+    Map<String, dynamic> raw, {
+    required int page,
+    required int pageSize,
+  }) {
+    final pagedRaw =
+        raw.containsKey('data') && raw['data'] is Map<String, dynamic>
+        ? raw['data'] as Map<String, dynamic>
+        : raw;
+    final items = pagedRaw['data'] is List
+        ? pagedRaw['data'] as List<dynamic>
+        : const [];
+    final reviews = items
+        .map((json) => Review.fromJson(json as Map<String, dynamic>))
+        .toList();
+    final totalItems = (pagedRaw['totalItems'] as int?) ?? reviews.length;
+    final totalPages = (pagedRaw['totalPages'] as int?) ?? 1;
+
+    return PaginatedResponse<Review>(
+      data: reviews,
+      page: (pagedRaw['page'] as int?) ?? page,
+      pageSize: (pagedRaw['pageSize'] as int?) ?? pageSize,
+      totalItems: totalItems,
+      totalPages: totalPages,
+      hasNext: (pagedRaw['hasNext'] as bool?) ?? page < totalPages,
+      hasPrevious: (pagedRaw['hasPrevious'] as bool?) ?? page > 1,
+    );
+  }
+
   Future<BookingResponse> createBooking(CreateBookingRequest request) async {
     final response = await postPayment<Map<String, dynamic>>(
       '/api/bookings',
@@ -1117,7 +1186,8 @@ class APIClient {
     final response = await post<Map<String, dynamic>>(
       '/api/bookings/$bookingId/validate',
       data: {
-        'expectedShowtimeId': expectedShowtimeId,
+        if (expectedShowtimeId.trim().isNotEmpty)
+          'expectedShowtimeId': expectedShowtimeId.trim(),
         if (staffId != null) 'staffId': staffId,
       },
       options: createStandardOptions(
@@ -1174,8 +1244,34 @@ class APIClient {
     );
 
     return _extractList(response.data)
-        .map((json) => BookingDetails.fromJson(json as Map<String, dynamic>))
+        .map(
+          (json) => _bookingDetailsFromSearchJson(json as Map<String, dynamic>),
+        )
         .toList();
+  }
+
+  BookingDetails _bookingDetailsFromSearchJson(Map<String, dynamic> json) {
+    return BookingDetails(
+      bookingId: json['bookingId'] as String,
+      userId: json['userId'] as String? ?? '',
+      showtimeId: json['showtimeId'] as String? ?? '',
+      movieId: json['movieId'] as String?,
+      movieTitle: json['movieTitle'] as String? ?? '',
+      roomName: json['roomName'] as String? ?? '',
+      cinemaName: json['cinemaName'] as String? ?? '',
+      showtimeDateTime: DateTime.parse(json['showtimeDateTime'] as String),
+      seatCodes: ((json['seatCodes'] as List<dynamic>?) ?? const [])
+          .map((item) => item as String)
+          .toList(),
+      combos: ((json['combos'] as List<dynamic>?) ?? const [])
+          .map((item) => item as String)
+          .toList(),
+      totalAmount: (json['totalAmount'] as num?)?.toInt() ?? 0,
+      status: json['status'] as String? ?? '',
+      paymentStatus: json['paymentStatus'] as String? ?? '',
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      qrCode: json['qrCode'] as String?,
+    );
   }
 
   // ============================================================================
@@ -1346,7 +1442,7 @@ class APIClient {
       '/api/users/$userId/profile',
       cancelToken: cancelToken,
     );
-    return UserProfile.fromJson(response.data!);
+    return UserProfile.fromJson(_extractDataMap(response.data!));
   }
 
   /// Update profile data for a user.
@@ -1382,7 +1478,7 @@ class APIClient {
       data: request.toJson(),
       cancelToken: cancelToken,
     );
-    return UserProfile.fromJson(response.data!);
+    return UserProfile.fromJson(_extractDataMap(response.data!));
   }
 
   // ============================================================================
@@ -1407,9 +1503,16 @@ class APIClient {
   /// ```
   Future<DashboardMetrics> getDashboardMetrics({
     CancelToken? cancelToken,
+    bool quiet = true,
   }) async {
     final response = await get<Map<String, dynamic>>(
       '/api/admin/dashboard/metrics',
+      options: createStandardOptions(
+        connectTimeout: quiet ? _optionalRequestTimeout : null,
+        receiveTimeout: quiet ? _optionalRequestTimeout : null,
+        sendTimeout: quiet ? _optionalRequestTimeout : null,
+        extra: quiet ? const {'silentRequest': true, 'skipRetry': true} : null,
+      ),
       cancelToken: cancelToken,
     );
     return DashboardMetrics.fromJson(_extractDataMap(response.data!));

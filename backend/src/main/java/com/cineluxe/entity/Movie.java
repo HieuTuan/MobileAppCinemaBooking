@@ -25,9 +25,16 @@ public class Movie {
     @Id
     private String id;
 
+    @Column(length = 255)
     private String title;
+
+    @Column(columnDefinition = "TEXT")
     private String description;
+
+    @Column(length = 1024)
     private String posterUrl;
+
+    @Column(length = 1024)
     private String trailerUrl;
     private int durationMinutes;
     private String ageRating;
@@ -43,6 +50,7 @@ public class Movie {
     @Column(name = "cast_member")
     private List<String> cast = new ArrayList<>();
 
+    @Column(length = 255)
     private String director;
     private double rating;
 

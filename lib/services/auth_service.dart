@@ -244,8 +244,9 @@ class AuthService {
         phone: phone,
       );
 
-      // Call backend register endpoint
-      final authResponse = await _registerUser(registerRequest);
+      // Call backend register endpoint. The account is created inactive and
+      // activated after email OTP verification, so no user session is stored.
+      await _registerUser(registerRequest);
 
       // Registration succeeds, but the user should sign in explicitly.
       _refreshTimer?.cancel();
@@ -253,7 +254,7 @@ class AuthService {
       _currentUser = null;
       _authStateController.add(AuthState.unauthenticated);
 
-      return AuthResult(isSuccess: true, user: authResponse.user);
+      return AuthResult(isSuccess: true);
     } catch (e) {
       _authStateController.add(AuthState.error);
       return AuthResult(
@@ -303,6 +304,51 @@ class AuthService {
         message: _messageFromResponse(
           response.data,
           fallback: 'Mật khẩu đã được cập nhật. Bạn có thể đăng nhập lại.',
+        ),
+      );
+    } catch (e) {
+      return AuthActionResult(
+        isSuccess: false,
+        message: _messageFromException(e),
+      );
+    }
+  }
+
+  Future<AuthActionResult> verifyRegistration({
+    required String email,
+    required String code,
+  }) async {
+    try {
+      final response = await _apiClient.post(
+        '/api/auth/verify-registration',
+        data: {'email': email.trim(), 'code': code.trim()},
+      );
+      return AuthActionResult(
+        isSuccess: true,
+        message: _messageFromResponse(
+          response.data,
+          fallback: 'Email đã được xác nhận. Bạn có thể đăng nhập.',
+        ),
+      );
+    } catch (e) {
+      return AuthActionResult(
+        isSuccess: false,
+        message: _messageFromException(e),
+      );
+    }
+  }
+
+  Future<AuthActionResult> resendRegistrationOtp(String email) async {
+    try {
+      final response = await _apiClient.post(
+        '/api/auth/resend-registration-otp',
+        data: {'email': email.trim()},
+      );
+      return AuthActionResult(
+        isSuccess: true,
+        message: _messageFromResponse(
+          response.data,
+          fallback: 'Mã OTP mới đã được gửi tới email của bạn.',
         ),
       );
     } catch (e) {

@@ -7,6 +7,7 @@ import '../../core/formatters.dart';
 import '../../models/app_models.dart';
 import '../../state/cinema_store.dart';
 import '../../../api/api_client.dart';
+import '../../../models/review.dart' as review_models;
 import '../../../services/analytics_service.dart';
 import 'booking_screen.dart';
 import 'movie_reviews_section.dart';
@@ -30,6 +31,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   final _api = APIClient();
   bool _loadingShowtimes = true;
   String? _showtimeError;
+  Map<String, String> _actorAvatarsByName = const {};
 
   @override
   void initState() {
@@ -46,6 +48,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       screenClass: 'MovieDetailScreen',
     );
     _loadShowtimes();
+    _loadActorAvatars();
   }
 
   Future<void> _loadShowtimes() async {
@@ -64,6 +67,21 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         _loadingShowtimes = false;
         _showtimeError = 'Không thể tải suất chiếu từ API.';
       });
+    }
+  }
+
+  Future<void> _loadActorAvatars() async {
+    try {
+      final actors = await _api.adminGetActors();
+      if (!mounted) return;
+      setState(() {
+        _actorAvatarsByName = {
+          for (final actor in actors)
+            _normalizeActorName(actor.name): actor.avatarUrl,
+        };
+      });
+    } catch (_) {
+      // Cast cards still render with initials if actor avatars are unavailable.
     }
   }
 
@@ -140,7 +158,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           const _SectionDivider(),
           _StorySection(movie: movie),
           const _SectionDivider(),
-          _CastSection(movie: movie),
+          _CastSection(movie: movie, actorAvatarsByName: _actorAvatarsByName),
           const _SectionDivider(),
           _ShowtimeSection(
             store: store,
@@ -309,126 +327,370 @@ class _MetaItem extends StatelessWidget {
   }
 }
 
-class _MomoRatingCard extends StatelessWidget {
+class _MomoRatingCard extends StatefulWidget {
   const _MomoRatingCard({required this.movie});
 
   final Movie movie;
 
   @override
+  State<_MomoRatingCard> createState() => _MomoRatingCardState();
+}
+
+class _MomoRatingCardState extends State<_MomoRatingCard> {
+  final _api = APIClient();
+
+  List<review_models.Review> _allReviews = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAllReviews();
+  }
+
+  Future<void> _loadAllReviews() async {
+    try {
+      final firstPage = await _api.getMovieReviews(
+        widget.movie.id,
+        page: 1,
+        pageSize: 100,
+      );
+      final allData = <review_models.Review>[...firstPage.data];
+      for (int p = 2; p <= firstPage.totalPages && p <= 3; p++) {
+        final page = await _api.getMovieReviews(
+          widget.movie.id,
+          page: p,
+          pageSize: 100,
+        );
+        allData.addAll(page.data);
+      }
+      if (mounted) {
+        setState(() {
+          _allReviews = allData;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  double get _avgRating {
+    if (_allReviews.isEmpty) return widget.movie.rating;
+    final sum = _allReviews.fold<int>(0, (acc, r) => acc + r.rating);
+    return sum.toDouble() / _allReviews.length;
+  }
+
+  double _fraction(int lo, int hi) {
+    if (_allReviews.isEmpty) return 0;
+    final count = _allReviews
+        .where((r) => r.rating >= lo && r.rating <= hi)
+        .length;
+    return count / _allReviews.length;
+  }
+
+  /// Màu bar theo nhóm điểm
+  Color _barColor(String label) {
+    return switch (label) {
+      '9-10' => const Color(0xFF22C55E),
+      '7-8' => const Color(0xFF84CC16),
+      '5-6' => const Color(0xFFF59E0B),
+      '3-4' => const Color(0xFFF97316),
+      _ => const Color(0xFFEF4444),
+    };
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final rating = movie.rating.clamp(0, 10);
+    final rating = _avgRating.clamp(0.0, 10.0);
+    final totalReviews = _allReviews.length;
+
+    // Tỷ lệ % cho từng nhóm
+    final bars = [
+      ('9-10', _fraction(9, 10)),
+      ('7-8', _fraction(7, 8)),
+      ('5-6', _fraction(5, 6)),
+      ('3-4', _fraction(3, 4)),
+      ('1-2', _fraction(1, 2)),
+    ];
+
     return Container(
-      margin: const EdgeInsets.fromLTRB(18, 14, 18, 18),
-      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.black),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: .35),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.local_movies_rounded, color: Colors.black),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Text(
-                  'CineLuxe Rating',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-                ),
-              ),
-              TextButton(
-                onPressed: () {},
-                child: const Text(
-                  'Viết đánh giá',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.w900,
+          // ── Header ──────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 12, 0),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B).withValues(alpha: .18),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.local_movies_rounded,
+                    color: Color(0xFFF59E0B),
+                    size: 18,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              const Icon(Icons.star_rounded, color: Colors.black, size: 42),
-              const SizedBox(width: 8),
-              RichText(
-                text: TextSpan(
-                  style: DefaultTextStyle.of(context).style,
-                  children: [
-                    TextSpan(
-                      text: rating.toStringAsFixed(1).replaceAll('.0', ''),
-                      style: const TextStyle(
-                        fontSize: 44,
-                        fontWeight: FontWeight.w900,
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'CineLuxe Rating',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: .2,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {},
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFF59E0B),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: const BorderSide(
+                        color: Color(0xFFF59E0B),
+                        width: .8,
                       ),
                     ),
-                    const TextSpan(
-                      text: '/10',
-                      style: TextStyle(fontSize: 18, color: AppColors.muted),
+                    textStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
                     ),
-                  ],
+                  ),
+                  child: const Text('✏ Viết đánh giá'),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Divider ──────────────────────────────────────────────
+          const Padding(
+            padding: EdgeInsets.fromLTRB(18, 12, 18, 0),
+            child: Divider(color: Color(0xFF334155), height: 1),
+          ),
+
+          // ── Body ─────────────────────────────────────────────────
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: Color(0xFFF59E0B),
+                  strokeWidth: 2,
                 ),
               ),
-              const SizedBox(width: 24),
-              Expanded(child: _RatingBars(rating: rating.toDouble())),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Từ 126 khán giả đã mua vé',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: AppColors.muted),
-          ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Điểm số
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Stars row
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(5, (i) {
+                          final filled = (rating / 2).ceil();
+                          return Icon(
+                            i < filled
+                                ? Icons.star_rounded
+                                : Icons.star_border_rounded,
+                            color: const Color(0xFFF59E0B),
+                            size: 16,
+                          );
+                        }),
+                      ),
+                      const SizedBox(height: 6),
+                      RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: rating.toStringAsFixed(1),
+                              style: const TextStyle(
+                                fontSize: 42,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                height: 1,
+                              ),
+                            ),
+                            const TextSpan(
+                              text: '\n/10',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF94A3B8),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        totalReviews > 0 ? '$totalReviews lượt' : 'Chưa có',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Đường kẻ dọc
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 20),
+                    width: 1,
+                    height: 110,
+                    color: const Color(0xFF334155),
+                  ),
+
+                  // Thanh bar
+                  Expanded(
+                    child: _PremiumRatingBars(bars: bars, barColor: _barColor),
+                  ),
+                ],
+              ),
+            ),
+
+          // ── Footer ───────────────────────────────────────────────
+          if (!_loading)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.verified_rounded,
+                    size: 14,
+                    color: Color(0xFF22C55E),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    totalReviews > 0
+                        ? 'Từ $totalReviews khán giả đã xem phim'
+                        : 'Chưa có đánh giá nào. Hãy là người đầu tiên!',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
-class _RatingBars extends StatelessWidget {
-  const _RatingBars({required this.rating});
+/// Thanh phân phối điểm với màu theo nhóm và % hiển thị.
+class _PremiumRatingBars extends StatelessWidget {
+  const _PremiumRatingBars({required this.bars, required this.barColor});
 
-  final double rating;
+  final List<(String, double)> bars;
+  final Color Function(String) barColor;
 
   @override
   Widget build(BuildContext context) {
-    final rows = [
-      ('9-10', rating >= 8.5 ? .86 : .42),
-      ('7-8', rating >= 7 ? .48 : .22),
-      ('5-6', rating >= 5 ? .24 : .08),
-      ('3-4', rating >= 3 ? .12 : .04),
-      ('1-2', .04),
-    ];
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        for (final row in rows)
+        for (final bar in bars)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: 7),
             child: Row(
               children: [
                 SizedBox(
-                  width: 36,
+                  width: 30,
                   child: Text(
-                    row.$1,
+                    bar.$1,
                     style: const TextStyle(
-                      color: AppColors.muted,
+                      fontSize: 11,
+                      color: Color(0xFF94A3B8),
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
                 Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: LinearProgressIndicator(
-                      value: row.$2,
-                      minHeight: 5,
-                      backgroundColor: AppColors.line,
-                      color: Colors.black,
+                  child: LayoutBuilder(
+                    builder: (_, constraints) {
+                      final pct = bar.$2;
+                      final color = barColor(bar.$1);
+                      return Stack(
+                        children: [
+                          // Track
+                          Container(
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF334155),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                          // Fill
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 700),
+                            curve: Curves.easeOutCubic,
+                            height: 6,
+                            width: constraints.maxWidth * pct,
+                            decoration: BoxDecoration(
+                              color: color,
+                              borderRadius: BorderRadius.circular(999),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: color.withValues(alpha: .5),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 30,
+                  child: Text(
+                    '${(bar.$2 * 100).round()}%',
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -480,10 +742,15 @@ class _StorySection extends StatelessWidget {
   }
 }
 
+String _normalizeActorName(String value) {
+  return value.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+}
+
 class _CastSection extends StatelessWidget {
-  const _CastSection({required this.movie});
+  const _CastSection({required this.movie, required this.actorAvatarsByName});
 
   final Movie movie;
+  final Map<String, String> actorAvatarsByName;
 
   @override
   Widget build(BuildContext context) {
@@ -506,7 +773,12 @@ class _CastSection extends StatelessWidget {
               separatorBuilder: (_, __) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
                 final name = cast[index];
-                return _CastCard(name: name, role: _roleFor(index, movie));
+                return _CastCard(
+                  name: name,
+                  role: _roleFor(index, movie),
+                  avatarUrl:
+                      actorAvatarsByName[_normalizeActorName(name)] ?? '',
+                );
               },
             ),
           ),
@@ -523,10 +795,15 @@ class _CastSection extends StatelessWidget {
 }
 
 class _CastCard extends StatelessWidget {
-  const _CastCard({required this.name, required this.role});
+  const _CastCard({
+    required this.name,
+    required this.role,
+    required this.avatarUrl,
+  });
 
   final String name;
   final String role;
+  final String avatarUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -537,8 +814,9 @@ class _CastCard extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: CachedNetworkImage(
-              imageUrl:
-                  'https://api.dicebear.com/8.x/initials/png?seed=${Uri.encodeComponent(name)}&backgroundColor=fce7f3,ddd6fe,e0f2fe,fee2e2',
+              imageUrl: avatarUrl.isNotEmpty
+                  ? avatarUrl
+                  : 'https://api.dicebear.com/8.x/initials/png?seed=${Uri.encodeComponent(name)}&backgroundColor=fce7f3,ddd6fe,e0f2fe,fee2e2',
               width: 116,
               height: 112,
               fit: BoxFit.cover,

@@ -129,8 +129,9 @@ public class AdminShowtimeController {
         if (!request.endTime().isAfter(request.startTime())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "endTime phải sau startTime");
         }
-        if (request.startTime().isBefore(Instant.now().minusSeconds(60))) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Không thể tạo suất chiếu trong quá khứ");
+        // Suất chiếu phải bắt đầu sau ít nhất 15 phút (900 giây) kể từ bây giờ
+        if (request.startTime().isBefore(Instant.now().plusSeconds(900))) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Suất chiếu phải bắt đầu sau ít nhất 15 phút kể từ bây giờ");
         }
     }
 

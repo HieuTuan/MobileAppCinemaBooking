@@ -24,7 +24,7 @@ class AuthScreen extends StatefulWidget {
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
-enum _AuthPage { login, register, forgotStep1, forgotStep2 }
+enum _AuthPage { login, register, registerVerify, forgotStep1, forgotStep2 }
 
 class _AuthScreenState extends State<AuthScreen>
     with SingleTickerProviderStateMixin {
@@ -103,6 +103,88 @@ class _AuthScreenState extends State<AuthScreen>
 
   // ── Login ──────────────────────────────────────────────────
   // Gọi API: POST /api/auth/login  (xem auth_service.dart)
+
+  /// Hiển thị SnackBar chào mừng đăng nhập thành công.
+  void _showWelcomeSnackBar(String name) {
+    final displayName = name.trim().split(' ').last;
+    ScaffoldMessenger.maybeOf(context)
+      ?..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 3),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+          content: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1B3A2A), Color(0xFF1E4D34)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: const Color(0xFF1B9E66).withValues(alpha: .55),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF1B9E66).withValues(alpha: .25),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1B9E66).withValues(alpha: .2),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFF1B9E66).withValues(alpha: .5),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.waving_hand_rounded,
+                    color: Color(0xFF4ECDA4),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Đăng nhập thành công!',
+                        style: TextStyle(
+                          color: Color(0xFF4ECDA4),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        'Chào mừng trở lại, $displayName 🎬',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+  }
+
   Future<void> _doLogin() async {
     final email = _email.text.trim();
     final password = _password.text;
@@ -126,7 +208,10 @@ class _AuthScreenState extends State<AuthScreen>
       userId: result.user!.id,
       method: 'email',
     );
-    if (mounted) context.go('/');
+    if (mounted) {
+      _showWelcomeSnackBar(result.user!.fullName);
+      context.go('/');
+    }
   }
 
   // ── Google Sign-In ────────────────────────────────────────
@@ -158,7 +243,10 @@ class _AuthScreenState extends State<AuthScreen>
       userId: result.user!.id,
       method: 'google',
     );
-    if (mounted) context.go('/');
+    if (mounted) {
+      _showWelcomeSnackBar(result.user!.fullName);
+      context.go('/');
+    }
   }
 
   // ── Register ──────────────────────────────────────────────
@@ -168,6 +256,13 @@ class _AuthScreenState extends State<AuthScreen>
     final password = _password.text;
     final fullName = _name.text.trim();
     final phone = _phone.text.trim();
+
+    if (!RegExp(r'^(03|05|07|08|09)[0-9]{8}$').hasMatch(phone)) {
+      _setError(
+        'Số điện thoại phải gồm 10 số và bắt đầu bằng 03, 05, 07, 08 hoặc 09.',
+      );
+      return;
+    }
 
     setState(() => _submitting = true);
     _clearMessages();
@@ -182,21 +277,71 @@ class _AuthScreenState extends State<AuthScreen>
     if (!mounted) return;
     setState(() => _submitting = false);
 
-    if (!result.isSuccess || result.user == null) {
+    if (!result.isSuccess) {
       _setError(result.errorMessage ?? 'Đăng ký thất bại. Vui lòng thử lại.');
       return;
     }
     _password.clear();
     _name.clear();
     _phone.clear();
+    _otpCode.clear();
     setState(() {
-      _page = _AuthPage.login;
-      _successMsg = 'Đăng ký thành công. Vui lòng đăng nhập.';
+      _page = _AuthPage.registerVerify;
+      _successMsg = 'Đăng ký thành công. Mã OTP đã được gửi tới email của bạn.';
       _errorMsg = null;
     });
     _fadeCtrl
       ..reset()
       ..forward();
+  }
+
+  Future<void> _doVerifyRegistration() async {
+    final code = _otpCode.text.trim();
+    if (!RegExp(r'^[0-9]{6}$').hasMatch(code)) {
+      _setError('Vui lòng nhập mã OTP gồm 6 số.');
+      return;
+    }
+
+    setState(() => _submitting = true);
+    _clearMessages();
+
+    final result = await _authService.verifyRegistration(
+      email: _email.text.trim(),
+      code: code,
+    );
+
+    if (!mounted) return;
+    setState(() => _submitting = false);
+
+    if (result.isSuccess) {
+      _otpCode.clear();
+      setState(() {
+        _page = _AuthPage.login;
+        _successMsg = result.message;
+        _errorMsg = null;
+      });
+      _fadeCtrl
+        ..reset()
+        ..forward();
+    } else {
+      _setError(result.message);
+    }
+  }
+
+  Future<void> _doResendRegistrationOtp() async {
+    setState(() => _submitting = true);
+    _clearMessages();
+
+    final result = await _authService.resendRegistrationOtp(_email.text.trim());
+
+    if (!mounted) return;
+    setState(() => _submitting = false);
+
+    if (result.isSuccess) {
+      _setSuccess(result.message);
+    } else {
+      _setError(result.message);
+    }
   }
 
   // ── Forgot Step 1 – Gửi mã OTP qua email ─────────────────
@@ -346,6 +491,7 @@ class _AuthScreenState extends State<AuthScreen>
     return switch (_page) {
       _AuthPage.login => _buildLoginPage(),
       _AuthPage.register => _buildRegisterPage(),
+      _AuthPage.registerVerify => _buildRegisterVerifyPage(),
       _AuthPage.forgotStep1 => _buildForgotStep1Page(),
       _AuthPage.forgotStep2 => _buildForgotStep2Page(),
     };
@@ -477,8 +623,8 @@ class _AuthScreenState extends State<AuthScreen>
             keyboardType: TextInputType.phone,
             enabled: !_submitting,
             inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
-              LengthLimitingTextInputFormatter(13),
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
             ],
             onSubmitted: (_) => FocusScope.of(context).nextFocus(),
           ),
@@ -534,6 +680,63 @@ class _AuthScreenState extends State<AuthScreen>
             text: 'Đã có tài khoản?',
             actionText: 'Đăng nhập',
             onTap: () => _goto(_AuthPage.login),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRegisterVerifyPage() {
+    return _AuthCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _BackButton(onTap: () => _goto(_AuthPage.register)),
+          ),
+          const SizedBox(height: 16),
+
+          _StepIndicator(email: _email.text.trim()),
+          const SizedBox(height: 24),
+
+          const _Heading(
+            title: 'Xác nhận email',
+            subtitle:
+                'Nhập mã OTP 6 số đã gửi tới email để kích hoạt tài khoản.',
+          ),
+          const SizedBox(height: 24),
+
+          _OtpField(controller: _otpCode, enabled: !_submitting),
+          const SizedBox(height: 16),
+
+          _MessageBox(error: _errorMsg, success: _successMsg),
+
+          _PrimaryButton(
+            label: 'Xác nhận tài khoản',
+            icon: Icons.verified_rounded,
+            loading: _submitting,
+            onPressed: _doVerifyRegistration,
+          ),
+          const SizedBox(height: 16),
+
+          Center(
+            child: TextButton(
+              onPressed: _submitting ? null : _doResendRegistrationOtp,
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFFC9A44C),
+              ),
+              child: const Text(
+                'Gửi lại mã OTP',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+          Center(
+            child: TextButton(
+              onPressed: _submitting ? null : () => _goto(_AuthPage.login),
+              child: const Text('Quay lại đăng nhập'),
+            ),
           ),
         ],
       ),
@@ -1294,37 +1497,68 @@ class _MessageBox extends StatelessWidget {
 
     final isError = error != null;
     final msg = error ?? success!;
-    final bgColor = isError
-        ? const Color(0xFFD04747).withValues(alpha: 0.12)
-        : const Color(0xFF1B9E66).withValues(alpha: 0.12);
-    final borderColor = isError
-        ? const Color(0xFFD04747).withValues(alpha: 0.40)
-        : const Color(0xFF1B9E66).withValues(alpha: 0.40);
-    final textColor = isError
-        ? const Color(0xFFFF7A7A)
+
+    final Color accent = isError
+        ? const Color(0xFFFF6B6B)
         : const Color(0xFF4ECDA4);
-    final iconData = isError
-        ? Icons.error_outline_rounded
-        : Icons.check_circle_outline_rounded;
+    final Color bg = isError
+        ? const Color(0xFF2D1515)
+        : const Color(0xFF0F2D20);
+    final Color border = isError
+        ? const Color(0xFFD04747).withValues(alpha: .5)
+        : const Color(0xFF1B9E66).withValues(alpha: .5);
+    final IconData icon = isError
+        ? Icons.error_rounded
+        : Icons.check_circle_rounded;
+    final String label = isError ? 'Có lỗi xảy ra' : 'Thành công';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: borderColor),
+          color: bg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: border, width: 1),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(iconData, color: textColor, size: 18),
-            const SizedBox(width: 10),
+            // Icon circle
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: .15),
+                shape: BoxShape.circle,
+                border: Border.all(color: accent.withValues(alpha: .4)),
+              ),
+              child: Icon(icon, color: accent, size: 18),
+            ),
+            const SizedBox(width: 12),
+            // Text
             Expanded(
-              child: Text(
-                msg,
-                style: TextStyle(color: textColor, fontSize: 13, height: 1.4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: accent,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    msg,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

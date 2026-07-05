@@ -7,7 +7,9 @@
       "type": "dart",
       "flutterMode": "debug",
       "program": "lib/main.dart",
-      "args": []
+      "args": [
+        "--dart-define=DEV_SERVER_HOST=10.0.2.2"
+      ]
     },
     {
       "name": "📱 Physical Device (Debug)",
@@ -25,7 +27,9 @@
       "type": "dart",
       "flutterMode": "profile",
       "program": "lib/main.dart",
-      "args": []
+      "args": [
+        "--dart-define=DEV_SERVER_HOST=10.0.2.2"
+      ]
     },
     {
       "name": "📱 Physical Device (Profile)",

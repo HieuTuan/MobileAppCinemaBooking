@@ -35,10 +35,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return LuxuryScaffold(
       title: 'Bảng quản trị',
       actions: [
-        IconButton(
-          tooltip: 'Đăng xuất',
-          onPressed: _handleLogout,
-          icon: const Icon(Icons.logout_rounded),
+        InkWell(
+          onTap: _handleLogout,
+          borderRadius: BorderRadius.circular(20),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Icon(
+              Icons.logout_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
+          ),
         ),
       ],
       bottomNavigationBar: NavigationBar(

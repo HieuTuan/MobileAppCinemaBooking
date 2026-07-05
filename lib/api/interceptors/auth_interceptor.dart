@@ -57,7 +57,7 @@ class AuthInterceptor extends Interceptor {
         // Requirements: 33.2 - "Bearer {token}" format
         options.headers['Authorization'] = 'Bearer $accessToken';
 
-        if (kDebugMode) {
+        if (kDebugMode && !_isSilentRequest(options)) {
           print('🔐 AuthInterceptor: Added Authorization header');
         }
       }
@@ -69,7 +69,7 @@ class AuthInterceptor extends Interceptor {
 
       handler.next(options);
     } catch (e) {
-      if (kDebugMode) {
+      if (kDebugMode && !_isSilentRequest(options)) {
         print('❌ AuthInterceptor: Error attaching token: $e');
       }
       handler.next(options);
@@ -84,7 +84,7 @@ class AuthInterceptor extends Interceptor {
   void onError(DioException err, ErrorInterceptorHandler handler) async {
     // Check if this is a 401 Unauthorized error
     if (err.response?.statusCode == 401) {
-      if (kDebugMode) {
+      if (kDebugMode && !_isSilentRequest(err.requestOptions)) {
         print('🔒 AuthInterceptor: Received 401 Unauthorized');
       }
 
@@ -110,6 +110,10 @@ class AuthInterceptor extends Interceptor {
 
     // Not a 401 error, pass through
     handler.next(err);
+  }
+
+  bool _isSilentRequest(RequestOptions options) {
+    return options.extra['silentRequest'] == true;
   }
 
   // ============================================================================
@@ -338,6 +342,8 @@ class AuthInterceptor extends Interceptor {
   bool _isAuthEndpoint(String path) {
     return path.contains('/api/auth/login') ||
         path.contains('/api/auth/register') ||
+        path.contains('/api/auth/verify-registration') ||
+        path.contains('/api/auth/resend-registration-otp') ||
         path.contains('/api/auth/refresh') ||
         path.contains('/api/auth/forgot-password') ||
         path.contains('/api/auth/reset-password') ||

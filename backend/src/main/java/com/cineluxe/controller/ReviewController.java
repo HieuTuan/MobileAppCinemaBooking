@@ -36,4 +36,19 @@ public class ReviewController {
             @RequestParam(defaultValue = "5") int pageSize) {
         return ApiResponse.success(reviewService.getMovieReviews(movieId, page, pageSize));
     }
+
+    @GetMapping("/admin/reviews")
+    @Operation(summary = "Get paginated reviews for admin moderation")
+    public ResponseEntity<ApiResponse<ReviewPageResponse>> getAdminReviews(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int pageSize) {
+        return ApiResponse.success(reviewService.getAllReviews(page, pageSize));
+    }
+
+    @DeleteMapping("/admin/reviews/{reviewId}")
+    @Operation(summary = "Delete a review")
+    public ResponseEntity<ApiResponse<Void>> deleteReview(@PathVariable String reviewId) {
+        reviewService.deleteReview(reviewId);
+        return ApiResponse.success(null);
+    }
 }

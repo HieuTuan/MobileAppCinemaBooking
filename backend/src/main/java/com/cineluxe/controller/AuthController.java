@@ -6,6 +6,7 @@ import com.cineluxe.dto.request.GoogleAuthRequest;
 import com.cineluxe.dto.request.LoginRequest;
 import com.cineluxe.dto.request.RefreshTokenRequest;
 import com.cineluxe.dto.request.ResetPasswordRequest;
+import com.cineluxe.dto.request.VerifyRegistrationRequest;
 import com.cineluxe.dto.response.AuthResponse;
 import com.cineluxe.dto.response.AuthUserResponse;
 import com.cineluxe.entity.UserProfile;
@@ -50,11 +51,13 @@ public class AuthController {
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
     private static final Duration ACCESS_TOKEN_TTL = Duration.ofMinutes(15);
     private static final Duration PASSWORD_RESET_TTL = Duration.ofMinutes(10);
+    private static final Duration REGISTRATION_VERIFICATION_TTL = Duration.ofMinutes(10);
 
     private final UserProfileRepository userProfileRepository;
     private final SecureRandom secureRandom = new SecureRandom();
     private final Map<String, String> refreshTokens = new ConcurrentHashMap<>();
     private final Map<String, PasswordResetCode> passwordResetCodes = new ConcurrentHashMap<>();
+    private final Map<String, RegistrationVerificationCode> registrationVerificationCodes = new ConcurrentHashMap<>();
     private final RestTemplate restTemplate;
     private final Optional<JavaMailSender> mailSender;
     private final String mailFrom;
@@ -99,10 +102,56 @@ public class AuthController {
         profile.setPhone(request.phone().trim());
         profile.setBirthdate(request.birthdate());
         profile.setPasswordHash(hashPassword(request.password()));
+        profile.setActive(false);
+
+        var code = generateResetCode();
+        sendRegistrationVerificationEmail(email, code);
+        registrationVerificationCodes.put(
+                email,
+                new RegistrationVerificationCode(code, Instant.now().plus(REGISTRATION_VERIFICATION_TTL)));
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(createAuthResponse(userProfileRepository.save(profile)));
+    }
+
+    @PostMapping("/verify-registration")
+    public ResponseEntity<Map<String, String>> verifyRegistration(
+            @Valid @RequestBody VerifyRegistrationRequest request) {
+        var email = normalizeEmail(request.email());
+        var verification = registrationVerificationCodes.get(email);
+        if (verification == null || verification.expiresAt().isBefore(Instant.now())
+                || !MessageDigest.isEqual(verification.code().getBytes(StandardCharsets.UTF_8),
+                request.code().getBytes(StandardCharsets.UTF_8))) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Mã xác nhận không hợp lệ hoặc đã hết hạn");
+        }
+
+        var profile = userProfileRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "Tài khoản đăng ký không tồn tại"));
+        profile.setActive(true);
+        userProfileRepository.save(profile);
+        registrationVerificationCodes.remove(email);
+
+        return ResponseEntity.ok(Map.of("message", "Email đã được xác nhận. Bạn có thể đăng nhập."));
+    }
+
+    @PostMapping("/resend-registration-otp")
+    public ResponseEntity<Map<String, String>> resendRegistrationOtp(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+        var email = normalizeEmail(request.email());
+        var profile = userProfileRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Tài khoản đăng ký không tồn tại"));
+        if (profile.isActive()) {
+            return ResponseEntity.ok(Map.of("message", "Email đã được xác nhận. Bạn có thể đăng nhập."));
+        }
+
+        var code = generateResetCode();
+        sendRegistrationVerificationEmail(email, code);
+        registrationVerificationCodes.put(
+                email,
+                new RegistrationVerificationCode(code, Instant.now().plus(REGISTRATION_VERIFICATION_TTL)));
+
+        return ResponseEntity.ok(Map.of("message", "Mã OTP mới đã được gửi tới email của bạn."));
     }
 
     @PostMapping("/login")
@@ -115,7 +164,7 @@ public class AuthController {
         }
 
         if (!profile.isActive()) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "Tài khoản đã bị khóa");
+            throw new ApiException(HttpStatus.FORBIDDEN, "Tài khoản chưa xác nhận email hoặc đã bị khóa");
         }
 
         return ResponseEntity.ok(createAuthResponse(profile));
@@ -272,6 +321,29 @@ public class AuthController {
         }
     }
 
+    private void sendRegistrationVerificationEmail(String email, String code) {
+        if (mailSender.isEmpty() || smtpHost.isBlank()) {
+            log.warn("SMTP is not configured. Registration verification code for {} is {}", email, code);
+            return;
+        }
+
+        try {
+            var message = new SimpleMailMessage();
+            message.setFrom(mailFrom.isBlank() ? "no-reply@cineluxe.local" : mailFrom);
+            message.setTo(email);
+            message.setSubject("CineLuxe - Mã xác nhận đăng ký tài khoản");
+            message.setText("""
+                    Mã xác nhận đăng ký tài khoản CineLuxe của bạn là: %s
+
+                    Mã này có hiệu lực trong 10 phút. Vui lòng nhập mã trong ứng dụng để kích hoạt tài khoản.
+                    Nếu bạn không đăng ký tài khoản CineLuxe, vui lòng bỏ qua email này.
+                    """.formatted(code));
+            mailSender.get().send(message);
+        } catch (MailException e) {
+            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "Không thể gửi email xác nhận. Vui lòng thử lại sau");
+        }
+    }
+
     private Set<String> configuredGoogleClientIds() {
         var clientIds = new LinkedHashSet<String>();
         addClientIds(clientIds, googleAllowedClientIds);
@@ -370,4 +442,5 @@ public class AuthController {
     }
 
     private record PasswordResetCode(String code, Instant expiresAt) {}
+    private record RegistrationVerificationCode(String code, Instant expiresAt) {}
 }

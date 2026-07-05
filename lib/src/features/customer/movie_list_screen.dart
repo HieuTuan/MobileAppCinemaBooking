@@ -122,7 +122,9 @@ class _MovieListScreenState extends State<MovieListScreen> {
     });
     try {
       // Bước 2: truyền search text → backend JPQL không phân biệt hoa thường
-      final searchText = _search.text.trim().isEmpty ? null : _search.text.trim();
+      final searchText = _search.text.trim().isEmpty
+          ? null
+          : _search.text.trim();
 
       // Bước 3: truyền genre và status filter
       final genreParam = (_genre.isEmpty || _genre == 'Tất cả') ? null : _genre;
@@ -211,13 +213,22 @@ class _MovieListScreenState extends State<MovieListScreen> {
           else if (movies.isEmpty)
             _MovieListMessage(
               icon: Icons.search_off_rounded,
-              message: _search.text.isNotEmpty || _genre.isNotEmpty || _status != null
+              message:
+                  _search.text.isNotEmpty ||
+                      _genre.isNotEmpty ||
+                      _status != null
                   ? 'Không tìm thấy phim phù hợp với bộ lọc.'
                   : 'Chưa có phim nào.',
-              actionLabel: (_search.text.isNotEmpty || _genre.isNotEmpty || _status != null)
+              actionLabel:
+                  (_search.text.isNotEmpty ||
+                      _genre.isNotEmpty ||
+                      _status != null)
                   ? 'Xóa bộ lọc'
                   : null,
-              onAction: (_search.text.isNotEmpty || _genre.isNotEmpty || _status != null)
+              onAction:
+                  (_search.text.isNotEmpty ||
+                      _genre.isNotEmpty ||
+                      _status != null)
                   ? _clearFilters
                   : null,
             )
@@ -601,8 +612,14 @@ class _FeaturedMovieCarousel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final featuredMovies = movies.take(5).toList();
-    if (featuredMovies.isEmpty) return const SizedBox.shrink();
+    final featuredMovies = [...movies]
+      ..sort((a, b) {
+        final ratingCompare = b.rating.compareTo(a.rating);
+        if (ratingCompare != 0) return ratingCompare;
+        return b.releaseDate.compareTo(a.releaseDate);
+      });
+    final topFeaturedMovies = featuredMovies.take(5).toList();
+    if (topFeaturedMovies.isEmpty) return const SizedBox.shrink();
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -617,7 +634,7 @@ class _FeaturedMovieCarousel extends StatelessWidget {
                 controller: controller,
                 clipBehavior: Clip.none,
                 physics: const BouncingScrollPhysics(),
-                itemCount: featuredMovies.length,
+                itemCount: topFeaturedMovies.length,
                 itemBuilder: (context, index) {
                   final distance = (page - index).abs().clamp(0.0, 1.0);
                   final scale = 1 - distance * .12;
@@ -630,9 +647,9 @@ class _FeaturedMovieCarousel extends StatelessWidget {
                       scale: scale,
                       alignment: Alignment.topCenter,
                       child: _FeaturedMovieCard(
-                        movie: featuredMovies[index],
+                        movie: topFeaturedMovies[index],
                         active: distance < .35,
-                        onTap: () => onMovieTap(featuredMovies[index]),
+                        onTap: () => onMovieTap(topFeaturedMovies[index]),
                       ),
                     ),
                   );
@@ -826,7 +843,6 @@ class _HeroBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final banner = store.banners.firstWhere((item) => item.active);
-    final cinema = store.cinemas.first;
     return GlassCard(
       padding: EdgeInsets.zero,
       child: Container(
@@ -859,24 +875,6 @@ class _HeroBanner extends StatelessWidget {
             const SizedBox(height: 6),
             Text(banner.message),
             const SizedBox(height: 14),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Chip(
-                  avatar: const Icon(Icons.location_on_outlined),
-                  label: Text('Gần bạn: ${cinema.name}'),
-                ),
-                Chip(
-                  avatar: const Icon(Icons.map_outlined),
-                  label: Text(cinema.address),
-                ),
-                const Chip(
-                  avatar: Icon(Icons.timer_outlined),
-                  label: Text('Đặt vé trong <= 5 bước'),
-                ),
-              ],
-            ),
           ],
         ),
       ),
@@ -892,6 +890,9 @@ class _MovieCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final genres = movie.genres.take(2).join(', ');
+    final isNowShowing = movie.status == MovieStatus.nowShowing;
+
     return TiltCard(
       onTap: onTap,
       child: GlassCard(
@@ -901,6 +902,7 @@ class _MovieCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ── Poster + badges ───────────────────────────────────────
               Expanded(
                 child: Stack(
                   fit: StackFit.expand,
@@ -920,27 +922,74 @@ class _MovieCard extends StatelessWidget {
                         child: const Icon(Icons.local_movies_rounded, size: 42),
                       ),
                     ),
+                    // Gradient overlay ở đáy poster
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              AppColors.ink.withValues(alpha: .55),
+                            ],
+                            stops: const [.55, 1],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Age rating badge (top-left)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: _SmallBadge(
+                        label: movie.ageRating,
+                        color: AppColors.gold,
+                      ),
+                    ),
+                    // Status badge (top-right)
                     Positioned(
                       top: 8,
                       right: 8,
+                      child: _SmallBadge(
+                        label: isNowShowing ? 'Đang chiếu' : 'Sắp chiếu',
+                        color: isNowShowing
+                            ? const Color(0xFF1B8A5A)
+                            : const Color(0xFF1565C0),
+                      ),
+                    ),
+                    // ★ Rating badge (bottom-right)
+                    Positioned(
+                      right: 8,
+                      bottom: 8,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: .88),
-                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.white.withValues(alpha: .92),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
+                            horizontal: 7,
+                            vertical: 3,
                           ),
-                          child: Text(
-                            movie.status == MovieStatus.nowShowing
-                                ? 'Đang chiếu'
-                                : 'Sắp chiếu',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 11,
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.star_rounded,
+                                color: Colors.deepOrange,
+                                size: 13,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                movie.rating.toStringAsFixed(1),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -948,28 +997,108 @@ class _MovieCard extends StatelessWidget {
                   ],
                 ),
               ),
+              // ── Info panel ───────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.fromLTRB(9, 8, 9, 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Title
                     Text(
                       movie.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w900),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                      ),
                     ),
+                    if (genres.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      // Genres
+                      Text(
+                        genres,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.muted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 4),
-                    Text(
-                      '${movie.durationMinutes} phút - ${movie.ageRating} - ${movie.rating}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall,
+                    // Duration + Director
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.schedule_rounded,
+                          size: 11,
+                          color: AppColors.muted,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${movie.durationMinutes} phút',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(fontSize: 11, color: AppColors.muted),
+                        ),
+                        if (movie.director.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          const Text(
+                            '·',
+                            style: TextStyle(
+                              color: AppColors.muted,
+                              fontSize: 11,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              movie.director,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    fontSize: 11,
+                                    color: AppColors.muted,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Badge nhỏ dùng cho age rating và trạng thái chiếu.
+class _SmallBadge extends StatelessWidget {
+  const _SmallBadge({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .9),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 10,
           ),
         ),
       ),

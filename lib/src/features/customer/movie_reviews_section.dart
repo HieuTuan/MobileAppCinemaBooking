@@ -4,7 +4,7 @@ import '../../../api/api_client.dart';
 import '../../../api/exceptions/api_exceptions.dart';
 import '../../../models/review.dart';
 import '../../core/app_theme.dart';
-import '../../core/formatters.dart';
+import 'write_review_sheet.dart';
 
 /// Requirements 14.1–14.9: Review section with paginated list and write-review support.
 ///
@@ -140,15 +140,11 @@ class _MovieReviewsSectionState extends State<MovieReviewsSection> {
   ///
   /// Requirements: 14.1, 14.2, 14.3
   Future<void> _openWriteReviewSheet(BuildContext context) async {
-    final submitted = await showModalBottomSheet<bool>(
+    final submitted = await showWriteReviewSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _WriteReviewSheet(
-        movieId: widget.movieId,
-        userId: widget.currentUserId!,
-        api: _api,
-      ),
+      api: _api,
+      userId: widget.currentUserId!,
+      movieId: widget.movieId,
     );
 
     if (submitted == true) {
@@ -163,7 +159,10 @@ class _MovieReviewsSectionState extends State<MovieReviewsSection> {
     }
 
     if (_error != null && _reviews.isEmpty) {
-      return _ErrorView(message: _error!, onRetry: () => _fetchReviews(page: 1, replace: true));
+      return _ErrorView(
+        message: _error!,
+        onRetry: () => _fetchReviews(page: 1, replace: true),
+      );
     }
 
     if (_reviews.isEmpty) {
@@ -292,9 +291,9 @@ class _ApiReviewCardState extends State<_ApiReviewCard> {
                     const SizedBox(height: 3),
                     Text(
                       review.relativeTime,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.muted,
-                      ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
                     ),
                   ],
                 ),
@@ -334,9 +333,9 @@ class _ApiReviewCardState extends State<_ApiReviewCard> {
               const Spacer(),
               Text(
                 review.formattedDate,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.muted,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
               ),
             ],
           ),
@@ -370,11 +369,11 @@ class _VerifiedBadge extends StatelessWidget {
             width: 0.8,
           ),
         ),
-        child: Row(
+        child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.verified_rounded, size: 13, color: AppColors.success),
-            const SizedBox(width: 3),
+            SizedBox(width: 3),
             Text(
               'Đã xem',
               style: TextStyle(
@@ -408,7 +407,7 @@ class _StarRatingPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        '★ $rating/5',
+        '★ $rating/10',
         style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
       ),
     );
@@ -429,9 +428,10 @@ class _StarRow extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(5, (index) {
+        final visualRating = (rating / 2).ceil();
         return Icon(
-          index < rating ? Icons.star_rounded : Icons.star_border_rounded,
-          color: Colors.amber.shade700,
+          index < visualRating ? Icons.star_rounded : Icons.star_border_rounded,
+          color: AppColors.ink,
           size: 16,
         );
       }),
@@ -488,9 +488,7 @@ class _LoadMoreButton extends StatelessWidget {
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.ink,
           side: const BorderSide(color: AppColors.line),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         icon: const Icon(Icons.expand_more_rounded),
         label: const Text(
@@ -518,9 +516,9 @@ class _AllLoadedIndicator extends StatelessWidget {
       child: Center(
         child: Text(
           'Đã hiển thị tất cả $totalItems đánh giá',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: AppColors.muted,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
         ),
       ),
     );
@@ -561,32 +559,32 @@ class _SkeletonCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.line),
       ),
-      child: Column(
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const _SkeletonBox(width: 44, height: 44, radius: 22),
-              const SizedBox(width: 12),
+              _SkeletonBox(width: 44, height: 44, radius: 22),
+              SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     _SkeletonBox(width: 120, height: 14),
                     SizedBox(height: 6),
                     _SkeletonBox(width: 80, height: 11),
                   ],
                 ),
               ),
-              const _SkeletonBox(width: 48, height: 28, radius: 8),
+              _SkeletonBox(width: 48, height: 28, radius: 8),
             ],
           ),
-          const SizedBox(height: 12),
-          const _SkeletonBox(width: double.infinity, height: 12),
-          const SizedBox(height: 6),
-          const _SkeletonBox(width: double.infinity, height: 12),
-          const SizedBox(height: 6),
-          const _SkeletonBox(width: 160, height: 12),
+          SizedBox(height: 12),
+          _SkeletonBox(width: double.infinity, height: 12),
+          SizedBox(height: 6),
+          _SkeletonBox(width: double.infinity, height: 12),
+          SizedBox(height: 6),
+          _SkeletonBox(width: 160, height: 12),
         ],
       ),
     );
@@ -648,9 +646,9 @@ class _EmptyReviews extends StatelessWidget {
           Text(
             'Hãy là người đầu tiên đánh giá bộ phim này!',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppColors.muted,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.muted),
           ),
         ],
       ),
@@ -675,11 +673,7 @@ class _ErrorView extends StatelessWidget {
       alignment: Alignment.center,
       child: Column(
         children: [
-          const Icon(
-            Icons.cloud_off_rounded,
-            size: 44,
-            color: AppColors.muted,
-          ),
+          const Icon(Icons.cloud_off_rounded, size: 44, color: AppColors.muted),
           const SizedBox(height: 12),
           Text(
             message,
@@ -859,9 +853,9 @@ class _WriteReviewSheetState extends State<_WriteReviewSheet> {
                 const SizedBox(height: 4),
                 Text(
                   'Chia sẻ cảm nhận của bạn về bộ phim này.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.muted,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
                 ),
                 const SizedBox(height: 20),
 
@@ -888,7 +882,7 @@ class _WriteReviewSheetState extends State<_WriteReviewSheet> {
                               ? Icons.star_rounded
                               : Icons.star_border_rounded,
                           color: index < _rating
-                              ? Colors.amber.shade700
+                              ? AppColors.ink
                               : AppColors.muted,
                           size: 34,
                         ),
@@ -936,15 +930,17 @@ class _WriteReviewSheetState extends State<_WriteReviewSheet> {
                     // Live char-count update + re-validate if already shown error
                     if (_commentError != null) {
                       setState(() {
-                        _commentError =
-                            _validateComment(_commentController.text);
+                        _commentError = _validateComment(
+                          _commentController.text,
+                        );
                       });
                     } else {
                       setState(() {}); // just refresh char counter
                     }
                   },
                   decoration: InputDecoration(
-                    hintText: 'Bạn nghĩ gì về bộ phim này? (tối thiểu 10 ký tự)',
+                    hintText:
+                        'Bạn nghĩ gì về bộ phim này? (tối thiểu 10 ký tự)',
                     errorText: _commentError,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),

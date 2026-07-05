@@ -28,6 +28,10 @@ class QrTicketData {
   final List<String> seats;
 }
 
+final RegExp _bookingIdPattern = RegExp(
+  r'BK-[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}',
+);
+
 QrTicketData parseQrTicket(String value) {
   final parts = value.trim().split('|');
   if (parts.length != 5 || parts.first != 'CINELUXE') {
@@ -46,4 +50,28 @@ QrTicketData parseQrTicket(String value) {
     showtimeId: parts[3],
     seats: seats,
   );
+}
+
+String? tryExtractBookingId(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) return null;
+
+  if (trimmed.startsWith('CINELUXE|')) {
+    return parseQrTicket(trimmed).bookingId;
+  }
+
+  final match = _bookingIdPattern.firstMatch(trimmed);
+  if (match != null) {
+    return match.group(0);
+  }
+
+  return null;
+}
+
+String parseTicketBookingId(String value) {
+  final bookingId = tryExtractBookingId(value);
+  if (bookingId == null) {
+    throw const QrCodeFormatException('Không tìm thấy mã booking hợp lệ');
+  }
+  return bookingId;
 }

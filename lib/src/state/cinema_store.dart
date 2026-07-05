@@ -168,7 +168,7 @@ class CinemaStore extends ChangeNotifier {
       cast: movie.cast,
       posterUrl: movie.posterUrl,
       trailerUrl: movie.trailerUrl,
-      rating: movie.rating <= 5 ? movie.rating * 2 : movie.rating,
+      rating: movie.rating,
       ageRating: movie.ageRating,
       releaseDate: movie.releaseDate,
       status: movie.isComingSoon

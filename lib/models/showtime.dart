@@ -2,6 +2,7 @@ import 'package:json_annotation/json_annotation.dart';
 
 part 'showtime.g.dart';
 
+
 /// Showtime model representing a specific screening of a movie.
 ///
 /// **Requirements Coverage:**
@@ -72,8 +73,24 @@ class Showtime {
        coupleSeatPrice = coupleSeatPrice ?? basePrice;
 
   /// Creates an instance from JSON map
-  factory Showtime.fromJson(Map<String, dynamic> json) =>
-      _$ShowtimeFromJson(json);
+  /// Converts UTC timestamps from server to local device timezone.
+  factory Showtime.fromJson(Map<String, dynamic> json) {
+    final raw = _$ShowtimeFromJson(json);
+    return Showtime(
+      id: raw.id,
+      movieId: raw.movieId,
+      roomId: raw.roomId,
+      startTime: raw.startTime.toLocal(),
+      endTime: raw.endTime.toLocal(),
+      basePrice: raw.basePrice,
+      vipSeatPrice: raw.vipSeatPrice,
+      coupleSeatPrice: raw.coupleSeatPrice,
+      status: raw.status,
+      roomName: raw.roomName,
+      cinemaName: raw.cinemaName,
+      cinemaAddress: raw.cinemaAddress,
+    );
+  }
 
   /// Converts instance to JSON map
   Map<String, dynamic> toJson() => _$ShowtimeToJson(this);

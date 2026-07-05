@@ -111,6 +111,7 @@ class MovieRepository {
         status: status,
         page: page,
         pageSize: pageSize,
+        quiet: true,
       );
       // Chỉ cache khi không có filter (cache = toàn bộ phim)
       if (!hasFilter) {
@@ -190,7 +191,7 @@ class MovieRepository {
   Future<bool> syncMovies() async {
     try {
       final cached = await _cache.readMovies();
-      final response = await _api.getMovies();
+      final response = await _api.getMovies(quiet: true);
       await _cache.upsertMovies(response.data);
       if (!_changes.isClosed && _movieListsDiffer(cached, response.data)) {
         _changes.add(null);

@@ -12,7 +12,6 @@ import '../../../services/qr_scanner_service.dart';
 import '../../../utils/qr_code_parser.dart';
 import '../../core/app_theme.dart';
 import '../../core/formatters.dart';
-import '../../models/app_models.dart';
 import '../../shared/widgets/glass_card.dart';
 import '../../state/cinema_store.dart';
 
@@ -36,6 +35,7 @@ class _StaffTicketVerificationSectionState
   final _code = TextEditingController();
   final _apiClient = APIClient();
   ValidationResult? _validation;
+  List<BookingDetails> _lookupResults = [];
   String _message = 'Sẵn sàng quét QR hoặc nhập mã vé.';
   bool _success = false;
   bool _loading = false;
@@ -58,8 +58,9 @@ class _StaffTicketVerificationSectionState
             children: [
               TextField(
                 controller: _code,
+                onSubmitted: (_) => _lookupManual(),
                 decoration: const InputDecoration(
-                  labelText: 'Mã booking hoặc QR data',
+                  labelText: 'Mã booking, đoạn mã, tên khách hoặc QR data',
                   prefixIcon: Icon(Icons.qr_code_2_rounded),
                 ),
               ),
@@ -68,14 +69,14 @@ class _StaffTicketVerificationSectionState
                 children: [
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: _loading ? null : _verifyManual,
+                      onPressed: _loading ? null : _lookupManual,
                       icon: _loading
                           ? const SizedBox.square(
                               dimension: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Icon(Icons.verified_rounded),
-                      label: const Text('Xác thực'),
+                          : const Icon(Icons.search_rounded),
+                      label: const Text('Tìm vé'),
                       style: FilledButton.styleFrom(
                         backgroundColor: AppColors.ink,
                         foregroundColor: Colors.white,
@@ -84,13 +85,22 @@ class _StaffTicketVerificationSectionState
                   ),
                   const SizedBox(width: 10),
                   OutlinedButton.icon(
-                    onPressed: _openScanner,
+                    onPressed: _loading ? null : _openScanner,
                     icon: const Icon(Icons.qr_code_scanner_rounded),
                     label: const Text('Quét liên tục'),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
+              if (_lookupResults.isNotEmpty) ...[
+                for (final booking in _lookupResults)
+                  _LookupBookingCard(
+                    booking: booking,
+                    loading: _loading,
+                    onValidate: () => _validateBookingId(booking.bookingId),
+                  ),
+                const SizedBox(height: 4),
+              ],
               _ResultBanner(
                 message: _message,
                 success: _success,
@@ -103,28 +113,96 @@ class _StaffTicketVerificationSectionState
     );
   }
 
-  Future<void> _verifyManual() async {
+  Future<void> _lookupManual() async {
     final raw = _code.text.trim();
     if (raw.isEmpty) return;
-    var bookingId = raw;
-    if (raw.startsWith('CINELUXE|')) {
-      try {
-        bookingId = parseQrTicket(raw).bookingId;
-      } on FormatException catch (error) {
-        _showError(error.message);
+
+    try {
+      final bookingId = tryExtractBookingId(raw);
+      if (bookingId != null) {
+        await _loadBookingById(bookingId);
         return;
       }
+      await _searchManual(raw);
+    } on FormatException catch (error) {
+      _showError(error.message);
     }
+  }
+
+  Future<void> _loadBookingById(String bookingId) async {
+    setState(() {
+      _loading = true;
+      _lookupResults = [];
+      _validation = null;
+      _success = false;
+      _message = 'Đang tải thông tin vé...';
+    });
+
+    try {
+      final booking = await _apiClient.getBookingDetails(bookingId);
+      if (!mounted) return;
+      setState(() {
+        _lookupResults = [booking];
+        _message = 'Đã tìm thấy vé. Kiểm tra thông tin rồi bấm Xác thực vé.';
+        _success = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      _showError(_apiMessage(error));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _searchManual(String raw) async {
+    final query = raw.trim();
+    if (query.isEmpty) return;
+
+    setState(() {
+      _loading = true;
+      _lookupResults = [];
+      _validation = null;
+      _success = false;
+      _message = 'Đang tìm vé...';
+    });
+
+    try {
+      final looksLikeBookingCode =
+          query.toUpperCase().startsWith('BK-') ||
+          query.contains('-') ||
+          RegExp(r'^[0-9a-fA-F]{6,}$').hasMatch(query);
+      final results = await _apiClient.searchBookings(
+        bookingId: looksLikeBookingCode ? query : null,
+        customerName: looksLikeBookingCode ? null : query,
+      );
+      if (!mounted) return;
+      setState(() {
+        _lookupResults = results;
+        _message = results.isEmpty
+            ? 'Không tìm thấy vé phù hợp.'
+            : 'Tìm thấy ${results.length} vé. Chọn vé để xác thực.';
+        _success = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      _showError(_apiMessage(error));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _validateBookingId(String bookingId) async {
     setState(() => _loading = true);
     try {
       final result = await _apiClient.validateTicket(
         bookingId,
-        '', // Empty string for global showtime check-in
+        '',
         staffId: widget.store.currentUser?.id,
       );
       if (!mounted) return;
       setState(() {
         _validation = result;
+        _lookupResults = [];
         _message = 'Vé hợp lệ. Đã xác thực thành công.';
         _success = true;
       });
@@ -143,7 +221,7 @@ class _StaffTicketVerificationSectionState
       MaterialPageRoute(
         builder: (_) => _ContinuousScannerScreen(
           apiClient: _apiClient,
-          expectedShowtimeId: '', // Empty string for global showtime check-in
+          expectedShowtimeId: '',
           staffId: widget.store.currentUser?.id,
         ),
       ),
@@ -151,6 +229,7 @@ class _StaffTicketVerificationSectionState
     if (result == null || !mounted) return;
     setState(() {
       _validation = result;
+      _lookupResults = [];
       _message = 'Vé hợp lệ. Đã xác thực thành công.';
       _success = true;
     });
@@ -159,14 +238,10 @@ class _StaffTicketVerificationSectionState
   void _showError(String message) {
     setState(() {
       _validation = null;
+      _lookupResults = [];
       _message = message;
       _success = false;
     });
-  }
-
-  String _showtimeLabel(Showtime showtime) {
-    final movie = widget.store.movieById(showtime.movieId);
-    return '${movie.title} • ${shortDate(showtime.startTime)} ${shortTime(showtime.startTime)}';
   }
 }
 
@@ -216,9 +291,9 @@ class _ContinuousScannerScreenState extends State<_ContinuousScannerScreen> {
     if (_processing) return;
     setState(() => _processing = true);
     try {
-      final qr = parseQrTicket(rawCode);
+      final bookingId = parseTicketBookingId(rawCode);
       final result = await widget.apiClient.validateTicket(
-        qr.bookingId,
+        bookingId,
         widget.expectedShowtimeId,
         staffId: widget.staffId,
       );
@@ -334,6 +409,102 @@ class _ContinuousScannerScreenState extends State<_ContinuousScannerScreen> {
   }
 }
 
+class _LookupBookingCard extends StatelessWidget {
+  const _LookupBookingCard({
+    required this.booking,
+    required this.loading,
+    required this.onValidate,
+  });
+
+  final BookingDetails booking;
+  final bool loading;
+  final VoidCallback onValidate;
+
+  @override
+  Widget build(BuildContext context) {
+    final canValidate = booking.status == 'active';
+    final statusColor = switch (booking.status) {
+      'active' => AppColors.success,
+      'used' => AppColors.muted,
+      'cancelled' || 'refunded' => AppColors.danger,
+      _ => AppColors.warning,
+    };
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  booking.movieTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: .1),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  booking.status,
+                  style: TextStyle(
+                    color: statusColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            booking.bookingId,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.muted,
+              fontFamily: 'monospace',
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${shortDate(booking.showtimeDateTime)} ${shortTime(booking.showtimeDateTime)} · ${booking.roomName}',
+            style: const TextStyle(fontSize: 12, color: AppColors.muted),
+          ),
+          Text(
+            'Ghế: ${booking.seatCodes.join(', ')}',
+            style: const TextStyle(fontSize: 12, color: AppColors.muted),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: loading || !canValidate ? null : onValidate,
+              icon: const Icon(Icons.verified_rounded),
+              label: Text(canValidate ? 'Xác thực vé' : 'Không thể xác thực'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.ink,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ResultBanner extends StatelessWidget {
   const _ResultBanner({
     required this.message,
@@ -383,9 +554,28 @@ Future<void> _feedback(bool success) async {
 }
 
 String _apiMessage(Object error) {
-  if (error is DioException && error.error is ApiException) {
-    return (error.error! as ApiException).error.message;
+  String normalize(String message) {
+    if (message == 'Validation window closed') {
+      return 'Mã booking hợp lệ, nhưng chưa tới giờ check-in. Vé chỉ xác thực từ 2 giờ trước suất chiếu đến 30 phút sau giờ chiếu.';
+    }
+    if (message == 'Ticket is not active') {
+      return 'Vé chưa ở trạng thái hoạt động. Hãy kiểm tra lại thanh toán hoặc trạng thái vé.';
+    }
+    if (message == 'Ticket already validated') {
+      return 'Vé này đã được xác thực trước đó.';
+    }
+    if (message == 'Ticket cancelled, entry denied') {
+      return 'Vé đã bị hủy hoặc hoàn tiền, không thể vào cổng.';
+    }
+    if (message.startsWith('Booking not found')) {
+      return 'Không tìm thấy mã booking. Hãy nhập đủ mã, ví dụ: BK-448fd3bc-4a4b-4d03-8b6b-949377ad888a.';
+    }
+    return message;
   }
-  if (error is ApiException) return error.error.message;
+
+  if (error is DioException && error.error is ApiException) {
+    return normalize((error.error! as ApiException).error.message);
+  }
+  if (error is ApiException) return normalize(error.error.message);
   return 'Không thể xác thực vé. Vui lòng thử lại.';
 }
