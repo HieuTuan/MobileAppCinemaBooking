@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'api_tickets_screen.dart';
+import 'ai_chatbot_sheet.dart';
 import 'movie_list_screen.dart';
 import 'profile_screen.dart';
 
@@ -58,6 +59,9 @@ class _CustomerShellState extends State<CustomerShell> {
     return LuxuryScaffold(
       title: ['CineLuxe', 'Vé của tôi', 'Hồ sơ'][_index],
       actions: isLoggedIn ? _loggedInActions() : _guestActions(context),
+      floatingActionButton: isLoggedIn
+          ? AiChatbotButton(store: widget.store)
+          : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (value) {
@@ -97,11 +101,7 @@ class _CustomerShellState extends State<CustomerShell> {
         borderRadius: BorderRadius.circular(20),
         child: const Padding(
           padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Icon(
-            Icons.logout_rounded,
-            color: Colors.white,
-            size: 22,
-          ),
+          child: Icon(Icons.logout_rounded, color: Colors.white, size: 22),
         ),
       ),
     ];
